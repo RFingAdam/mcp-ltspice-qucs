@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "purpose": "FCC Part 15.247 generic 902-928 MHz harmonic suppression sanity check (out-of-band -41.2 dBm/MHz, in-restricted-bands -41.2 dBm/MHz)",
+    "source": "47 CFR §15.247(d) and §15.209"
+  },
+  "passband": {
+    "f_start": 902e6,
+    "f_stop": 928e6,
+    "il_max_db": 1.0,
+    "rl_min_db": 10
+  },
+  "stopband_targets": [
+    {"freq": 1820e6, "rejection_min_db": 50, "label": "2H avg"},
+    {"freq": 2745e6, "rejection_min_db": 40, "label": "3H avg"},
+    {"freq": 3660e6, "rejection_min_db": 40, "label": "4H avg"}
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "source": "ITU Radio Regulations Article 5; FCC Part 15; ETSI EN 300 220 / 300 328 / 301 893",
+    "notes": "Allocation by ITU region (1 = EMEA, 2 = Americas, 3 = APAC).",
+    "last_updated": "2026-04-22"
+  },
+  "bands": [
+    {"label": "13.56 MHz",   "f_low": 13.553e6,  "f_high": 13.567e6,  "regions": [1,2,3], "notes": "RFID, NFC"},
+    {"label": "27 MHz",      "f_low": 26.957e6,  "f_high": 27.283e6,  "regions": [1,2,3], "notes": "CB, RC toys"},
+    {"label": "40 MHz",      "f_low": 40.66e6,   "f_high": 40.7e6,    "regions": [1,2,3]},
+    {"label": "433 MHz",     "f_low": 433.05e6,  "f_high": 434.79e6,  "regions": [1],     "notes": "EMEA SRD; remote keyless entry"},
+    {"label": "868 MHz",     "f_low": 863e6,     "f_high": 870e6,     "regions": [1],     "notes": "EMEA SRD per EN 300 220 (subbands)"},
+    {"label": "915 MHz",     "f_low": 902e6,     "f_high": 928e6,     "regions": [2],     "notes": "FCC Part 15.247; HaLow Wi-Fi NA channels here"},
+    {"label": "920 MHz JP",  "f_low": 920.5e6,   "f_high": 928.1e6,   "regions": [3],     "notes": "Japan SRD"},
+    {"label": "2.4 GHz",     "f_low": 2400e6,    "f_high": 2483.5e6,  "regions": [1,2,3], "notes": "BLE, WiFi 2.4G, Zigbee, microwave ovens"},
+    {"label": "5.8 GHz",     "f_low": 5725e6,    "f_high": 5875e6,    "regions": [1,2,3], "notes": "FCC U-NII-3, ETSI 5.8 GHz SRD"},
+    {"label": "5 GHz UNII",  "f_low": 5150e6,    "f_high": 5925e6,    "regions": [1,2,3], "notes": "WiFi 5/6 across U-NII-1..U-NII-4"},
+    {"label": "6 GHz UNII",  "f_low": 5925e6,    "f_high": 7125e6,    "regions": [2],     "notes": "FCC 6 GHz unlicensed (U-NII-5..8) for WiFi 6E/7"},
+    {"label": "24 GHz",      "f_low": 24e9,      "f_high": 24.25e9,   "regions": [1,2,3], "notes": "ISM"},
+    {"label": "60 GHz",      "f_low": 57e9,      "f_high": 71e9,      "regions": [1,2,3], "notes": "WiGig / 802.11ad/ay"}
+  ]
+}

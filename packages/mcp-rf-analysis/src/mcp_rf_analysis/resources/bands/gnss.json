@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "source": "GPS ICD-GPS-705 (L5), IS-GPS-200 (L1, L2), Galileo OS SIS ICD, GLONASS ICD, BDS-SIS-ICD-OS-B1C/B2A",
+    "notes": "Center frequencies in Hz; bandwidth in Hz. Sensitivity from typical commercial GNSS receivers (-130 dBm acquisition, -160 dBm tracking).",
+    "last_updated": "2026-04-22"
+  },
+  "bands": [
+    {"system": "GPS",     "signal": "L1 C/A",  "f_center": 1575.42e6, "bandwidth": 2.046e6,  "sensitivity_dbm_acq": -130, "sensitivity_dbm_track": -160},
+    {"system": "GPS",     "signal": "L2C",     "f_center": 1227.60e6, "bandwidth": 2.046e6,  "sensitivity_dbm_acq": -130, "sensitivity_dbm_track": -158},
+    {"system": "GPS",     "signal": "L5",      "f_center": 1176.45e6, "bandwidth": 20.46e6,  "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "GLONASS", "signal": "L1OF",    "f_center": 1602.0e6,  "bandwidth": 8.0e6,    "sensitivity_dbm_acq": -130, "sensitivity_dbm_track": -160, "notes": "FDMA channels 1602 + k*0.5625 MHz, k=-7..6"},
+    {"system": "GLONASS", "signal": "L2OF",    "f_center": 1246.0e6,  "bandwidth": 6.0e6,    "sensitivity_dbm_acq": -130, "sensitivity_dbm_track": -158},
+    {"system": "Galileo", "signal": "E1",      "f_center": 1575.42e6, "bandwidth": 24.552e6, "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "Galileo", "signal": "E5a",     "f_center": 1176.45e6, "bandwidth": 20.46e6,  "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "Galileo", "signal": "E5b",     "f_center": 1207.14e6, "bandwidth": 20.46e6,  "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "Galileo", "signal": "E6",      "f_center": 1278.75e6, "bandwidth": 40.92e6,  "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "BeiDou",  "signal": "B1I",     "f_center": 1561.098e6,"bandwidth": 4.092e6,  "sensitivity_dbm_acq": -130, "sensitivity_dbm_track": -160},
+    {"system": "BeiDou",  "signal": "B1C",     "f_center": 1575.42e6, "bandwidth": 32.736e6, "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "BeiDou",  "signal": "B2a",     "f_center": 1176.45e6, "bandwidth": 20.46e6,  "sensitivity_dbm_acq": -127, "sensitivity_dbm_track": -157},
+    {"system": "BeiDou",  "signal": "B3",      "f_center": 1268.52e6, "bandwidth": 20.46e6,  "sensitivity_dbm_acq": -130, "sensitivity_dbm_track": -160}
+  ]
+}

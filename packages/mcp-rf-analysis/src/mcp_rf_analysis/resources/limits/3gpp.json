@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "source": "3GPP TS 36.101 §6.6 (UE general spurious emission), TS 38.101-1 §6.5.3 (UE FR1 spurious)",
+    "notes": "General UE spurious limits (out-of-band emissions outside the assigned channel + adjacent guard).",
+    "last_updated": "2026-04-22"
+  },
+  "limits": {
+    "3gpp_ts_36_101_ue_spurious": {
+      "scope": "LTE UE general spurious",
+      "ranges": [
+        {"f_low": 9e3,    "f_high": 150e3,  "limit_dbm": -36, "rbw_hz": 1e3},
+        {"f_low": 150e3,  "f_high": 30e6,   "limit_dbm": -36, "rbw_hz": 10e3},
+        {"f_low": 30e6,   "f_high": 1000e6, "limit_dbm": -36, "rbw_hz": 100e3},
+        {"f_low": 1000e6, "f_high": 12750e6,"limit_dbm": -30, "rbw_hz": 1e6}
+      ],
+      "notes": "Tighter limits apply within victim band protection windows (see TS 36.101 Tables 6.6.3.2-1 and -2)."
+    },
+    "3gpp_ts_38_101_1_ue_spurious_fr1": {
+      "scope": "5G NR UE general spurious (FR1)",
+      "ranges": [
+        {"f_low": 30e6,   "f_high": 1000e6, "limit_dbm": -36, "rbw_hz": 100e3},
+        {"f_low": 1000e6, "f_high": 12750e6,"limit_dbm": -30, "rbw_hz": 1e6}
+      ]
+    },
+    "3gpp_gnss_protection": {
+      "scope": "GNSS coexistence (3GPP TS 36.101 Table 6.6.3.2-2)",
+      "ranges": [
+        {"f_low": 1559e6, "f_high": 1610e6, "limit_dbm": -57, "rbw_hz": 1e6, "notes": "GPS L1 / Galileo E1 / BeiDou B1 protection"},
+        {"f_low": 1164e6, "f_high": 1215e6, "limit_dbm": -57, "rbw_hz": 1e6, "notes": "GPS L5 / Galileo E5 / BeiDou B2"},
+        {"f_low": 1215e6, "f_high": 1300e6, "limit_dbm": -57, "rbw_hz": 1e6, "notes": "GPS L2 / Galileo E6 / GLONASS L2"}
+      ]
+    }
+  }
+}

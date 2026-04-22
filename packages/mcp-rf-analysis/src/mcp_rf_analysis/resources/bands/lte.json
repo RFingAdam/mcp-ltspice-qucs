@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "source": "3GPP TS 36.101 v18.4.0 Table 5.5-1 (E-UTRA Operating Bands)",
+    "notes": "Frequencies in Hz. Bands 1-46 + selected supplementary downlink. f_ul/f_dl pairs are UE TX / UE RX respectively.",
+    "last_updated": "2026-04-22"
+  },
+  "bands": [
+    {"band": 1, "duplex": "FDD", "region": "Asia/EMEA", "f_ul": [1920e6, 1980e6], "f_dl": [2110e6, 2170e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 2, "duplex": "FDD", "region": "Americas", "f_ul": [1850e6, 1910e6], "f_dl": [1930e6, 1990e6], "bandwidth_mhz": [1.4,3,5,10,15,20]},
+    {"band": 3, "duplex": "FDD", "region": "Global", "f_ul": [1710e6, 1785e6], "f_dl": [1805e6, 1880e6], "bandwidth_mhz": [1.4,3,5,10,15,20]},
+    {"band": 4, "duplex": "FDD", "region": "Americas", "f_ul": [1710e6, 1755e6], "f_dl": [2110e6, 2155e6], "bandwidth_mhz": [1.4,3,5,10,15,20]},
+    {"band": 5, "duplex": "FDD", "region": "Americas", "f_ul": [824e6, 849e6], "f_dl": [869e6, 894e6], "bandwidth_mhz": [1.4,3,5,10]},
+    {"band": 7, "duplex": "FDD", "region": "EMEA", "f_ul": [2500e6, 2570e6], "f_dl": [2620e6, 2690e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 8, "duplex": "FDD", "region": "Global", "f_ul": [880e6, 915e6], "f_dl": [925e6, 960e6], "bandwidth_mhz": [1.4,3,5,10]},
+    {"band": 9, "duplex": "FDD", "region": "Japan", "f_ul": [1749.9e6, 1784.9e6], "f_dl": [1844.9e6, 1879.9e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 10, "duplex": "FDD", "region": "Americas", "f_ul": [1710e6, 1770e6], "f_dl": [2110e6, 2170e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 11, "duplex": "FDD", "region": "Japan", "f_ul": [1427.9e6, 1447.9e6], "f_dl": [1475.9e6, 1495.9e6], "bandwidth_mhz": [5,10]},
+    {"band": 12, "duplex": "FDD", "region": "Americas", "f_ul": [699e6, 716e6], "f_dl": [729e6, 746e6], "bandwidth_mhz": [1.4,3,5,10]},
+    {"band": 13, "duplex": "FDD", "region": "Americas", "f_ul": [777e6, 787e6], "f_dl": [746e6, 756e6], "bandwidth_mhz": [5,10]},
+    {"band": 14, "duplex": "FDD", "region": "Americas", "f_ul": [788e6, 798e6], "f_dl": [758e6, 768e6], "bandwidth_mhz": [5,10]},
+    {"band": 17, "duplex": "FDD", "region": "Americas", "f_ul": [704e6, 716e6], "f_dl": [734e6, 746e6], "bandwidth_mhz": [5,10]},
+    {"band": 18, "duplex": "FDD", "region": "Japan", "f_ul": [815e6, 830e6], "f_dl": [860e6, 875e6], "bandwidth_mhz": [5,10,15]},
+    {"band": 19, "duplex": "FDD", "region": "Japan", "f_ul": [830e6, 845e6], "f_dl": [875e6, 890e6], "bandwidth_mhz": [5,10,15]},
+    {"band": 20, "duplex": "FDD", "region": "EMEA", "f_ul": [832e6, 862e6], "f_dl": [791e6, 821e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 21, "duplex": "FDD", "region": "Japan", "f_ul": [1447.9e6, 1462.9e6], "f_dl": [1495.9e6, 1510.9e6], "bandwidth_mhz": [5,10,15]},
+    {"band": 25, "duplex": "FDD", "region": "Americas", "f_ul": [1850e6, 1915e6], "f_dl": [1930e6, 1995e6], "bandwidth_mhz": [1.4,3,5,10,15,20]},
+    {"band": 26, "duplex": "FDD", "region": "Americas", "f_ul": [814e6, 849e6], "f_dl": [859e6, 894e6], "bandwidth_mhz": [1.4,3,5,10,15]},
+    {"band": 28, "duplex": "FDD", "region": "APAC/EMEA", "f_ul": [703e6, 748e6], "f_dl": [758e6, 803e6], "bandwidth_mhz": [3,5,10,15,20]},
+    {"band": 29, "duplex": "SDL", "region": "Americas", "f_ul": null, "f_dl": [717e6, 728e6], "bandwidth_mhz": [3,5,10]},
+    {"band": 30, "duplex": "FDD", "region": "Americas", "f_ul": [2305e6, 2315e6], "f_dl": [2350e6, 2360e6], "bandwidth_mhz": [5,10]},
+    {"band": 32, "duplex": "SDL", "region": "EMEA", "f_ul": null, "f_dl": [1452e6, 1496e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 38, "duplex": "TDD", "region": "EMEA", "f_ul": [2570e6, 2620e6], "f_dl": [2570e6, 2620e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 39, "duplex": "TDD", "region": "China", "f_ul": [1880e6, 1920e6], "f_dl": [1880e6, 1920e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 40, "duplex": "TDD", "region": "Asia", "f_ul": [2300e6, 2400e6], "f_dl": [2300e6, 2400e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 41, "duplex": "TDD", "region": "Global", "f_ul": [2496e6, 2690e6], "f_dl": [2496e6, 2690e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 42, "duplex": "TDD", "region": "Global", "f_ul": [3400e6, 3600e6], "f_dl": [3400e6, 3600e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 43, "duplex": "TDD", "region": "Global", "f_ul": [3600e6, 3800e6], "f_dl": [3600e6, 3800e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 46, "duplex": "TDD", "region": "Global (LAA)", "f_ul": [5150e6, 5925e6], "f_dl": [5150e6, 5925e6], "bandwidth_mhz": [10,20]},
+    {"band": 48, "duplex": "TDD", "region": "Americas (CBRS)", "f_ul": [3550e6, 3700e6], "f_dl": [3550e6, 3700e6], "bandwidth_mhz": [5,10,15,20]},
+    {"band": 66, "duplex": "FDD", "region": "Americas (AWS-3)", "f_ul": [1710e6, 1780e6], "f_dl": [2110e6, 2200e6], "bandwidth_mhz": [1.4,3,5,10,15,20]},
+    {"band": 71, "duplex": "FDD", "region": "Americas (600 MHz)", "f_ul": [663e6, 698e6], "f_dl": [617e6, 652e6], "bandwidth_mhz": [5,10,15,20]}
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "purpose": "HaLow (902-928 MHz, US/FCC) PA harmonic suppression LPF for a multi-radio device coexisting with LTE B2/B3/B4/B25 + WiFi 2.4G + GNSS",
+    "source": "Derived from FCC Part 15.247 spurious limits and 3GPP TS 36.101 Table 6.6.3.2-2 GNSS protection"
+  },
+  "passband": {
+    "f_start": 1.0e6,
+    "f_stop": 928e6,
+    "il_max_db": 0.5,
+    "rl_min_db": 15
+  },
+  "stopband_targets": [
+    {"freq": 1575.42e6, "rejection_min_db": 30, "label": "GPS L1 protection"},
+    {"freq": 1730e6,    "rejection_min_db": 55, "label": "EU 2f0 (LTE B3 UL collision)"},
+    {"freq": 1853e6,    "rejection_min_db": 55, "label": "NA 2f0 (LTE B25 DL collision)"},
+    {"freq": 2400e6,    "rejection_min_db": 30, "label": "ISM 2.4 GHz low edge (BLE/WiFi)"},
+    {"freq": 2484e6,    "rejection_min_db": 30, "label": "ISM 2.4 GHz high edge"},
+    {"freq": 2780e6,    "rejection_min_db": 40, "label": "NA 3f0 (LTE B7/B41)"}
+  ]
+}
