@@ -1,0 +1,21 @@
+name: Question / discussion
+description: Ask how to do something, propose a workflow, or discuss design.
+title: "[q] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions are welcome here. For broader open-ended chats, GitHub
+        Discussions on this repo is also a good place.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What's on your mind?
+      description: |
+        For "how do I" questions, including the workflow you're trying
+        to accomplish and what you've already tried makes the answer
+        much faster.
+    validations:
+      required: true

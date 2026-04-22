@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Python deps for each workspace package
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      dev-tools:
+        patterns:
+          - "ruff"
+          - "mypy"
+          - "pytest*"
+          - "pre-commit"
+          - "mkdocs*"
+      runtime:
+        patterns:
+          - "scikit-rf"
+          - "scipy"
+          - "numpy"
+          - "pydantic*"
+          - "fastmcp"
+          - "spicelib"
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"

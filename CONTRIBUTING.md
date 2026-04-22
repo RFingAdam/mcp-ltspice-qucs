@@ -13,9 +13,10 @@ uv sync --all-packages
 uv run pytest -q
 ```
 
-You should see ~150 tests pass. Two tests for the LTspice / ngspice
-runner skip by default; install one or both simulators (see
-[`docs/installation.md`](docs/installation.md)) to enable them.
+You should see ~180 tests pass. Two tests for the LTspice / ngspice
+runner skip by default; install one or both simulators (see the
+[Installation guide](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/docs/installation.md))
+to enable them.
 
 ## Layout
 
@@ -26,7 +27,7 @@ The repo is a uv workspace with four packages under `packages/`:
 - `mcp-rf-analysis` — skrf wrappers, regulatory band DBs, coex matrix
 - `mcp-qucs-s` — Qucs-S native S-param + harmonic balance + microstrip
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the inter-server contract.
+See [ARCHITECTURE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/ARCHITECTURE.md) for the inter-server contract.
 
 ## Running tests
 
@@ -76,7 +77,7 @@ Three steps:
 2. Depend on `rf-mcp-common` so the envelope and Touchstone helpers
    are available — don't reimplement either.
 3. Use Touchstone files for any inter-server data exchange. The
-   contract is documented in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+   contract is documented in [ARCHITECTURE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/ARCHITECTURE.md).
 
 ## Testing conventions
 

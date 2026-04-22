@@ -9,6 +9,37 @@ grouped by package.
 
 ## [Unreleased]
 
+### `mcp-qucs-s`
+- Implemented all 4 closed-form synthesis tools (no Qucs-S install required):
+  - `synthesize_microstrip_line` — Hammerstad-Jensen W/L from Z₀
+  - `analyze_microstrip_tool` — Z₀ / ε_eff / wavelength from W
+  - `synthesize_coupler` — branch-line / rat-race / coupled-line / Lange
+  - `lumped_to_distributed` — Richards transformation + Kuroda identities
+- Implemented all 4 simulator-driven tools with graceful degradation:
+  - `run_sp_analysis`, `extract_noise_parameters`, `export_touchstone`,
+    `run_harmonic_balance` return clean error envelopes when Qucs-S /
+    Xyce are missing instead of crashing
+- Added `status` tool for capability discovery
+- Qucs-S `.dat` parser + Touchstone exporter
+
+### Docs / branding
+- Logo SVG (full and mark variants) under `assets/`
+- mkdocs-material site at `mkdocs.yml` with auto-generated tool API docs
+  via mkdocstrings
+- Per-page docs: index, getting-started, architecture, installation,
+  tool-catalog, examples, reference (envelope / Touchstone / E-series),
+  contributing, changelog, security
+- `.github/workflows/docs.yml` builds and deploys to GitHub Pages
+
+### Repo conventions
+- Issue templates: bug, feature, question (config disables blank issues)
+- Pull request template
+- CODEOWNERS
+- Dependabot config (weekly, grouped dev-tools / runtime / actions)
+- Code of Conduct (Contributor Covenant 2.1)
+
+
+
 ## [0.1.0] — 2026-04-22
 
 Initial release of the four-package monorepo.
@@ -60,8 +91,8 @@ Initial release of the four-package monorepo.
 - Link budget tools (Friis, log-distance, antenna isolation, desense)
 
 ### `mcp-qucs-s` 0.1.0
-- Skeleton scaffold; full implementation pending
-  ([#issue-link](https://github.com/RFingAdam/mcp-ltspice-qucs/issues))
+- Initial scaffold + status tool. Full implementation lands in
+  Unreleased above.
 
 ### Examples
 - `examples/halow_lpf/`: full end-to-end design of a 9th-order
