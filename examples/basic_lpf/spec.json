@@ -1,0 +1,14 @@
+{
+  "_purpose": "Generic 5th-order Butterworth LPF showing the synth -> evaluate -> render -> Monte Carlo workflow. Cutoff 1 GHz, 50 ohm.",
+  "passband": {
+    "f_start": 1000000,
+    "f_stop": 600000000,
+    "il_max_db": 0.5,
+    "rl_min_db": 14
+  },
+  "stopband_targets": [
+    {"freq": 2000000000,  "rejection_min_db": 30, "label": "2 x fc"},
+    {"freq": 3000000000,  "rejection_min_db": 45, "label": "3 x fc"},
+    {"freq": 5000000000,  "rejection_min_db": 60, "label": "5 x fc"}
+  ]
+}

@@ -32,13 +32,13 @@ exchange format and return a uniform [response envelope](reference/envelope.md).
 
 ## Headline demo
 
-The [HaLow LPF example](examples/halow-lpf.md) finalizes a 9th-order
-elliptic low-pass filter for an 802.11ah HaLow + LTE + WiFi + BLE +
-GNSS device, hitting **all 8 coex spec targets** with **86.6% Monte
-Carlo yield** at 2% component tolerance — entirely through MCP tool
-calls.
+The [basic LPF example](examples/basic-lpf.md) synthesizes a 5th-order
+Butterworth low-pass filter at 1 GHz, substitutes Coilcraft 0402HP +
+Murata GJM C0G real parts, and runs a 1000-trial Monte Carlo at 5%
+component tolerance — entirely through MCP tool calls. **All 5 spec
+criteria pass with 99% yield.**
 
-![HaLow LPF response](assets/halow-lpf-response.png){ loading=lazy }
+![Basic LPF response](assets/basic-lpf-response.png){ loading=lazy }
 
 ## Quickstart
 

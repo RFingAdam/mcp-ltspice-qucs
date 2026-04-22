@@ -4,4 +4,16 @@ End-to-end walkthroughs that exercise multiple tools together.
 
 | Example | What it shows |
 |---|---|
-| [HaLow LPF](halow-lpf.md) | 9th-order elliptic low-pass filter for an 802.11ah HaLow + LTE + WiFi + BLE + GNSS device. Synthesis → zero placement → vendor substitution → optimization → Monte Carlo yield. |
+| [Basic LPF](basic-lpf.md) | 5th-order Butterworth low-pass filter at 1 GHz. Synthesis → vendor substitution → spec evaluation → Monte Carlo yield. Generic — no application-specific values. |
+
+## Running your own designs privately
+
+The repo gitignores three folders by convention so your in-progress
+designs don't accidentally get pushed:
+
+- `examples/halow_lpf/`
+- `examples/private/`
+- `examples/_local/`
+
+Drop your `design.py` + `spec.json` into any of those and you can use
+the full toolchain locally without worrying about visibility.

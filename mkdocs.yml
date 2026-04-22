@@ -110,7 +110,7 @@ nav:
       - mcp-qucs-s: tools/qucs-s.md
   - Examples:
       - Overview: examples/index.md
-      - HaLow LPF: examples/halow-lpf.md
+      - Basic LPF: examples/basic-lpf.md
   - Reference:
       - Touchstone interop: reference/touchstone.md
       - Envelope contract: reference/envelope.md
