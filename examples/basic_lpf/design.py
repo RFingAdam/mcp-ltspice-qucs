@@ -73,7 +73,9 @@ def main() -> None:
     real_comps = {ref: info["snapped_value"] for ref, info in parts.items()}
     for ref, info in sorted(parts.items()):
         delta = (info["snapped_value"] - info["ideal_value"]) / info["ideal_value"] * 100
-        print(f"   {ref}: ideal {info['ideal_value']:.3e} -> {info['snapped_value']:.3e} ({delta:+.1f}%)")
+        print(
+            f"   {ref}: ideal {info['ideal_value']:.3e} -> {info['snapped_value']:.3e} ({delta:+.1f}%)"
+        )
 
     final_s2p = _write_s2p(real_comps, HERE / "basic_lpf.s2p")
     asc = generate_lpf_asc(real_comps, HERE / "basic_lpf.asc")
@@ -109,9 +111,9 @@ def main() -> None:
     )
     print(f"   yield: {mc.yield_pct:.1f}% ({mc.n_passing}/{mc.n_runs})")
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"VERDICT: {check.overall.upper()}  |  MC yield: {mc.yield_pct:.1f}%")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
 
 
 if __name__ == "__main__":
