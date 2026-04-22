@@ -1,0 +1,1 @@
+--8<-- "examples/halow_lpf/README.md"

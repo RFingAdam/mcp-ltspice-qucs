@@ -1,0 +1,125 @@
+site_name: mcp-ltspice-qucs
+site_description: |
+  A three-server Model Context Protocol suite for RF filter design and
+  multi-radio coexistence engineering — LTspice, Qucs-S, and skrf-based
+  analysis, all speaking Touchstone.
+site_url: https://RFingAdam.github.io/mcp-ltspice-qucs/
+repo_url: https://github.com/RFingAdam/mcp-ltspice-qucs
+repo_name: RFingAdam/mcp-ltspice-qucs
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 Adam Engelbrecht — Apache-2.0
+
+theme:
+  name: material
+  logo: assets/logo-mark.svg
+  favicon: assets/logo-mark.svg
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - packages/rf-mcp-common/src
+            - packages/mcp-ltspice/src
+            - packages/mcp-rf-analysis/src
+            - packages/mcp-qucs-s/src
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            merge_init_into_class: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture: architecture.md
+  - Installation: installation.md
+  - Tool catalog:
+      - Overview: tool-catalog.md
+      - mcp-ltspice: tools/ltspice.md
+      - mcp-rf-analysis: tools/rf-analysis.md
+      - mcp-qucs-s: tools/qucs-s.md
+  - Examples:
+      - Overview: examples/index.md
+      - HaLow LPF: examples/halow-lpf.md
+  - Reference:
+      - Touchstone interop: reference/touchstone.md
+      - Envelope contract: reference/envelope.md
+      - E-series snap: reference/e-series.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - Security: security.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/RFingAdam/mcp-ltspice-qucs
