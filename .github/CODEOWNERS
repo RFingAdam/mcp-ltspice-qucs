@@ -1,0 +1,12 @@
+# Default reviewer for everything
+*       @RFingAdam
+
+# Per-package owners (extend later as the project grows)
+/packages/rf-mcp-common/        @RFingAdam
+/packages/mcp-ltspice/          @RFingAdam
+/packages/mcp-rf-analysis/      @RFingAdam
+/packages/mcp-qucs-s/           @RFingAdam
+
+# Docs and CI
+/docs/                          @RFingAdam
+/.github/                       @RFingAdam

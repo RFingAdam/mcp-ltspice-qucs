@@ -1,0 +1,92 @@
+name: Bug report
+description: A tool produces wrong output, crashes, or otherwise misbehaves.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill in the fields below so we can
+        reproduce. If you can attach a minimal `.s2p` / `.asc` /
+        component dict that triggers the issue, that's gold.
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which MCP server is affected?
+      options:
+        - mcp-ltspice
+        - mcp-rf-analysis
+        - mcp-qucs-s
+        - rf-mcp-common
+        - more than one / unsure
+    validations:
+      required: true
+
+  - type: input
+    id: tool
+    attributes:
+      label: Tool name
+      description: e.g. synthesize_lc_filter, check_coex_matrix, run_sp_analysis
+      placeholder: "e.g. optimize_filter"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Actual vs expected behavior. Include the input arguments and the
+        envelope you got back.
+      placeholder: |
+        I called `synthesize_lc_filter(filter_type="elliptic", order=11, ...)` and
+        got `status="error"` with message "...". I expected ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal Python or MCP call that reproduces the issue.
+      render: python
+      placeholder: |
+        from mcp_ltspice.synthesis import synthesize_lc_lpf
+        d = synthesize_lc_lpf("elliptic", order=11, cutoff_hz=1e9)
+        ...
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version(s)
+      description: Run `uv pip list | grep mcp` and paste the line(s)
+      placeholder: "mcp-ltspice 0.1.0"
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.13.7"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other (please specify in description)
+
+  - type: textarea
+    id: simulator
+    attributes:
+      label: Simulator state (if relevant)
+      description: |
+        Output of `which ngspice; which qucs-s; ls $LTSPICE_PATH 2>/dev/null`
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Logs, traceback, screenshots, related issues, ideas for a fix.

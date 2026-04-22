@@ -1,0 +1,58 @@
+name: Feature request
+description: Propose a new tool or capability.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! For new tools, the most useful issues
+        describe a *workflow* the tool would unlock — not just an API
+        signature in isolation.
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: What problem are you solving?
+      description: |
+        What does the workflow look like today? Where does it break
+        down? An example with concrete frequencies / components / specs
+        is more useful than an abstract description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        What new tool or change to an existing tool would help? If you
+        have an API sketch, paste it as a code block — but the *what*
+        matters more than the *how*.
+      render: python
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing tools you tried, why they don't work.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - New tool in an existing server
+        - New server in the suite
+        - New regulatory / band data
+        - New vendor model bundle
+        - Workflow / docs / example improvement
+        - Other
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Are you interested in contributing?
+      options:
+        - label: I'd be willing to open a PR for this.
+        - label: I can review a PR if someone else writes it.
