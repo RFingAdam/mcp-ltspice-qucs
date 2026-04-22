@@ -73,7 +73,7 @@ jobs:
         run: uv run pytest -q --cov --cov-report=xml --cov-report=term
 
   example:
-    name: HaLow LPF design example
+    name: Basic LPF design example
     runs-on: ubuntu-latest
     needs: test
     steps:
@@ -91,15 +91,14 @@ jobs:
       - name: Sync workspace
         run: uv sync --all-packages
 
-      - name: Run HaLow LPF design
-        run: uv run python examples/halow_lpf/design.py
+      - name: Run basic LPF design
+        run: uv run python examples/basic_lpf/design.py
 
       - name: Upload generated artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: halow_lpf_outputs
+          name: basic_lpf_outputs
           path: |
-            examples/halow_lpf/final.s2p
-            examples/halow_lpf/final.asc
-            examples/halow_lpf/response.png
-            examples/halow_lpf/report.md
+            examples/basic_lpf/basic_lpf.s2p
+            examples/basic_lpf/basic_lpf.asc
+            examples/basic_lpf/response.png

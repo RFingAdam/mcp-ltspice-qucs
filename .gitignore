@@ -72,5 +72,12 @@ site/
 .env.local
 *.local.json
 
+# Private design experiments — these stay local for review and don't
+# get pushed. Add a gitkeep'd subfolder under examples/ to share an
+# example you want public.
+examples/halow_lpf/
+examples/private/
+examples/_local/
+
 # pre-commit
 .pre-commit-cache/

@@ -79,5 +79,5 @@ list tools and call `synthesize_lc_filter`.
   three-server layout and the Touchstone interop contract.
 - Browse the [Tool Catalog](tool-catalog.md) for the full list of
   available tools.
-- Try the [HaLow LPF example](examples/halow-lpf.md) end-to-end to see
+- Try the [basic LPF example](examples/basic-lpf.md) end-to-end to see
   the workflow in action.
