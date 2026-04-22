@@ -27,6 +27,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_ltspice"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"resources" = "mcp_ltspice/resources"

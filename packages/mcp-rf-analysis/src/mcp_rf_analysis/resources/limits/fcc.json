@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "source": "47 CFR Part 15.247 (intentional radiators in 902-928, 2400-2483.5, 5725-5850 MHz)",
+    "notes": "Conducted-output limits; spurious limit references §15.209 (-41.2 dBm/MHz from 30-1000 MHz, -41.2 dBm in 1 MHz above). Restricted bands per §15.205.",
+    "last_updated": "2026-04-22"
+  },
+  "limits": {
+    "fcc_part15_247_915mhz": {
+      "band_label": "902-928 MHz ISM",
+      "f_low": 902e6,
+      "f_high": 928e6,
+      "max_conducted_power_dbm": 30,
+      "max_eirp_dbm": 36,
+      "spurious_outside_band_dbm_mhz": -41.2,
+      "spurious_in_restricted_dbm_mhz": -41.2,
+      "antenna_gain_max_dbi_no_offset": 6,
+      "modulation_required": ["FHSS", "DSSS", "DTS"]
+    },
+    "fcc_part15_247_24ghz": {
+      "band_label": "2400-2483.5 MHz ISM",
+      "f_low": 2400e6,
+      "f_high": 2483.5e6,
+      "max_conducted_power_dbm": 30,
+      "max_eirp_dbm": 36,
+      "spurious_outside_band_dbm_mhz": -41.2,
+      "antenna_gain_max_dbi_no_offset": 6
+    },
+    "fcc_part15_247_58ghz": {
+      "band_label": "5725-5850 MHz",
+      "f_low": 5725e6,
+      "f_high": 5850e6,
+      "max_conducted_power_dbm": 30,
+      "max_eirp_dbm": 36,
+      "spurious_outside_band_dbm_mhz": -41.2
+    }
+  },
+  "restricted_bands": [
+    {"f_low": 0.090e6,    "f_high": 0.110e6,   "notes": "LF nav"},
+    {"f_low": 90.254e6,   "f_high": 90.384e6,  "notes": "FAA radar"},
+    {"f_low": 108e6,      "f_high": 121.94e6,  "notes": "VHF aviation"},
+    {"f_low": 123e6,      "f_high": 138e6,     "notes": "VHF aviation"},
+    {"f_low": 149.9e6,    "f_high": 150.05e6,  "notes": "Maritime"},
+    {"f_low": 156.52475e6,"f_high": 156.52525e6,"notes": "AIS"},
+    {"f_low": 156.7e6,    "f_high": 156.9e6,   "notes": "Maritime"},
+    {"f_low": 162.0125e6, "f_high": 167.17e6,  "notes": "Maritime"},
+    {"f_low": 167.72e6,   "f_high": 173.2e6,   "notes": "Maritime"},
+    {"f_low": 240e6,      "f_high": 285e6,     "notes": "Government"},
+    {"f_low": 322e6,      "f_high": 335.4e6,   "notes": "Radio astronomy"},
+    {"f_low": 399.9e6,    "f_high": 410e6,     "notes": "Mobile satellite"},
+    {"f_low": 608e6,      "f_high": 614e6,     "notes": "Radio astronomy"},
+    {"f_low": 960e6,      "f_high": 1240e6,    "notes": "Aviation radar"},
+    {"f_low": 1300e6,     "f_high": 1427e6,    "notes": "Aviation, GPS L2"},
+    {"f_low": 1435e6,     "f_high": 1626.5e6,  "notes": "GPS L1, telemetry"},
+    {"f_low": 1645.5e6,   "f_high": 1646.5e6,  "notes": "Inmarsat"},
+    {"f_low": 1660e6,     "f_high": 1710e6,    "notes": "Radio astronomy"},
+    {"f_low": 1718.8e6,   "f_high": 1722.2e6,  "notes": "Radio astronomy"},
+    {"f_low": 2200e6,     "f_high": 2300e6,    "notes": "Government, telemetry"},
+    {"f_low": 2310e6,     "f_high": 2390e6,    "notes": "WCS / SDARS"},
+    {"f_low": 2483.5e6,   "f_high": 2500e6,    "notes": "MSS"},
+    {"f_low": 2690e6,     "f_high": 2900e6,    "notes": "Radio astronomy / radar"},
+    {"f_low": 3260e6,     "f_high": 3267e6,    "notes": "Radio astronomy"},
+    {"f_low": 3332e6,     "f_high": 3339e6,    "notes": "Radio astronomy"},
+    {"f_low": 4500e6,     "f_high": 5150e6,    "notes": "Aviation"}
+  ]
+}

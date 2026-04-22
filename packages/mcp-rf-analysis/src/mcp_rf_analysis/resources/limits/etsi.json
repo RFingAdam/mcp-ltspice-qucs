@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "source": "ETSI EN 300 220-2 v3.2.1 (SRD 25-1000 MHz), EN 300 328 v2.2.2 (2.4 GHz), EN 301 893 v2.1.1 (5 GHz)",
+    "notes": "Limits in dBm e.r.p. (effective radiated power, dipole reference). Duty cycle constraints apply per sub-band.",
+    "last_updated": "2026-04-22"
+  },
+  "limits": {
+    "en_300_220_h1p6": {
+      "band_label": "868 MHz EU SRD - sub-band h1.6",
+      "f_low": 869.4e6,
+      "f_high": 869.65e6,
+      "max_erp_dbm": 27,
+      "duty_cycle_max_pct": 10,
+      "spurious_dbm": -36
+    },
+    "en_300_220_g3": {
+      "band_label": "868 MHz EU SRD - sub-band G3",
+      "f_low": 868.7e6,
+      "f_high": 869.2e6,
+      "max_erp_dbm": 14,
+      "duty_cycle_max_pct": 0.1,
+      "spurious_dbm": -36
+    },
+    "en_300_328": {
+      "band_label": "2.4 GHz",
+      "f_low": 2400e6,
+      "f_high": 2483.5e6,
+      "max_eirp_dbm": 20,
+      "max_psd_dbm_per_mhz": 10,
+      "spurious_outside_band_dbm": -30,
+      "spurious_above_1ghz_dbm": -30
+    },
+    "en_301_893_unii1": {
+      "band_label": "5150-5350 MHz EU U-NII",
+      "f_low": 5150e6,
+      "f_high": 5350e6,
+      "max_eirp_dbm": 23,
+      "max_psd_dbm_per_mhz": 10,
+      "tpc_required": true,
+      "dfs_required_above_mhz": 5250
+    }
+  }
+}

@@ -26,6 +26,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_rf_analysis"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"resources" = "mcp_rf_analysis/resources"

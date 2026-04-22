@@ -1,0 +1,73 @@
+{
+  "_meta": {
+    "source": "IEEE 802.11ah-2016 / 802.11-2020 Annex E (regional channel sets); FCC Part 15.247; ETSI EN 300 220",
+    "notes": "Center frequencies in Hz. HaLow operates in sub-1 GHz ISM bands; channel grids and allowed PSDs differ by region.",
+    "last_updated": "2026-04-22"
+  },
+  "regions": {
+    "US": {
+      "label": "United States (FCC Part 15.247)",
+      "band": [902e6, 928e6],
+      "channel_widths_mhz": [1, 2, 4, 8, 16],
+      "max_eirp_dbm": 36,
+      "notes": "Frequency hopping or DSSS. Rich channel set; full 26 MHz available.",
+      "channels_1mhz_centers": [
+        903e6,  904e6,  905e6,  906e6,  907e6,  908e6,  909e6,  910e6,  911e6,  912e6,
+        913e6,  914e6,  915e6,  916e6,  917e6,  918e6,  919e6,  920e6,  921e6,  922e6,
+        923e6,  924e6,  925e6,  926e6,  927e6
+      ]
+    },
+    "EU": {
+      "label": "Europe (ETSI EN 300 220 sub-bands)",
+      "band": [863e6, 870e6],
+      "channel_widths_mhz": [1, 2],
+      "max_eirp_dbm": 14,
+      "notes": "Sub-band-dependent duty cycle limits (0.1%-10%); restricted relative to US allocation.",
+      "channels_1mhz_centers": [864e6, 865e6, 866e6, 867e6, 868e6, 869e6]
+    },
+    "JP": {
+      "label": "Japan (ARIB STD-T108)",
+      "band": [916.5e6, 927.5e6],
+      "channel_widths_mhz": [1, 2, 4],
+      "max_eirp_dbm": 20,
+      "channels_1mhz_centers": [917e6, 918e6, 919e6, 920e6, 921e6, 922e6, 923e6, 924e6, 925e6, 926e6, 927e6]
+    },
+    "KR": {
+      "label": "Korea",
+      "band": [917.5e6, 923.5e6],
+      "channel_widths_mhz": [1, 2, 4],
+      "max_eirp_dbm": 14,
+      "channels_1mhz_centers": [918e6, 919e6, 920e6, 921e6, 922e6, 923e6]
+    },
+    "CN": {
+      "label": "China",
+      "band": [755e6, 787e6],
+      "channel_widths_mhz": [1, 2, 4, 8],
+      "max_eirp_dbm": 20,
+      "notes": "Operates in vacated UHF TV white space spectrum"
+    },
+    "SG": {
+      "label": "Singapore",
+      "band": [866e6, 869e6],
+      "channel_widths_mhz": [1, 2],
+      "max_eirp_dbm": 14,
+      "channels_1mhz_centers": [866e6, 867e6, 868e6, 869e6]
+    },
+    "AU_NZ": {
+      "label": "Australia / New Zealand",
+      "band": [915e6, 928e6],
+      "channel_widths_mhz": [1, 2, 4, 8],
+      "max_eirp_dbm": 30,
+      "channels_1mhz_centers": [
+        916e6, 917e6, 918e6, 919e6, 920e6, 921e6, 922e6, 923e6, 924e6, 925e6, 926e6, 927e6
+      ]
+    },
+    "IN": {
+      "label": "India",
+      "band": [865e6, 868e6],
+      "channel_widths_mhz": [1, 2],
+      "max_eirp_dbm": 14,
+      "channels_1mhz_centers": [866e6, 867e6]
+    }
+  }
+}
