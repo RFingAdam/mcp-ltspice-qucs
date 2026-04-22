@@ -7,9 +7,10 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")  # headless backend; safe for CI / MCP
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from rf_mcp_common.touchstone import read_touchstone  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+
+from rf_mcp_common.touchstone import read_touchstone
 
 
 def render_response(
@@ -61,8 +62,14 @@ def render_response(
         for freq_hz, label in markers:
             ax21.axvline(freq_hz / 1e6, color="black", alpha=0.4, lw=0.8, ls=":")
             ax21.text(
-                freq_hz / 1e6, ymax - 0.05 * (ymax - ymin), label,
-                rotation=90, va="top", ha="right", fontsize=8, alpha=0.7,
+                freq_hz / 1e6,
+                ymax - 0.05 * (ymax - ymin),
+                label,
+                rotation=90,
+                va="top",
+                ha="right",
+                fontsize=8,
+                alpha=0.7,
             )
 
     ax21.set_title(title or Path(s2p_path).stem)

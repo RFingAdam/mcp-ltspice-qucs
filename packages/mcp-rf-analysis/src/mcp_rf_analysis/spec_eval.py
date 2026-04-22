@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from rf_mcp_common.touchstone import read_touchstone
 
 from mcp_rf_analysis.network_ops import s21_db_at
+from rf_mcp_common.touchstone import read_touchstone
 
 
 def check_rejection_at(
@@ -67,11 +67,7 @@ def check_passband_compliance(
         "measured_worst_rl_db": worst_rl,
         "il_margin_db": il_max_db - worst_il,
         "rl_margin_db": worst_rl - rl_min_db,
-        "status": (
-            "pass"
-            if worst_il <= il_max_db and worst_rl >= rl_min_db
-            else "fail"
-        ),
+        "status": ("pass" if worst_il <= il_max_db and worst_rl >= rl_min_db else "fail"),
     }
 
 
@@ -81,9 +77,7 @@ def list_spec_templates() -> list[str]:
     return sorted(p.name.removesuffix(".json") for p in pkg.iterdir() if p.suffix == ".json")
 
 
-def evaluate_against_spec_template(
-    s2p_path: str | Path, template_name: str
-) -> dict[str, Any]:
+def evaluate_against_spec_template(s2p_path: str | Path, template_name: str) -> dict[str, Any]:
     """Load a spec template by name and evaluate the .s2p against it."""
     pkg = resources.files("mcp_rf_analysis").joinpath("resources/templates")
     path = pkg.joinpath(f"{template_name}.json")
@@ -98,8 +92,11 @@ def evaluate_against_spec_template(
             {
                 "label": "passband",
                 **check_passband_compliance(
-                    s2p_path, pb["f_start"], pb["f_stop"],
-                    il_max_db=pb["il_max_db"], rl_min_db=pb["rl_min_db"],
+                    s2p_path,
+                    pb["f_start"],
+                    pb["f_stop"],
+                    il_max_db=pb["il_max_db"],
+                    rl_min_db=pb["rl_min_db"],
                 ),
             }
         )
@@ -107,7 +104,7 @@ def evaluate_against_spec_template(
     for tgt in spec.get("stopband_targets", []):
         results.append(
             {
-                "label": tgt.get("label", f"stopband@{tgt['freq']/1e6:.1f}MHz"),
+                "label": tgt.get("label", f"stopband@{tgt['freq'] / 1e6:.1f}MHz"),
                 **check_rejection_at(s2p_path, tgt["freq"], tgt["rejection_min_db"]),
             }
         )

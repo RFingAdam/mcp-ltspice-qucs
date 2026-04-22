@@ -8,6 +8,7 @@ from typing import Literal
 import numpy as np
 import skrf as rf
 from pydantic import BaseModel, Field
+
 from rf_mcp_common.touchstone import read_touchstone
 
 
@@ -17,9 +18,7 @@ class PassbandSpec(BaseModel):
     f_start: float = Field(ge=0, description="Lower band edge in Hz")
     f_stop: float = Field(gt=0, description="Upper band edge in Hz")
     il_max_db: float = Field(gt=0, description="Max allowed insertion loss in dB (positive)")
-    rl_min_db: float = Field(
-        gt=0, description="Min required return loss in dB (positive)"
-    )
+    rl_min_db: float = Field(gt=0, description="Min required return loss in dB (positive)")
 
 
 class StopbandTarget(BaseModel):
@@ -104,7 +103,7 @@ def evaluate_filter_spec(
     criteria.append(
         CriterionResult(
             label="Passband IL",
-            metric=f"|S21| over [{pb.f_start/1e6:.0f}–{pb.f_stop/1e6:.0f}] MHz",
+            metric=f"|S21| over [{pb.f_start / 1e6:.0f}–{pb.f_stop / 1e6:.0f}] MHz",
             target_db=pb.il_max_db,
             measured_db=worst_il,
             margin_db=pb.il_max_db - worst_il,
@@ -114,7 +113,7 @@ def evaluate_filter_spec(
     criteria.append(
         CriterionResult(
             label="Passband RL",
-            metric=f"|S11| over [{pb.f_start/1e6:.0f}–{pb.f_stop/1e6:.0f}] MHz",
+            metric=f"|S11| over [{pb.f_start / 1e6:.0f}–{pb.f_stop / 1e6:.0f}] MHz",
             target_db=pb.rl_min_db,
             measured_db=worst_rl,
             margin_db=worst_rl - pb.rl_min_db,
@@ -127,7 +126,7 @@ def evaluate_filter_spec(
             criteria.append(
                 CriterionResult(
                     label=tgt.label,
-                    metric=f"|S21| at {tgt.freq/1e6:.1f} MHz",
+                    metric=f"|S21| at {tgt.freq / 1e6:.1f} MHz",
                     target_db=tgt.rejection_min_db,
                     measured_db=float("nan"),
                     margin_db=float("nan"),
@@ -140,7 +139,7 @@ def evaluate_filter_spec(
         criteria.append(
             CriterionResult(
                 label=tgt.label,
-                metric=f"|S21| at {tgt.freq/1e6:.1f} MHz",
+                metric=f"|S21| at {tgt.freq / 1e6:.1f} MHz",
                 target_db=tgt.rejection_min_db,
                 measured_db=rejection,
                 margin_db=rejection - tgt.rejection_min_db,

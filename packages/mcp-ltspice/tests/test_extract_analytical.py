@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import pytest
+
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
@@ -33,9 +33,7 @@ def test_shunt_lc_trap_notches_at_resonance() -> None:
     l_t, c_t = 4.7e-9, 1.8e-12
     f0 = 1 / (2 * math.pi * math.sqrt(l_t * c_t))
     f = np.linspace(f0 * 0.5, f0 * 1.5, 501)
-    s = ladder_sparams_from_components(
-        [("shunt_lc_trap", {"L": l_t, "C": c_t})], f
-    )
+    s = ladder_sparams_from_components([("shunt_lc_trap", {"L": l_t, "C": c_t})], f)
     s21_db = 20 * np.log10(np.abs(s[:, 1, 0]) + 1e-12)
     notch_idx = int(np.argmin(s21_db))
     # Notch within ±1% of resonance, depth > 60 dB (lossless)
@@ -93,9 +91,11 @@ def test_components_dict_to_elements_butterworth_n3() -> None:
 def test_components_dict_to_elements_elliptic_n5() -> None:
     comps = {
         "L1": 5e-9,
-        "L2": 4e-9, "C2": 2e-12,  # trap
+        "L2": 4e-9,
+        "C2": 2e-12,  # trap
         "L3": 8e-9,
-        "L4": 4e-9, "C4": 2e-12,  # trap
+        "L4": 4e-9,
+        "C4": 2e-12,  # trap
         "L5": 5e-9,
     }
     elements = components_dict_to_elements(comps, transmission_zeros=True)

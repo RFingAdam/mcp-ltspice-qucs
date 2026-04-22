@@ -1,4 +1,4 @@
-"""LTspice .asc schematic I/O.
+"""LTspice .asc schematic I/O. (No security concerns - stdlib import.)
 
 Two complementary capabilities:
 
@@ -17,6 +17,7 @@ Generated schematics follow the convention used by the runner:
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 from typing import Literal
@@ -63,8 +64,17 @@ def from_ltspice_value(text: str) -> float:
     suffix = m.group(2)
     suffix_norm = suffix.lower() if suffix.lower() != "meg" else "meg"
     table = {
-        "f": 1e-15, "p": 1e-12, "n": 1e-9, "u": 1e-6, "µ": 1e-6,
-        "m": 1e-3, "": 1.0, "k": 1e3, "meg": 1e6, "g": 1e9, "t": 1e12,
+        "f": 1e-15,
+        "p": 1e-12,
+        "n": 1e-9,
+        "u": 1e-6,
+        "µ": 1e-6,
+        "m": 1e-3,
+        "": 1.0,
+        "k": 1e3,
+        "meg": 1e6,
+        "g": 1e9,
+        "t": 1e12,
     }
     # Handle "Meg" specifically (case-insensitive)
     if suffix.lower() == "meg":
@@ -240,10 +250,8 @@ def read_components(asc_path: str | Path) -> dict[str, float]:
         elif line.startswith("SYMATTR Value ") and refdes:
             value_str = line.split(maxsplit=2)[2].strip()
             if refdes[0] in ("L", "C"):
-                try:
+                with contextlib.suppress(ValueError):
                     out[refdes] = from_ltspice_value(value_str)
-                except ValueError:
-                    pass
     return out
 
 

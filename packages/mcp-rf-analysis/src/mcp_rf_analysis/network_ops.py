@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import skrf as rf
 from numpy.typing import NDArray
+
 from rf_mcp_common.touchstone import read_touchstone, write_touchstone
 
 
@@ -26,7 +27,7 @@ def cascade_networks(s2p_paths: list[str | Path], output_path: str | Path) -> Pa
     nets = [n.interpolate(rf.Frequency.from_f(f_common, unit="Hz")) for n in nets]
     cascaded = nets[0]
     for n in nets[1:]:
-        cascaded = cascaded ** n
+        cascaded = cascaded**n
     return write_touchstone(cascaded, output_path)
 
 
@@ -54,13 +55,11 @@ def deembed_network(
     left = left.interpolate(fr)
     right = right.interpolate(fr)
 
-    dut = left.inv ** meas ** right.inv
+    dut = left.inv**meas**right.inv
     return write_touchstone(dut, output_path)
 
 
-def renormalize_impedance(
-    s2p_path: str | Path, new_z0: float, output_path: str | Path
-) -> Path:
+def renormalize_impedance(s2p_path: str | Path, new_z0: float, output_path: str | Path) -> Path:
     """Renormalize an S-parameter file to a new reference impedance."""
     net = read_touchstone(s2p_path)
     net.renormalize(new_z0)
@@ -76,9 +75,7 @@ def compute_stability(s2p_path: str | Path) -> dict[str, list[float]]:
     k = (1 - np.abs(s11) ** 2 - np.abs(s22) ** 2 + np.abs(delta) ** 2) / (
         2 * np.abs(s12 * s21) + 1e-30
     )
-    mu = (1 - np.abs(s11) ** 2) / (
-        np.abs(s22 - np.conj(s11) * delta) + np.abs(s12 * s21) + 1e-30
-    )
+    mu = (1 - np.abs(s11) ** 2) / (np.abs(s22 - np.conj(s11) * delta) + np.abs(s12 * s21) + 1e-30)
     return {
         "freq_hz": net.f.tolist(),
         "k_factor": k.real.tolist(),

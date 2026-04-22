@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import skrf as rf
+
 from rf_mcp_common.touchstone import read_touchstone
 
 
@@ -52,7 +53,7 @@ def compare_sparameters(
         "diff": diff.tolist(),
         "max_abs_diff": float(np.max(np.abs(diff))),
         "mean_abs_diff": float(np.mean(np.abs(diff))),
-        "rms_diff": float(np.sqrt(np.mean(diff ** 2))),
+        "rms_diff": float(np.sqrt(np.mean(diff**2))),
     }
 
 
@@ -122,28 +123,41 @@ def fit_equivalent_circuit(
         return 2.0 / denom
 
     if topology == "series_l":
-        def res(x): return np.concatenate(
-            [(_model_series_l(x[0]) - target_s21).real,
-             (_model_series_l(x[0]) - target_s21).imag]
-        )
+
+        def res(x):
+            return np.concatenate(
+                [
+                    (_model_series_l(x[0]) - target_s21).real,
+                    (_model_series_l(x[0]) - target_s21).imag,
+                ]
+            )
+
         out = least_squares(res, [1e-9], bounds=(1e-15, 1e-3))
         return {"topology": topology, "L": float(out.x[0])}
 
     if topology == "shunt_c":
-        def res(x): return np.concatenate(
-            [(_model_shunt_c(x[0]) - target_s21).real,
-             (_model_shunt_c(x[0]) - target_s21).imag]
-        )
+
+        def res(x):
+            return np.concatenate(
+                [(_model_shunt_c(x[0]) - target_s21).real, (_model_shunt_c(x[0]) - target_s21).imag]
+            )
+
         out = least_squares(res, [1e-12], bounds=(1e-18, 1e-6))
         return {"topology": topology, "C": float(out.x[0])}
 
     if topology == "series_l_shunt_c":
-        def res(x): return np.concatenate(
-            [(_model_l_section(x[0], x[1]) - target_s21).real,
-             (_model_l_section(x[0], x[1]) - target_s21).imag]
-        )
+
+        def res(x):
+            return np.concatenate(
+                [
+                    (_model_l_section(x[0], x[1]) - target_s21).real,
+                    (_model_l_section(x[0], x[1]) - target_s21).imag,
+                ]
+            )
+
         out = least_squares(
-            res, [1e-9, 1e-12],
+            res,
+            [1e-9, 1e-12],
             bounds=([1e-15, 1e-18], [1e-3, 1e-6]),
         )
         return {"topology": topology, "L": float(out.x[0]), "C": float(out.x[1])}

@@ -53,11 +53,14 @@ HERE = Path(__file__).parent
 SPEC_PATH = HERE / "spec.json"
 
 
-def _write_s2p(components: dict[str, float], path: Path, *, transmission_zeros: bool = True) -> Path:
+def _write_s2p(
+    components: dict[str, float], path: Path, *, transmission_zeros: bool = True
+) -> Path:
     """Render LC ladder analytically and dump as Touchstone."""
     f = np.geomspace(10e6, 5e9, 1001)
     elements = components_dict_to_elements(
-        components, topology="series_first",
+        components,
+        topology="series_first",
         transmission_zeros=transmission_zeros,
     )
     s = ladder_sparams_from_components(elements, f, z0=50.0)
@@ -71,9 +74,7 @@ def _print_check(label: str, result) -> None:
         target = f"{c.target_db:.1f} dB"
         measured = f"{c.measured_db:.2f} dB" if math.isfinite(c.measured_db) else "n/a"
         margin = f"{c.margin_db:+.2f} dB" if math.isfinite(c.margin_db) else "n/a"
-        print(
-            f"{c.label:<30} {target:>10} {measured:>12} {margin:>10} {c.status:>8}"
-        )
+        print(f"{c.label:<30} {target:>10} {measured:>12} {margin:>10} {c.status:>8}")
 
 
 def main() -> None:
@@ -87,14 +88,20 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("\n[2] Synthesizing 9th-order elliptic LPF (fc=1.0 GHz, 0.1 dB ripple, 50 dB stopband)")
     design = synthesize_lc_lpf(
-        "elliptic", order=9, cutoff_hz=1.0e9,
-        ripple_db=0.1, stopband_atten_db=50,
-        z0=50.0, topology=Topology.SERIES_FIRST,
+        "elliptic",
+        order=9,
+        cutoff_hz=1.0e9,
+        ripple_db=0.1,
+        stopband_atten_db=50,
+        z0=50.0,
+        topology=Topology.SERIES_FIRST,
     )
     print(f"   {len(design.components)} components synthesized")
     for ref, val in sorted(design.components.items()):
         print(f"     {ref}: {val:.3e}")
-    print(f"   Synthesized transmission zeros (Hz): {[f'{z/1e6:.1f} MHz' for z in design.transmission_zeros_hz]}")
+    print(
+        f"   Synthesized transmission zeros (Hz): {[f'{z / 1e6:.1f} MHz' for z in design.transmission_zeros_hz]}"
+    )
     starting = _write_s2p(design.components, HERE / "starting_point.s2p")
     print(f"   --> {starting.name}")
 
@@ -110,13 +117,16 @@ def main() -> None:
     zero_targets = [(2, 1.575e9), (4, 1.73e9), (6, 1.87e9), (8, 2.78e9)]
     for trap_idx, freq in zero_targets:
         result = place_transmission_zero(
-            comps, trap_index=trap_idx, target_freq_hz=freq,
-            preserve_ratio=True, snap_series=None,
+            comps,
+            trap_index=trap_idx,
+            target_freq_hz=freq,
+            preserve_ratio=True,
+            snap_series=None,
         )
         comps = result["components"]
         print(
-            f"   Trap L{trap_idx}/C{trap_idx} -> {freq/1e9:.3f} GHz "
-            f"(achieved {result['achieved_freq_hz']/1e9:.3f} GHz, "
+            f"   Trap L{trap_idx}/C{trap_idx} -> {freq / 1e9:.3f} GHz "
+            f"(achieved {result['achieved_freq_hz'] / 1e9:.3f} GHz, "
             f"err {result['freq_error_pct']:+.2f}%)"
         )
     after_zeros = _write_s2p(comps, HERE / "after_zero_placement.s2p")
@@ -132,7 +142,7 @@ def main() -> None:
     real_comps = {ref: info["snapped_value"] for ref, info in parts.items()}
     for ref, info in sorted(parts.items()):
         delta_pct = (info["snapped_value"] - info["ideal_value"]) / info["ideal_value"] * 100
-        srf_str = f"SRF={info['srf_hz']/1e9:.2f} GHz" if "srf_hz" in info else ""
+        srf_str = f"SRF={info['srf_hz'] / 1e9:.2f} GHz" if "srf_hz" in info else ""
         print(
             f"   {ref}: ideal {info['ideal_value']:.3e} -> "
             f"vendor {info['snapped_value']:.3e} ({delta_pct:+.1f}%) [{srf_str}]"
@@ -147,9 +157,12 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("\n[5] Optimizing for spec compliance (Nelder-Mead, 3000 iter, E96 snap)")
     opt_result = optimize_filter(
-        real_comps, spec,
-        transmission_zeros=True, z0=50.0,
-        max_iter=3000, snap_series="E96",
+        real_comps,
+        spec,
+        transmission_zeros=True,
+        z0=50.0,
+        max_iter=3000,
+        snap_series="E96",
     )
     print(f"   loss: {opt_result.initial_loss:.3f} -> {opt_result.final_loss:.3f}")
     print(f"   converged: {opt_result.converged} ({opt_result.n_iterations} iterations)")
@@ -168,15 +181,20 @@ def main() -> None:
     found_zeros = find_transmission_zeros(final_s2p, min_depth_db=15)
     print("\n[6] Detected transmission zeros in final design:")
     for z in found_zeros:
-        print(f"     {z['freq_hz']/1e9:.3f} GHz, depth {z['depth_db']:.1f} dB, Q~={z['q_factor']:.0f}")
+        print(
+            f"     {z['freq_hz'] / 1e9:.3f} GHz, depth {z['depth_db']:.1f} dB, Q~={z['q_factor']:.0f}"
+        )
 
     # ------------------------------------------------------------------
     # Step 7: Generate the .asc schematic
     # ------------------------------------------------------------------
     asc = generate_lpf_asc(
-        final_comps, HERE / "final.asc",
-        topology="lpf_t_elliptic", z0=50.0,
-        f_start_hz=10e6, f_stop_hz=5e9,
+        final_comps,
+        HERE / "final.asc",
+        topology="lpf_t_elliptic",
+        z0=50.0,
+        f_start_hz=10e6,
+        f_stop_hz=5e9,
     )
     print(f"\n[7] Wrote LTspice schematic --> {asc.name}")
 
@@ -184,7 +202,8 @@ def main() -> None:
     # Step 8: Render plot
     # ------------------------------------------------------------------
     png = render_response(
-        final_s2p, HERE / "response.png",
+        final_s2p,
+        HERE / "response.png",
         markers=[
             (928e6, "passband edge"),
             (1575e6, "GPS L1"),
@@ -206,21 +225,31 @@ def main() -> None:
     mc_n_runs = 1000
     print(f"\n[8] Monte Carlo yield ({mc_tol_pct}% tolerance, {mc_n_runs} runs, parallel)")
     mc = monte_carlo_analysis(
-        final_comps, spec,
-        tolerance_pct=mc_tol_pct, n_runs=mc_n_runs,
-        transmission_zeros=True, n_jobs=-1,
+        final_comps,
+        spec,
+        tolerance_pct=mc_tol_pct,
+        n_runs=mc_n_runs,
+        transmission_zeros=True,
+        n_jobs=-1,
     )
     print(f"   yield: {mc.yield_pct:.1f}% ({mc.n_passing}/{mc.n_runs} passing)")
     print("   top failing criteria:")
     for label, count in sorted(mc.failing_criteria_counts.items(), key=lambda kv: -kv[1])[:5]:
-        print(f"     - {label}: {count} failures ({100*count/mc.n_runs:.1f}%)")
+        print(f"     - {label}: {count} failures ({100 * count / mc.n_runs:.1f}%)")
 
     # ------------------------------------------------------------------
     # Step 10: Write report.md
     # ------------------------------------------------------------------
     report_path = HERE / "report.md"
     _write_report(
-        report_path, check1, check2, check3, mc, final_comps, parts, found_zeros,
+        report_path,
+        check1,
+        check2,
+        check3,
+        mc,
+        final_comps,
+        parts,
+        found_zeros,
         mc_tol_pct=mc_tol_pct,
     )
     print(f"\n[9] Wrote report --> {report_path.name}")
@@ -228,15 +257,23 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Final pass/fail summary
     # ------------------------------------------------------------------
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"FINAL VERDICT: {check3.overall.upper()}")
     print(f"Monte Carlo yield: {mc.yield_pct:.1f}%")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 def _write_report(
-    path, check1, check2, check_final, mc, comps, parts, zeros,
-    *, mc_tol_pct: float = 5.0,
+    path,
+    check1,
+    check2,
+    check_final,
+    mc,
+    comps,
+    parts,
+    zeros,
+    *,
+    mc_tol_pct: float = 5.0,
 ) -> None:
     lines = [
         "# HaLow LPF Final Design Report",
@@ -257,7 +294,7 @@ def _write_report(
         srf = info.get("srf_hz", None)
         ideal_str = f"{ideal:.3e}" if isinstance(ideal, (int, float)) else str(ideal)
         vendor_str = f"{vendor_val:.3e}"
-        srf_str = f"{srf/1e9:.2f} GHz" if srf else "--"
+        srf_str = f"{srf / 1e9:.2f} GHz" if srf else "--"
         lines.append(f"| {ref} | {ideal_str} | {vendor_str} | {vendor} | {srf_str} |")
     lines.append("")
 
@@ -282,7 +319,7 @@ def _write_report(
         lines.append("")
         lines.append("Failing criteria breakdown:")
         for label, count in sorted(mc.failing_criteria_counts.items(), key=lambda kv: -kv[1]):
-            lines.append(f"- {label}: {count} ({100*count/mc.n_runs:.1f}%)")
+            lines.append(f"- {label}: {count} ({100 * count / mc.n_runs:.1f}%)")
     lines.append("")
 
     lines.append("## Detected transmission zeros (final design)")
@@ -291,7 +328,7 @@ def _write_report(
     lines.append("|---|---|---|")
     for z in zeros:
         lines.append(
-            f"| {z['freq_hz']/1e9:.3f} GHz | {z['depth_db']:.1f} dB | {z['q_factor']:.0f} |"
+            f"| {z['freq_hz'] / 1e9:.3f} GHz | {z['depth_db']:.1f} dB | {z['q_factor']:.0f} |"
         )
 
     lines.append("")

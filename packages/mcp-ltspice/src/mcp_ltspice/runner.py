@@ -101,17 +101,19 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
     else:
         cmd = [str(ltspice_exe), "-b", "-Run", str(asc_path)]
 
-    proc = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout, check=False
-    )
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     if not raw_path.is_file():
         raise RuntimeError(
             f"LTspice did not produce {raw_path}. stdout={proc.stdout[-500:]!r} "
             f"stderr={proc.stderr[-500:]!r}"
         )
     return RunResult(
-        raw_path=raw_path, log_path=log_path, simulator=Simulator.LTSPICE,
-        returncode=proc.returncode, stdout=proc.stdout, stderr=proc.stderr,
+        raw_path=raw_path,
+        log_path=log_path,
+        simulator=Simulator.LTSPICE,
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
     )
 
 
@@ -138,17 +140,19 @@ def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunRes
     raw_path = asc_path.with_suffix(".raw")
     log_path = asc_path.with_suffix(".log")
     cmd = [str(ngspice_exe), "-b", "-r", str(raw_path), "-o", str(log_path), str(netlist)]
-    proc = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout, check=False
-    )
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     if not raw_path.is_file():
         raise RuntimeError(
             f"ngspice did not produce {raw_path}. stdout={proc.stdout[-500:]!r} "
             f"stderr={proc.stderr[-500:]!r}"
         )
     return RunResult(
-        raw_path=raw_path, log_path=log_path, simulator=Simulator.NGSPICE,
-        returncode=proc.returncode, stdout=proc.stdout, stderr=proc.stderr,
+        raw_path=raw_path,
+        log_path=log_path,
+        simulator=Simulator.NGSPICE,
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
     )
 
 
@@ -186,6 +190,5 @@ def run_simulation(
     if exe is not None:
         return _run_ngspice(asc_path, exe, timeout=timeout)
     raise RuntimeError(
-        "No SPICE simulator found. Install ngspice "
-        "(`apt install ngspice`) or LTspice via Wine."
+        "No SPICE simulator found. Install ngspice (`apt install ngspice`) or LTspice via Wine."
     )

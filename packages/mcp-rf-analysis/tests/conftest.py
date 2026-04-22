@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
 from rf_mcp_common.touchstone import network_to_touchstone
 
 
@@ -13,11 +14,11 @@ from rf_mcp_common.touchstone import network_to_touchstone
 def lpf_s2p(tmp_path: Path) -> Path:
     """A simple 3rd-order Butterworth LPF .s2p with fc≈500 MHz, computed
     analytically (no simulator)."""
-    from mcp_ltspice.extract import (  # noqa: PLC0415 — fixture-local import
+    from mcp_ltspice.extract import (
         components_dict_to_elements,
         ladder_sparams_from_components,
     )
-    from mcp_ltspice.synthesis import synthesize_lc_lpf  # noqa: PLC0415
+    from mcp_ltspice.synthesis import synthesize_lc_lpf
 
     design = synthesize_lc_lpf("butterworth", order=3, cutoff_hz=500e6)
     f = np.geomspace(1e6, 5e9, 501)

@@ -24,11 +24,29 @@ class JsonFormatter(logging.Formatter):
         # Merge any extras attached via logger.info("msg", extra={...})
         for k, v in record.__dict__.items():
             if k in {
-                "name", "msg", "args", "levelname", "levelno", "pathname",
-                "filename", "module", "exc_info", "exc_text", "stack_info",
-                "lineno", "funcName", "created", "msecs", "relativeCreated",
-                "thread", "threadName", "processName", "process",
-                "taskName", "message", "asctime",
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "taskName",
+                "message",
+                "asctime",
             }:
                 continue
             payload[k] = v

@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 import pytest
+
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
@@ -48,8 +49,11 @@ def test_place_transmission_zero_moves_notch(tmp_path) -> None:
     )
     f_target = 1.5e9
     res = place_transmission_zero(
-        design.components, trap_index=2, target_freq_hz=f_target,
-        preserve_ratio=True, snap_series=None,  # don't snap so we can test math precisely
+        design.components,
+        trap_index=2,
+        target_freq_hz=f_target,
+        preserve_ratio=True,
+        snap_series=None,  # don't snap so we can test math precisely
     )
     new_comps = res["components"]
 
@@ -61,9 +65,7 @@ def test_place_transmission_zero_moves_notch(tmp_path) -> None:
     # The S21 response should now have a deep notch near 1.5 GHz
     f = np.linspace(1.4e9, 1.6e9, 201)
     s = ladder_sparams_from_components(
-        components_dict_to_elements(
-            new_comps, topology="series_first", transmission_zeros=True
-        ),
+        components_dict_to_elements(new_comps, topology="series_first", transmission_zeros=True),
         f,
     )
     s21_db = 20 * np.log10(np.abs(s[:, 1, 0]) + 1e-12)
@@ -78,8 +80,11 @@ def test_place_transmission_zero_with_e24_snap() -> None:
         "elliptic", order=5, cutoff_hz=1e9, ripple_db=0.1, stopband_atten_db=30
     )
     res = place_transmission_zero(
-        design.components, trap_index=2, target_freq_hz=1.85e9,
-        preserve_ratio=True, snap_series="E24",
+        design.components,
+        trap_index=2,
+        target_freq_hz=1.85e9,
+        preserve_ratio=True,
+        snap_series="E24",
     )
     # E24 snap usually pulls achieved within ~5% of target
     assert abs(res["freq_error_pct"]) < 10.0

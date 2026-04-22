@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, TypeVar
 
 from fastmcp import FastMCP
+from pydantic import Field
+
 from mcp_rf_analysis import __version__
 from mcp_rf_analysis.bands import (
     is_in_restricted_band,
@@ -18,40 +20,65 @@ from mcp_rf_analysis.bands import (
 )
 from mcp_rf_analysis.coex import (
     check_coex_matrix as _check_coex_matrix,
+)
+from mcp_rf_analysis.coex import (
     lookup_harmonic_victims as _lookup_harmonic_victims,
 )
 from mcp_rf_analysis.link import (
     compute_antenna_isolation_estimate as _compute_antenna_isolation_estimate,
+)
+from mcp_rf_analysis.link import (
     compute_desense as _compute_desense,
+)
+from mcp_rf_analysis.link import (
     compute_path_loss as _compute_path_loss,
 )
 from mcp_rf_analysis.network_ops import (
     cascade_networks as _cascade_networks,
+)
+from mcp_rf_analysis.network_ops import (
     compute_stability as _compute_stability,
+)
+from mcp_rf_analysis.network_ops import (
     deembed_network as _deembed_network,
+)
+from mcp_rf_analysis.network_ops import (
     renormalize_impedance as _renormalize_impedance,
+)
+from mcp_rf_analysis.network_ops import (
     smith_chart_data as _smith_chart_data,
 )
 from mcp_rf_analysis.spec_eval import (
     check_passband_compliance as _check_passband_compliance,
+)
+from mcp_rf_analysis.spec_eval import (
     check_rejection_at as _check_rejection_at,
+)
+from mcp_rf_analysis.spec_eval import (
     evaluate_against_spec_template as _evaluate_against_spec_template,
+)
+from mcp_rf_analysis.spec_eval import (
     list_spec_templates as _list_spec_templates,
 )
 from mcp_rf_analysis.touchstone_utils import (
     compare_sparameters as _compare_sparameters,
+)
+from mcp_rf_analysis.touchstone_utils import (
     extract_delay as _extract_delay,
+)
+from mcp_rf_analysis.touchstone_utils import (
     fit_equivalent_circuit as _fit_equivalent_circuit,
 )
-from pydantic import Field
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
 from rf_mcp_common.logging import get_logger
+
+T = TypeVar("T")
 
 mcp = FastMCP(name="mcp-rf-analysis", version=__version__)
 log = get_logger("mcp_rf_analysis.server")
 
 
-def _wrap[T](func, *args, **kwargs) -> Envelope[T]:
+def _wrap(func: Any, *args: Any, **kwargs: Any) -> Envelope[T]:
     """Run a callable inside the standard envelope contract."""
     timer = Timer()
     try:
@@ -60,19 +87,16 @@ def _wrap[T](func, *args, **kwargs) -> Envelope[T]:
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return error(f"{func.__name__} failed: {e}", tool_version=__version__)
 
 
 # -------- Network operations --------
 
+
 @mcp.tool(description="Cascade two or more 2-port networks (left-to-right).")
-def cascade_networks(
-    s2p_paths: list[str], output_path: str
-) -> Envelope[dict[str, Any]]:
-    return _wrap(
-        lambda: {"output_path": str(_cascade_networks(s2p_paths, output_path))}
-    )
+def cascade_networks(s2p_paths: list[str], output_path: str) -> Envelope[dict[str, Any]]:
+    return _wrap(lambda: {"output_path": str(_cascade_networks(s2p_paths, output_path))})
 
 
 @mcp.tool(description="De-embed left/right fixtures from a measured 2-port network.")
@@ -85,9 +109,7 @@ def deembed_network(
     return _wrap(
         lambda: {
             "output_path": str(
-                _deembed_network(
-                    measured_s2p, fixture_left_s2p, output_path, fixture_right_s2p
-                )
+                _deembed_network(measured_s2p, fixture_left_s2p, output_path, fixture_right_s2p)
             )
         }
     )
@@ -98,9 +120,7 @@ def renormalize_impedance(
     s2p_path: str, new_z0: Annotated[float, Field(gt=0)], output_path: str
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
-        lambda: {
-            "output_path": str(_renormalize_impedance(s2p_path, new_z0, output_path))
-        }
+        lambda: {"output_path": str(_renormalize_impedance(s2p_path, new_z0, output_path))}
     )
 
 
@@ -109,7 +129,9 @@ def compute_stability(s2p_path: str) -> Envelope[dict[str, Any]]:
     return _wrap(_compute_stability, s2p_path)
 
 
-@mcp.tool(description="Return Smith chart data (S_ii real/imag + normalized impedance) for plotting.")
+@mcp.tool(
+    description="Return Smith chart data (S_ii real/imag + normalized impedance) for plotting."
+)
 def smith_chart_data(
     s2p_path: str, port: Annotated[int, Field(ge=1)] = 1
 ) -> Envelope[dict[str, Any]]:
@@ -117,6 +139,7 @@ def smith_chart_data(
 
 
 # -------- Spec evaluation --------
+
 
 @mcp.tool(description="Check |S21| at a single frequency against a min-rejection target.")
 def check_rejection_at(
@@ -136,15 +159,17 @@ def check_passband_compliance(
     rl_min_db: Annotated[float, Field(gt=0)],
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
-        _check_passband_compliance, s2p_path, f_start, f_stop,
-        il_max_db=il_max_db, rl_min_db=rl_min_db,
+        _check_passband_compliance,
+        s2p_path,
+        f_start,
+        f_stop,
+        il_max_db=il_max_db,
+        rl_min_db=rl_min_db,
     )
 
 
 @mcp.tool(description="Evaluate a .s2p against a bundled spec template (FCC / ETSI / 3GPP).")
-def evaluate_against_spec_template(
-    s2p_path: str, template_name: str
-) -> Envelope[dict[str, Any]]:
+def evaluate_against_spec_template(s2p_path: str, template_name: str) -> Envelope[dict[str, Any]]:
     return _wrap(_evaluate_against_spec_template, s2p_path, template_name)
 
 
@@ -154,6 +179,7 @@ def list_spec_templates_tool() -> Envelope[list[str]]:
 
 
 # -------- Regulatory / coex DB --------
+
 
 @mcp.tool(description="List LTE bands. Optional ``region`` substring filter.")
 def list_lte_bands_tool(
@@ -174,14 +200,18 @@ def list_gnss_bands_tool(
     return _wrap(list_gnss_bands, system)
 
 
-@mcp.tool(description="List ISM band allocations. ``region`` is the ITU region (1=EMEA, 2=Americas, 3=APAC).")
+@mcp.tool(
+    description="List ISM band allocations. ``region`` is the ITU region (1=EMEA, 2=Americas, 3=APAC)."
+)
 def list_ism_bands_tool(
     region: int | None = None,
 ) -> Envelope[list[dict[str, Any]]]:
     return _wrap(list_ism_bands, region)
 
 
-@mcp.tool(description="List 802.11ah HaLow channels for a region (US, EU, JP, KR, CN, SG, AU_NZ, IN).")
+@mcp.tool(
+    description="List 802.11ah HaLow channels for a region (US, EU, JP, KR, CN, SG, AU_NZ, IN)."
+)
 def list_halow_channels_tool(region: str = "US") -> Envelope[dict[str, Any]]:
     return _wrap(list_halow_channels, region)
 
@@ -205,10 +235,13 @@ def is_in_restricted_band_tool(
     def _do() -> dict[str, Any]:
         is_in, info = is_in_restricted_band(freq_hz)
         return {"freq_hz": freq_hz, "in_restricted_band": is_in, "info": info}
+
     return _wrap(_do)
 
 
-@mcp.tool(description="For a TX center frequency, find which RX bands its 2nd / 3rd / etc. harmonics land in.")
+@mcp.tool(
+    description="For a TX center frequency, find which RX bands its 2nd / 3rd / etc. harmonics land in."
+)
 def lookup_harmonic_victims(
     f_center_hz: Annotated[float, Field(gt=0)],
     harmonic_orders: list[int] | None = None,
@@ -216,7 +249,9 @@ def lookup_harmonic_victims(
     return _wrap(_lookup_harmonic_victims, f_center_hz, harmonic_orders)
 
 
-@mcp.tool(description="Compute the multi-radio coex aggressor × victim matrix with predicted desense.")
+@mcp.tool(
+    description="Compute the multi-radio coex aggressor × victim matrix with predicted desense."
+)
 def check_coex_matrix(
     tx_list: list[dict[str, Any]],
     rx_list: list[dict[str, Any]],
@@ -224,13 +259,16 @@ def check_coex_matrix(
     default_filter_rejection_db: Annotated[float, Field(ge=0)] = 0.0,
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
-        _check_coex_matrix, tx_list, rx_list,
+        _check_coex_matrix,
+        tx_list,
+        rx_list,
         antenna_iso_db=antenna_iso_db,
         default_filter_rejection_db=default_filter_rejection_db,
     )
 
 
 # -------- Link budget --------
+
 
 @mcp.tool(description="Compute Friis or log-distance path loss in dB.")
 def compute_path_loss(
@@ -241,8 +279,12 @@ def compute_path_loss(
     extra_loss_db: float = 0.0,
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
-        _compute_path_loss, freq_hz, distance_m,
-        model=model, n=n, extra_loss_db=extra_loss_db,
+        _compute_path_loss,
+        freq_hz,
+        distance_m,
+        model=model,
+        n=n,
+        extra_loss_db=extra_loss_db,
     )
 
 
@@ -254,7 +296,8 @@ def compute_antenna_isolation_estimate(
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
         _compute_antenna_isolation_estimate,
-        antenna_separation_m, freq_hz,
+        antenna_separation_m,
+        freq_hz,
         ground_plane_size_m=ground_plane_size_m,
     )
 
@@ -267,30 +310,38 @@ def compute_desense(
     victim_noise_floor_dbm: float,
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
-        _compute_desense, aggressor_power_dbm, filter_rejection_db,
-        antenna_iso_db, victim_noise_floor_dbm,
+        _compute_desense,
+        aggressor_power_dbm,
+        filter_rejection_db,
+        antenna_iso_db,
+        victim_noise_floor_dbm,
     )
 
 
 # -------- Touchstone utilities --------
 
+
 @mcp.tool(description="Element-wise diff between two .s2p files (S21 dB / S11 dB / mag / phase).")
 def compare_sparameters(
-    s2p_a: str, s2p_b: str, metric: str = "s21_db",
+    s2p_a: str,
+    s2p_b: str,
+    metric: str = "s21_db",
 ) -> Envelope[dict[str, Any]]:
     return _wrap(_compare_sparameters, s2p_a, s2p_b, metric=metric)
 
 
 @mcp.tool(description="Compute group delay (or unwrapped phase) of S21.")
 def extract_delay(
-    s2p_path: str, method: str = "group_delay",
+    s2p_path: str,
+    method: str = "group_delay",
 ) -> Envelope[dict[str, Any]]:
     return _wrap(_extract_delay, s2p_path, method)
 
 
 @mcp.tool(description="Fit a lumped equivalent circuit to a measured 2-port network.")
 def fit_equivalent_circuit(
-    s2p_path: str, topology: str = "series_l_shunt_c",
+    s2p_path: str,
+    topology: str = "series_l_shunt_c",
 ) -> Envelope[dict[str, Any]]:
     return _wrap(_fit_equivalent_circuit, s2p_path, topology=topology)
 

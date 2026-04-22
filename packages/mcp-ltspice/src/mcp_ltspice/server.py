@@ -7,6 +7,8 @@ from typing import Annotated, Any
 
 import numpy as np
 from fastmcp import FastMCP
+from pydantic import Field
+
 from mcp_ltspice import __version__
 from mcp_ltspice.asc_io import (
     generate_lpf_asc,
@@ -23,18 +25,22 @@ from mcp_ltspice.find_zeros import find_transmission_zeros as _find_zeros
 from mcp_ltspice.montecarlo import monte_carlo_analysis as _monte_carlo
 from mcp_ltspice.optimize import optimize_filter as _optimize
 from mcp_ltspice.render import render_response as _render_response
-from mcp_ltspice.runner import RunResult, Simulator, run_simulation as _run_simulation
+from mcp_ltspice.runner import RunResult, Simulator
+from mcp_ltspice.runner import run_simulation as _run_simulation
 from mcp_ltspice.stability import stability_check as _stability_check
 from mcp_ltspice.synthesis import (
     Topology,
-    place_transmission_zero as _place_transmission_zero,
     synthesize_lc_lpf,
+)
+from mcp_ltspice.synthesis import (
+    place_transmission_zero as _place_transmission_zero,
 )
 from mcp_ltspice.vendor_models import (
     list_vendor_parts as _list_vendor_parts,
+)
+from mcp_ltspice.vendor_models import (
     substitute_real_components as _substitute_real,
 )
-from pydantic import Field
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
 from rf_mcp_common.logging import get_logger
 from rf_mcp_common.touchstone import network_to_touchstone, write_touchstone
@@ -69,9 +75,7 @@ def run_simulation(
     timer = Timer()
     try:
         prefer_enum = Simulator(prefer) if prefer else None
-        result: RunResult = _run_simulation(
-            asc_path, prefer=prefer_enum, timeout=timeout_sec
-        )
+        result: RunResult = _run_simulation(asc_path, prefer=prefer_enum, timeout=timeout_sec)
         return ok(
             {
                 "raw_path": str(result.raw_path),
@@ -82,7 +86,7 @@ def run_simulation(
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
         )
-    except Exception as e:  # noqa: BLE001 — tool boundary
+    except Exception as e:
         return error(f"run_simulation failed: {e}", tool_version=__version__)
 
 
@@ -139,13 +143,19 @@ def extract_sparameters(
 def synthesize_lc_filter(
     filter_type: Annotated[str, Field(description="'butterworth' | 'chebyshev1' | 'elliptic'.")],
     order: Annotated[int, Field(ge=1, le=15)],
-    cutoff_hz: Annotated[float, Field(gt=0, description="-3 dB cutoff for Butterworth, ripple edge for Cheby/Ellip.")],
+    cutoff_hz: Annotated[
+        float, Field(gt=0, description="-3 dB cutoff for Butterworth, ripple edge for Cheby/Ellip.")
+    ],
     output_asc: Annotated[str, Field(description="Path for output .asc.")],
-    output_s2p: Annotated[str | None, Field(description="Optional path for analytical .s2p preview.")] = None,
+    output_s2p: Annotated[
+        str | None, Field(description="Optional path for analytical .s2p preview.")
+    ] = None,
     ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
     stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
     z0: Annotated[float, Field(gt=0)] = 50.0,
-    topology: Annotated[str, Field(description="'series_first' (T) or 'shunt_first' (Pi).")] = "series_first",
+    topology: Annotated[
+        str, Field(description="'series_first' (T) or 'shunt_first' (Pi).")
+    ] = "series_first",
     f_sweep_start_hz: Annotated[float, Field(gt=0)] = 1e6,
     f_sweep_stop_hz: Annotated[float, Field(gt=0)] = 5e9,
     f_sweep_npoints: Annotated[int, Field(gt=0, le=10000)] = 801,
@@ -154,16 +164,21 @@ def synthesize_lc_filter(
     try:
         design = synthesize_lc_lpf(
             filter_type,  # type: ignore[arg-type]
-            order, cutoff_hz,
-            ripple_db=ripple_db, stopband_atten_db=stopband_atten_db,
-            z0=z0, topology=Topology(topology),
+            order,
+            cutoff_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
         )
         is_elliptic = filter_type == "elliptic"
         asc = generate_lpf_asc(
-            design.components, output_asc,
+            design.components,
+            output_asc,
             topology="lpf_t_elliptic" if is_elliptic else "lpf_t_butterworth_chebyshev",
             z0=z0,
-            f_start_hz=f_sweep_start_hz, f_stop_hz=f_sweep_stop_hz,
+            f_start_hz=f_sweep_start_hz,
+            f_stop_hz=f_sweep_stop_hz,
         )
         result: dict[str, Any] = {
             "asc_path": str(asc),
@@ -177,7 +192,9 @@ def synthesize_lc_filter(
         if output_s2p is not None:
             f = np.geomspace(f_sweep_start_hz, f_sweep_stop_hz, f_sweep_npoints)
             elements = components_dict_to_elements(
-                design.components, topology=topology, transmission_zeros=is_elliptic,
+                design.components,
+                topology=topology,
+                transmission_zeros=is_elliptic,
             )
             s = ladder_sparams_from_components(elements, f, z0=z0)
             s2p = network_to_touchstone(f, s, output_s2p, z0=z0)
@@ -210,7 +227,9 @@ def place_transmission_zero(
     try:
         comps = read_components(asc_path)
         result = _place_transmission_zero(
-            comps, trap_index=trap_index, target_freq_hz=target_freq_hz,
+            comps,
+            trap_index=trap_index,
+            target_freq_hz=target_freq_hz,
             preserve_ratio=preserve_ratio,
             snap_series=snap_series,  # type: ignore[arg-type]
         )
@@ -292,13 +311,15 @@ def render_response(
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
-        marker_tuples = (
-            [(float(f), str(label)) for f, label in markers] if markers else None
-        )
+        marker_tuples = [(float(f), str(label)) for f, label in markers] if markers else None
         fr = tuple(freq_range_hz) if freq_range_hz else None  # type: ignore[assignment]
         out = _render_response(
-            s2p_path, output_png,
-            freq_range=fr, markers=marker_tuples, title=title, show_s11=show_s11,
+            s2p_path,
+            output_png,
+            freq_range=fr,
+            markers=marker_tuples,
+            title=title,
+            show_s11=show_s11,
         )
         return ok(
             {"png_path": str(out), "size_bytes": out.stat().st_size},
@@ -327,8 +348,10 @@ def find_transmission_zeros(
     try:
         return ok(
             _find_zeros(
-                s2p_path, min_depth_db=min_depth_db,
-                f_min_hz=f_min_hz, f_max_hz=f_max_hz,
+                s2p_path,
+                min_depth_db=min_depth_db,
+                f_min_hz=f_min_hz,
+                f_max_hz=f_max_hz,
             ),
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -404,8 +427,11 @@ def optimize_filter(
     timer = Timer()
     try:
         result = _optimize(
-            initial_components, spec, tune=tune,
-            transmission_zeros=transmission_zeros, z0=z0,
+            initial_components,
+            spec,
+            tune=tune,
+            transmission_zeros=transmission_zeros,
+            z0=z0,
             method=method,  # type: ignore[arg-type]
             max_iter=max_iter,
             snap_series=snap_series,  # type: ignore[arg-type]
@@ -452,9 +478,13 @@ def monte_carlo_analysis(
     timer = Timer()
     try:
         result = _monte_carlo(
-            components, spec,
-            tolerance_pct=tolerance_pct, n_runs=n_runs,
-            z0=z0, transmission_zeros=transmission_zeros, n_jobs=n_jobs,
+            components,
+            spec,
+            tolerance_pct=tolerance_pct,
+            n_runs=n_runs,
+            z0=z0,
+            transmission_zeros=transmission_zeros,
+            n_jobs=n_jobs,
         )
         return ok(
             {

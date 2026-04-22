@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+
 from mcp_ltspice.eval import FilterSpec, evaluate_filter_spec
 from mcp_ltspice.extract import (
     components_dict_to_elements,
@@ -16,7 +17,9 @@ from rf_mcp_common.touchstone import network_to_touchstone
 def _write_synth_s2p(tmp_path, design, transmission_zeros: bool):
     f = np.geomspace(1e6, 5e9, 1001)
     elements = components_dict_to_elements(
-        design.components, topology="series_first", transmission_zeros=transmission_zeros,
+        design.components,
+        topology="series_first",
+        transmission_zeros=transmission_zeros,
     )
     s = ladder_sparams_from_components(elements, f, z0=design.z0)
     return network_to_touchstone(f, s, tmp_path / "design.s2p", z0=design.z0)
@@ -29,7 +32,10 @@ def test_passband_il_pass(tmp_path) -> None:
     spec = FilterSpec.model_validate(
         {
             "passband": {
-                "f_start": 1e6, "f_stop": 500e6, "il_max_db": 0.5, "rl_min_db": 15,
+                "f_start": 1e6,
+                "f_stop": 500e6,
+                "il_max_db": 0.5,
+                "rl_min_db": 15,
             },
             "stopband_targets": [],
         }
@@ -51,7 +57,10 @@ def test_passband_fails_when_pushed_above_cutoff(tmp_path) -> None:
     spec = FilterSpec.model_validate(
         {
             "passband": {
-                "f_start": 1e6, "f_stop": 1.5e9, "il_max_db": 0.5, "rl_min_db": 15,
+                "f_start": 1e6,
+                "f_stop": 1.5e9,
+                "il_max_db": 0.5,
+                "rl_min_db": 15,
             }
         }
     )
@@ -70,7 +79,10 @@ def test_stopband_target_pass_and_fail(tmp_path) -> None:
     spec = FilterSpec.model_validate(
         {
             "passband": {
-                "f_start": 1e6, "f_stop": 500e6, "il_max_db": 0.5, "rl_min_db": 15,
+                "f_start": 1e6,
+                "f_stop": 500e6,
+                "il_max_db": 0.5,
+                "rl_min_db": 15,
             },
             "stopband_targets": [
                 # Should easily pass — far in stopband
@@ -92,7 +104,10 @@ def test_evaluate_with_dict_spec(tmp_path) -> None:
     s2p = _write_synth_s2p(tmp_path, design, transmission_zeros=False)
     spec_dict = {
         "passband": {
-            "f_start": 1e6, "f_stop": 500e6, "il_max_db": 1.0, "rl_min_db": 10,
+            "f_start": 1e6,
+            "f_stop": 500e6,
+            "il_max_db": 1.0,
+            "rl_min_db": 10,
         },
     }
     result = evaluate_filter_spec(s2p, spec_dict)
@@ -105,7 +120,10 @@ def test_passband_outside_sweep_raises(tmp_path) -> None:
     spec = FilterSpec.model_validate(
         {
             "passband": {
-                "f_start": 100e9, "f_stop": 200e9, "il_max_db": 1.0, "rl_min_db": 10,
+                "f_start": 100e9,
+                "f_stop": 200e9,
+                "il_max_db": 1.0,
+                "rl_min_db": 10,
             }
         }
     )

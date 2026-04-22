@@ -12,7 +12,7 @@ from importlib import resources
 from typing import Any
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _load_band_json(name: str) -> dict[str, Any]:
     """Load a JSON file from the package resources/bands/ directory."""
     pkg_resources = resources.files("mcp_rf_analysis").joinpath("resources/bands")
@@ -21,7 +21,7 @@ def _load_band_json(name: str) -> dict[str, Any]:
         return json.load(f)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _load_limit_json(name: str) -> dict[str, Any]:
     pkg_resources = resources.files("mcp_rf_analysis").joinpath("resources/limits")
     path = pkg_resources.joinpath(f"{name}.json")
@@ -81,8 +81,13 @@ def lookup_band_by_freq(freq_hz: float) -> dict[str, list[dict[str, Any]]]:
     'gnss', 'ism', 'halow' — each mapping to a list of matching entries.
     """
     matches: dict[str, list[dict[str, Any]]] = {
-        "lte_ul": [], "lte_dl": [], "5gnr_ul": [], "5gnr_dl": [],
-        "gnss": [], "ism": [], "halow": [],
+        "lte_ul": [],
+        "lte_dl": [],
+        "5gnr_ul": [],
+        "5gnr_dl": [],
+        "gnss": [],
+        "ism": [],
+        "halow": [],
     }
     for b in list_lte_bands():
         if b["f_ul"] and b["f_ul"][0] <= freq_hz <= b["f_ul"][1]:

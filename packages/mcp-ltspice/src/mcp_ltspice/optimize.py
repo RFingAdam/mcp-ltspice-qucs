@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
-from rf_mcp_common.ecomp import ESeries, snap_to_eseries
 from scipy.optimize import minimize
 
 from mcp_ltspice.eval import FilterSpec
@@ -20,6 +19,7 @@ from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
 )
+from rf_mcp_common.ecomp import ESeries, snap_to_eseries
 
 
 @dataclass
@@ -109,12 +109,17 @@ def optimize_filter(
     x0 = np.asarray([initial_components[r] for r in refs], dtype=float)
 
     pb = spec.passband
-    span = max(pb.f_stop * 5, max((t.freq for t in spec.stopband_targets), default=pb.f_stop * 5) * 1.5)
+    span = max(
+        pb.f_stop * 5, max((t.freq for t in spec.stopband_targets), default=pb.f_stop * 5) * 1.5
+    )
     f_grid = np.geomspace(max(pb.f_start, 1e3), span, f_grid_npoints)
 
     initial_loss, margins_initial = _evaluate_loss(
-        initial_components, spec,
-        transmission_zeros=transmission_zeros, f_grid=f_grid, z0=z0,
+        initial_components,
+        spec,
+        transmission_zeros=transmission_zeros,
+        f_grid=f_grid,
+        z0=z0,
     )
 
     def _loss(x: np.ndarray) -> float:
@@ -124,12 +129,18 @@ def optimize_filter(
         for r, v in zip(refs, x, strict=True):
             comps[r] = float(v)
         loss, _ = _evaluate_loss(
-            comps, spec, transmission_zeros=transmission_zeros, f_grid=f_grid, z0=z0,
+            comps,
+            spec,
+            transmission_zeros=transmission_zeros,
+            f_grid=f_grid,
+            z0=z0,
         )
         return loss
 
     res = minimize(
-        _loss, x0, method=method,
+        _loss,
+        x0,
+        method=method,
         options={"maxiter": max_iter, "xatol": 1e-15, "fatol": 1e-4, "adaptive": True},
     )
     optimized = dict(initial_components)
@@ -143,7 +154,11 @@ def optimize_filter(
                 snapped[r] = snap_to_eseries(v, snap_series).snapped
 
     final_loss, margins_final = _evaluate_loss(
-        snapped, spec, transmission_zeros=transmission_zeros, f_grid=f_grid, z0=z0,
+        snapped,
+        spec,
+        transmission_zeros=transmission_zeros,
+        f_grid=f_grid,
+        z0=z0,
     )
 
     return OptimizeResult(
