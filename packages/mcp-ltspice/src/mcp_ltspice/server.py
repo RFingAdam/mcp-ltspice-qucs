@@ -19,12 +19,20 @@ from mcp_ltspice.extract import (
     extract_sparams_from_raw,
     ladder_sparams_from_components,
 )
+from mcp_ltspice.find_zeros import find_transmission_zeros as _find_zeros
+from mcp_ltspice.montecarlo import monte_carlo_analysis as _monte_carlo
+from mcp_ltspice.optimize import optimize_filter as _optimize
 from mcp_ltspice.render import render_response as _render_response
 from mcp_ltspice.runner import RunResult, Simulator, run_simulation as _run_simulation
+from mcp_ltspice.stability import stability_check as _stability_check
 from mcp_ltspice.synthesis import (
     Topology,
     place_transmission_zero as _place_transmission_zero,
     synthesize_lc_lpf,
+)
+from mcp_ltspice.vendor_models import (
+    list_vendor_parts as _list_vendor_parts,
+    substitute_real_components as _substitute_real,
 )
 from pydantic import Field
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
@@ -299,6 +307,193 @@ def render_response(
         )
     except Exception as e:
         return error(f"render_response failed: {e}", tool_version=__version__)
+
+
+# ---------------------------------------------------------------------------
+# Tool 5: find_transmission_zeros
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description="Locate notches (transmission zeros) in S21 by peak detection.",
+)
+def find_transmission_zeros(
+    s2p_path: Annotated[str, Field(description="Path to .s2p file.")],
+    min_depth_db: Annotated[float, Field(gt=0)] = 20.0,
+    f_min_hz: float | None = None,
+    f_max_hz: float | None = None,
+) -> Envelope[list[dict[str, float]]]:
+    timer = Timer()
+    try:
+        return ok(
+            _find_zeros(
+                s2p_path, min_depth_db=min_depth_db,
+                f_min_hz=f_min_hz, f_max_hz=f_max_hz,
+            ),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"find_transmission_zeros failed: {e}", tool_version=__version__)
+
+
+# ---------------------------------------------------------------------------
+# Tool 6: substitute_real_components
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Replace ideal L/C values with vendor parts. Returns parasitic data "
+        "(Cp/Ls, ESR, SRF) so downstream sims include realistic loss behavior. "
+        "Vendors: 'coilcraft_0402hp', 'coilcraft_0603cs', 'murata_gjm_c0g', "
+        "'johanson_l', 'tdk_mlg'."
+    ),
+)
+def substitute_real_components(
+    components: dict[str, float],
+    inductor_vendor: str = "coilcraft_0402hp",
+    capacitor_vendor: str = "murata_gjm_c0g",
+) -> Envelope[dict[str, dict[str, Any]]]:
+    timer = Timer()
+    try:
+        return ok(
+            _substitute_real(components, inductor_vendor, capacitor_vendor),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"substitute_real_components failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="List the value catalogue for a vendor part series.")
+def list_vendor_parts(vendor: str) -> Envelope[list[float]]:
+    timer = Timer()
+    try:
+        return ok(
+            _list_vendor_parts(vendor),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"list_vendor_parts failed: {e}", tool_version=__version__)
+
+
+# ---------------------------------------------------------------------------
+# Tool 8: optimize_filter
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Iteratively tune component values against a spec via Nelder-Mead. "
+        "Loss = sum of negative spec margins (failing criteria only). Final "
+        "values snapped to E24 / E96 by default."
+    ),
+)
+def optimize_filter(
+    initial_components: dict[str, float],
+    spec: dict,
+    tune: list[str] | None = None,
+    transmission_zeros: bool = True,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    method: str = "Nelder-Mead",
+    max_iter: Annotated[int, Field(gt=0, le=5000)] = 500,
+    snap_series: str | None = "E24",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _optimize(
+            initial_components, spec, tune=tune,
+            transmission_zeros=transmission_zeros, z0=z0,
+            method=method,  # type: ignore[arg-type]
+            max_iter=max_iter,
+            snap_series=snap_series,  # type: ignore[arg-type]
+        )
+        return ok(
+            {
+                "initial_components": result.initial_components,
+                "optimized_components": result.optimized_components,
+                "snapped_components": result.snapped_components,
+                "initial_loss": result.initial_loss,
+                "final_loss": result.final_loss,
+                "n_iterations": result.n_iterations,
+                "converged": result.converged,
+                "margins_initial": result.margins_initial,
+                "margins_final": result.margins_final,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"optimize_filter failed: {e}", tool_version=__version__)
+
+
+# ---------------------------------------------------------------------------
+# Tool 9: monte_carlo_analysis
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Run Monte Carlo trials with Gaussian-distributed component tolerances. "
+        "Reports yield (% passing the spec) and per-metric mean/std/percentiles."
+    ),
+)
+def monte_carlo_analysis(
+    components: dict[str, float],
+    spec: dict,
+    tolerance_pct: dict[str, float] | float = 5.0,
+    n_runs: Annotated[int, Field(gt=0, le=100000)] = 1000,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    transmission_zeros: bool = True,
+    n_jobs: int = -1,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _monte_carlo(
+            components, spec,
+            tolerance_pct=tolerance_pct, n_runs=n_runs,
+            z0=z0, transmission_zeros=transmission_zeros, n_jobs=n_jobs,
+        )
+        return ok(
+            {
+                "n_runs": result.n_runs,
+                "n_passing": result.n_passing,
+                "yield_pct": result.yield_pct,
+                "per_metric_stats": result.per_metric_stats,
+                "failing_criteria_counts": result.failing_criteria_counts,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"monte_carlo_analysis failed: {e}", tool_version=__version__)
+
+
+# ---------------------------------------------------------------------------
+# Tool 11: stability_check
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Compute Rollett K-factor, |Δ|, and Edwards-Sinsky μ-factor across "
+        "frequency for a 2-port network. Use for amplifier/oscillator stability."
+    ),
+)
+def stability_check(
+    s2p_path: Annotated[str, Field(description="Path to .s2p file.")],
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _stability_check(s2p_path),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"stability_check failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
