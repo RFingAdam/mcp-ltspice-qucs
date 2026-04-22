@@ -17,7 +17,7 @@ uv sync --all-packages
 uv run pytest -q
 ```
 
-You should see ~150 tests pass. The two simulator-integration tests
+You should see ~180 tests pass. The two simulator-integration tests
 skip until you install ngspice or LTspice (below).
 
 If you don't want the dev tools (ruff / mypy / pytest / mkdocs), pass
@@ -107,6 +107,13 @@ For harmonic-balance support you also need Xyce:
 # Or build from source — see Sandia's Xyce build guide.
 ```
 
+The synthesis tools in `mcp-qucs-s` (microstrip, couplers, Richards
+transform) are pure-Python closed-form and work without Qucs-S
+installed. Tools that need a real simulator (`run_sp_analysis`,
+`run_harmonic_balance`, `extract_noise_parameters`,
+`export_touchstone`) detect the missing binary and return an envelope
+with `status="error"` and a clear install hint, rather than crashing.
+
 ## Pre-commit hooks (optional)
 
 ```bash
@@ -137,3 +144,8 @@ under it (`xvfb-run uv run python ...`).
 sure you `uv sync --all-packages --reinstall-package mcp-rf-analysis`
 after pulling fresh source so the editable install re-discovers the
 bundled resources.
+
+**`File voltage.asy not found` from the ngspice runner** — fixed in
+0.1.1: the runner now emits ngspice netlists directly from our `.asc`
+generator output, bypassing spicelib's symbol-library lookup which
+needed LTspice installed.
