@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from rf_mcp_common.touchstone import read_touchstone
 from scipy.signal import find_peaks
+
+from rf_mcp_common.touchstone import read_touchstone
 
 
 def find_transmission_zeros(

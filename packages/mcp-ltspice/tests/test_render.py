@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
@@ -20,7 +21,8 @@ def test_render_writes_png(tmp_path) -> None:
     s2p = network_to_touchstone(f, s, tmp_path / "design.s2p", z0=design.z0)
 
     out = render_response(
-        s2p, tmp_path / "plot.png",
+        s2p,
+        tmp_path / "plot.png",
         markers=[(500e6, "passband edge"), (2e9, "2× fc")],
         title="Butterworth N=5 demo",
     )
@@ -36,7 +38,8 @@ def test_render_respects_freq_range(tmp_path) -> None:
     s2p = network_to_touchstone(f, s, tmp_path / "design.s2p", z0=design.z0)
 
     out = render_response(
-        s2p, tmp_path / "plot.png",
+        s2p,
+        tmp_path / "plot.png",
         freq_range=(100e6, 2e9),
         show_s11=False,
     )

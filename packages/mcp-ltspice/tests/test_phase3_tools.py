@@ -7,6 +7,7 @@ import math
 
 import numpy as np
 import pytest
+
 from mcp_ltspice.eval import FilterSpec
 from mcp_ltspice.extract import (
     components_dict_to_elements,
@@ -26,7 +27,6 @@ from mcp_ltspice.vendor_models import (
     substitute_real_components,
 )
 from rf_mcp_common.touchstone import network_to_touchstone
-
 
 # --------------------------------------------------------------------------
 # Vendor models
@@ -82,9 +82,9 @@ def test_find_transmission_zeros_in_elliptic(tmp_path) -> None:
     comps = place_transmission_zero(
         design.components, trap_index=2, target_freq_hz=1.5e9, snap_series=None
     )["components"]
-    comps = place_transmission_zero(
-        comps, trap_index=4, target_freq_hz=2.0e9, snap_series=None
-    )["components"]
+    comps = place_transmission_zero(comps, trap_index=4, target_freq_hz=2.0e9, snap_series=None)[
+        "components"
+    ]
     # Build s2p
     f = np.geomspace(0.5e9, 5e9, 1001)
     elements = components_dict_to_elements(comps, transmission_zeros=True)
@@ -100,9 +100,7 @@ def test_find_transmission_zeros_in_elliptic(tmp_path) -> None:
 
 def test_find_zeros_respects_freq_window(tmp_path, lpf_s2p_for_zeros) -> None:
     zeros_all = find_transmission_zeros(lpf_s2p_for_zeros, min_depth_db=20)
-    zeros_low = find_transmission_zeros(
-        lpf_s2p_for_zeros, min_depth_db=20, f_max_hz=1.7e9
-    )
+    zeros_low = find_transmission_zeros(lpf_s2p_for_zeros, min_depth_db=20, f_max_hz=1.7e9)
     assert len(zeros_low) <= len(zeros_all)
 
 
@@ -114,9 +112,9 @@ def lpf_s2p_for_zeros(tmp_path):
     comps = place_transmission_zero(
         design.components, trap_index=2, target_freq_hz=1.5e9, snap_series=None
     )["components"]
-    comps = place_transmission_zero(
-        comps, trap_index=4, target_freq_hz=2.0e9, snap_series=None
-    )["components"]
+    comps = place_transmission_zero(comps, trap_index=4, target_freq_hz=2.0e9, snap_series=None)[
+        "components"
+    ]
     f = np.geomspace(0.5e9, 5e9, 1001)
     elements = components_dict_to_elements(comps, transmission_zeros=True)
     s = ladder_sparams_from_components(elements, f, z0=50.0)
@@ -135,7 +133,10 @@ def test_optimize_improves_loss_or_already_passing() -> None:
     spec = FilterSpec.model_validate(
         {
             "passband": {
-                "f_start": 1e6, "f_stop": 800e6, "il_max_db": 0.5, "rl_min_db": 12,
+                "f_start": 1e6,
+                "f_stop": 800e6,
+                "il_max_db": 0.5,
+                "rl_min_db": 12,
             },
             "stopband_targets": [
                 {"freq": 2e9, "rejection_min_db": 30, "label": "2H"},
@@ -143,8 +144,11 @@ def test_optimize_improves_loss_or_already_passing() -> None:
         }
     )
     res = optimize_filter(
-        design.components, spec, transmission_zeros=True,
-        max_iter=200, snap_series=None,
+        design.components,
+        spec,
+        transmission_zeros=True,
+        max_iter=200,
+        snap_series=None,
     )
     # Either it converges to zero loss or it stays at zero loss (already passing)
     assert res.final_loss <= res.initial_loss + 1e-6
@@ -154,12 +158,18 @@ def test_optimize_with_e24_snap_returns_snapped_values() -> None:
     design = synthesize_lc_lpf("butterworth", order=3, cutoff_hz=500e6)
     spec = {
         "passband": {
-            "f_start": 1e6, "f_stop": 250e6, "il_max_db": 0.5, "rl_min_db": 15,
+            "f_start": 1e6,
+            "f_stop": 250e6,
+            "il_max_db": 0.5,
+            "rl_min_db": 15,
         },
     }
     res = optimize_filter(
-        design.components, spec, transmission_zeros=False,
-        snap_series="E24", max_iter=50,
+        design.components,
+        spec,
+        transmission_zeros=False,
+        snap_series="E24",
+        max_iter=50,
     )
     # Snapped values should differ from continuous-optimized in general
     assert res.snapped_components.keys() == design.components.keys()
@@ -174,12 +184,19 @@ def test_monte_carlo_returns_yield_and_stats() -> None:
     design = synthesize_lc_lpf("butterworth", order=3, cutoff_hz=500e6)
     spec = {
         "passband": {
-            "f_start": 1e6, "f_stop": 250e6, "il_max_db": 0.5, "rl_min_db": 15,
+            "f_start": 1e6,
+            "f_stop": 250e6,
+            "il_max_db": 0.5,
+            "rl_min_db": 15,
         },
     }
     res = monte_carlo_analysis(
-        design.components, spec, tolerance_pct=5.0,
-        n_runs=50, n_jobs=1, transmission_zeros=False,
+        design.components,
+        spec,
+        tolerance_pct=5.0,
+        n_runs=50,
+        n_jobs=1,
+        transmission_zeros=False,
     )
     assert res.n_runs == 50
     assert 0 <= res.yield_pct <= 100
@@ -191,13 +208,20 @@ def test_monte_carlo_per_refdes_tolerance() -> None:
     design = synthesize_lc_lpf("butterworth", order=3, cutoff_hz=500e6)
     spec = {
         "passband": {
-            "f_start": 1e6, "f_stop": 250e6, "il_max_db": 0.5, "rl_min_db": 15,
+            "f_start": 1e6,
+            "f_stop": 250e6,
+            "il_max_db": 0.5,
+            "rl_min_db": 15,
         },
     }
-    tol = {r: 2.0 for r in design.components}
+    tol = dict.fromkeys(design.components, 2.0)
     res = monte_carlo_analysis(
-        design.components, spec, tolerance_pct=tol,
-        n_runs=20, n_jobs=1, transmission_zeros=False,
+        design.components,
+        spec,
+        tolerance_pct=tol,
+        n_runs=20,
+        n_jobs=1,
+        transmission_zeros=False,
     )
     assert res.n_runs == 20
 

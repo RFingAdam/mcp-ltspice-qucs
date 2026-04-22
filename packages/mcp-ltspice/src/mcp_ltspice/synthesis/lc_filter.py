@@ -218,8 +218,12 @@ def _fit_lc_to_prototype(
     bounds_lo[-1], bounds_hi[-1] = 0.999, 1.001
 
     res = least_squares(
-        _residuals, x0, bounds=(bounds_lo, bounds_hi),
-        max_nfev=5000, ftol=1e-10, xtol=1e-10,
+        _residuals,
+        x0,
+        bounds=(bounds_lo, bounds_hi),
+        max_nfev=5000,
+        ftol=1e-10,
+        xtol=1e-10,
     )
     return [float(v) for v in res.x]
 
@@ -335,7 +339,6 @@ def lc_ladder(
         # Recover by counting series-only positions
         idx = 1
         ref = 1
-        n = 0
         # Determine number of traps from list length
         # Total elements = n_series + 2*n_traps + 2 (terminations)
         total = len(g) - 2
@@ -360,7 +363,6 @@ def lc_ladder(
                 out[f"L{ref}"] = lt_phys
                 out[f"C{ref}"] = ct_phys
                 ref += 1
-            n += 1
         return out
 
     # Butterworth / Chebyshev: alternating series L / shunt C
@@ -400,7 +402,10 @@ def synthesize_lc_lpf(
 
     g, zeros_norm = g_coefficients(filter_type, order, ripple_db, stopband_atten_db)
     components = lc_ladder(
-        g, cutoff_hz, z0, topology,
+        g,
+        cutoff_hz,
+        z0,
+        topology,
         transmission_zeros_norm=zeros_norm if filter_type == "elliptic" else None,
     )
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 
 from mcp_rf_analysis.coex import check_coex_matrix, lookup_harmonic_victims
@@ -42,7 +40,9 @@ def test_antenna_isolation_basic() -> None:
 def test_antenna_isolation_with_small_ground_adds_penalty() -> None:
     base = compute_antenna_isolation_estimate(0.05, 2.4e9)
     with_penalty = compute_antenna_isolation_estimate(
-        0.05, 2.4e9, ground_plane_size_m=0.01,  # << λ/4 at 2.4 GHz (3.1 cm)
+        0.05,
+        2.4e9,
+        ground_plane_size_m=0.01,  # << λ/4 at 2.4 GHz (3.1 cm)
     )
     assert with_penalty["isolation_db"] == base["isolation_db"] - 6
 

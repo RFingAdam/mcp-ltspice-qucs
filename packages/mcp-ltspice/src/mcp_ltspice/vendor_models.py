@@ -62,7 +62,10 @@ for L_nh, Cp_pf, Rs_ohm, srf_ghz in [
     L = L_nh * 1e-9
     Cp = Cp_pf * 1e-12
     COILCRAFT_0402HP[L] = ParasiticInductor(
-        L_h=L, Cp_f=Cp, Rs_ohm=Rs_ohm, srf_hz=srf_ghz * 1e9,
+        L_h=L,
+        Cp_f=Cp,
+        Rs_ohm=Rs_ohm,
+        srf_hz=srf_ghz * 1e9,
     )
 
 # -------- Coilcraft 0603CS series (lower frequency, higher inductance) ---
@@ -77,7 +80,10 @@ for L_nh, Cp_pf, Rs_ohm, srf_ghz in [
     L = L_nh * 1e-9
     Cp = Cp_pf * 1e-12
     COILCRAFT_0603CS[L] = ParasiticInductor(
-        L_h=L, Cp_f=Cp, Rs_ohm=Rs_ohm, srf_hz=srf_ghz * 1e9,
+        L_h=L,
+        Cp_f=Cp,
+        Rs_ohm=Rs_ohm,
+        srf_hz=srf_ghz * 1e9,
     )
 
 
@@ -106,7 +112,10 @@ for C_pf, Ls_nh, Rs_ohm in [
     C = C_pf * 1e-12
     Ls = Ls_nh * 1e-9
     MURATA_GJM_C0G[C] = ParasiticCapacitor(
-        C_f=C, Ls_h=Ls, Rs_ohm=Rs_ohm, srf_hz=_srf_from_lc(Ls, C),
+        C_f=C,
+        Ls_h=Ls,
+        Rs_ohm=Rs_ohm,
+        srf_hz=_srf_from_lc(Ls, C),
     )
 
 
@@ -118,7 +127,9 @@ JOHANSON_L: dict[float, ParasiticInductor] = COILCRAFT_0402HP.copy()
 TDK_MLG: dict[float, ParasiticInductor] = COILCRAFT_0402HP.copy()
 
 
-VendorName = Literal["coilcraft_0402hp", "coilcraft_0603cs", "murata_gjm_c0g", "johanson_l", "tdk_mlg"]
+VendorName = Literal[
+    "coilcraft_0402hp", "coilcraft_0603cs", "murata_gjm_c0g", "johanson_l", "tdk_mlg"
+]
 
 
 _VENDOR_TABLES: dict[str, dict[float, object]] = {

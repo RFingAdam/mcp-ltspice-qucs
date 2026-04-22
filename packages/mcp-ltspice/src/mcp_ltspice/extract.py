@@ -21,6 +21,7 @@ from typing import Literal
 import numpy as np
 import skrf as rf
 from numpy.typing import NDArray
+
 from rf_mcp_common.touchstone import network_to_touchstone
 
 ElementType = Literal["series_l", "shunt_c", "shunt_l", "series_c", "shunt_lc_trap"]
@@ -139,6 +140,7 @@ def components_dict_to_elements(
     components are L1, L2+C2 (trap), L3, L4+C4 (trap), L5, ...
     Pairs (Lk, Ck) for even k form shunt LC traps; lone Lk are series.
     """
+
     # Sort by numeric refdes index
     def _idx(name: str) -> int:
         m = re.match(r"[LC](\d+)", name)
@@ -176,9 +178,7 @@ def components_dict_to_elements(
         c_key = f"C{idx}"
         if l_key in components and c_key in components:
             # Trap
-            elements.append(
-                ("shunt_lc_trap", {"L": components[l_key], "C": components[c_key]})
-            )
+            elements.append(("shunt_lc_trap", {"L": components[l_key], "C": components[c_key]}))
             seen.add(l_key)
             seen.add(c_key)
         elif l_key in components:
@@ -247,9 +247,7 @@ def extract_sparams_from_raw(
         v_trace = raw.get_trace(f"V({node_k})")
         i_trace = raw.get_trace(f"I(Rs{k})")
         if v_trace is None or i_trace is None:
-            raise ValueError(
-                f"Missing trace for port {k}: need V({node_k}) and I(Rs{k})"
-            )
+            raise ValueError(f"Missing trace for port {k}: need V({node_k}) and I(Rs{k})")
         v_k = np.asarray(v_trace.get_wave(), dtype=np.complex128)
         i_k = np.asarray(i_trace.get_wave(), dtype=np.complex128)
 

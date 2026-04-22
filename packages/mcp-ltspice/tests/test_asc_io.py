@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from mcp_ltspice.asc_io import (
     from_ltspice_value,
     generate_lpf_asc,
@@ -56,7 +57,8 @@ def test_round_trip_value_preserves_within_4_sigfigs() -> None:
 def test_generate_lpf_asc_butterworth(tmp_path) -> None:
     design = synthesize_lc_lpf("butterworth", order=5, cutoff_hz=500e6)
     out = generate_lpf_asc(
-        design.components, tmp_path / "lpf5.asc",
+        design.components,
+        tmp_path / "lpf5.asc",
         topology="lpf_t_butterworth_chebyshev",
     )
     assert out.exists()
@@ -70,10 +72,15 @@ def test_generate_lpf_asc_butterworth(tmp_path) -> None:
 
 def test_generate_lpf_asc_elliptic(tmp_path) -> None:
     design = synthesize_lc_lpf(
-        "elliptic", order=5, cutoff_hz=1e9, ripple_db=0.1, stopband_atten_db=30,
+        "elliptic",
+        order=5,
+        cutoff_hz=1e9,
+        ripple_db=0.1,
+        stopband_atten_db=30,
     )
     out = generate_lpf_asc(
-        design.components, tmp_path / "ellip5.asc",
+        design.components,
+        tmp_path / "ellip5.asc",
         topology="lpf_t_elliptic",
     )
     text = out.read_text()

@@ -36,10 +36,7 @@ def _single_run(
     rng = np.random.default_rng(seed)
     sampled = {}
     for refdes, nominal in components.items():
-        tol = (
-            tolerance_pct[refdes] if isinstance(tolerance_pct, dict)
-            else tolerance_pct
-        )
+        tol = tolerance_pct[refdes] if isinstance(tolerance_pct, dict) else tolerance_pct
         # Gaussian: ±3σ ≈ tolerance window
         sigma = nominal * (tol / 100.0) / 3.0
         sampled[refdes] = max(rng.normal(nominal, sigma), nominal * 0.01)
@@ -103,13 +100,20 @@ def monte_carlo_analysis(
         spec = FilterSpec.model_validate(spec)
 
     pb = spec.passband
-    span = max(pb.f_stop * 5, max((t.freq for t in spec.stopband_targets), default=pb.f_stop * 5) * 1.5)
+    span = max(
+        pb.f_stop * 5, max((t.freq for t in spec.stopband_targets), default=pb.f_stop * 5) * 1.5
+    )
     f_grid = np.geomspace(max(pb.f_start, 1e3), span, f_grid_npoints)
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(_single_run)(
-            base_seed + i, components, tolerance_pct, spec,
-            transmission_zeros, f_grid, z0,
+            base_seed + i,
+            components,
+            tolerance_pct,
+            spec,
+            transmission_zeros,
+            f_grid,
+            z0,
         )
         for i in range(n_runs)
     )

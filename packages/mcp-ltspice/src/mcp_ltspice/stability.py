@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+
 from rf_mcp_common.touchstone import read_touchstone
 
 
@@ -26,9 +27,7 @@ def stability_check(s2p_path: str | Path) -> dict[str, Any]:
     delta = s11 * s22 - s12 * s21
     denom_k = 2.0 * np.abs(s12 * s21) + 1e-30
     k = (1 - np.abs(s11) ** 2 - np.abs(s22) ** 2 + np.abs(delta) ** 2) / denom_k
-    mu = (1 - np.abs(s11) ** 2) / (
-        np.abs(s22 - np.conj(s11) * delta) + np.abs(s12 * s21) + 1e-30
-    )
+    mu = (1 - np.abs(s11) ** 2) / (np.abs(s22 - np.conj(s11) * delta) + np.abs(s12 * s21) + 1e-30)
     return {
         "freq_hz": net.f.tolist(),
         "k_factor": k.real.tolist(),

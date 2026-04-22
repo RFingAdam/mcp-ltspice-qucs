@@ -146,11 +146,11 @@ def check_coex_matrix(
 # Re-export for convenience
 __all__ = [
     "check_coex_matrix",
+    "db_minus",
     "list_5gnr_bands",
     "list_gnss_bands",
     "list_halow_channels",
     "list_ism_bands",
     "list_lte_bands",
     "lookup_harmonic_victims",
-    "db_minus",
 ]

@@ -15,8 +15,13 @@ from rf_mcp_common.logging import JsonFormatter, get_logger, tool_timer
 def test_json_formatter_emits_valid_json() -> None:
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="x.py", lineno=1,
-        msg="hello %s", args=("world",), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="x.py",
+        lineno=1,
+        msg="hello %s",
+        args=("world",),
+        exc_info=None,
     )
     out = formatter.format(record)
     parsed = json.loads(out)
@@ -62,9 +67,8 @@ def test_tool_timer_marks_error_on_exception() -> None:
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
-    with pytest.raises(RuntimeError):
-        with tool_timer(logger, "bad_tool"):
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), tool_timer(logger, "bad_tool"):
+        raise RuntimeError("boom")
 
     parsed = json.loads(buf.getvalue().strip())
     assert parsed["status"] == "error"

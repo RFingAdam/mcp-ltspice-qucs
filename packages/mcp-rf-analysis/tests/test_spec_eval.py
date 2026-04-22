@@ -29,7 +29,11 @@ def test_check_rejection_out_of_sweep(lpf_s2p) -> None:
 
 def test_check_passband_compliance_pass(lpf_s2p) -> None:
     res = check_passband_compliance(
-        lpf_s2p, 1e6, 250e6, il_max_db=0.5, rl_min_db=15,
+        lpf_s2p,
+        1e6,
+        250e6,
+        il_max_db=0.5,
+        rl_min_db=15,
     )
     assert res["status"] == "pass"
 
@@ -37,7 +41,11 @@ def test_check_passband_compliance_pass(lpf_s2p) -> None:
 def test_check_passband_compliance_fail_above_cutoff(lpf_s2p) -> None:
     # Forcing passband through 1 GHz where the filter is rolling off
     res = check_passband_compliance(
-        lpf_s2p, 1e6, 1e9, il_max_db=0.5, rl_min_db=15,
+        lpf_s2p,
+        1e6,
+        1e9,
+        il_max_db=0.5,
+        rl_min_db=15,
     )
     assert res["status"] == "fail"
 

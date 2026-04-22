@@ -37,8 +37,7 @@ def write_touchstone(
     p.parent.mkdir(parents=True, exist_ok=True)
     network.write_touchstone(str(p.with_suffix("")), form=form)
     # skrf appends the appropriate .sNp extension based on nports
-    expected = p.parent / f"{p.stem}.s{network.nports}p"
-    return expected
+    return p.parent / f"{p.stem}.s{network.nports}p"
 
 
 def network_to_touchstone(
@@ -56,9 +55,7 @@ def network_to_touchstone(
     if s.ndim != 3:
         raise ValueError(f"s must be (npoints, nports, nports), got shape {s.shape}")
     if s.shape[0] != freq_hz.size:
-        raise ValueError(
-            f"s.shape[0]={s.shape[0]} does not match freq_hz.size={freq_hz.size}"
-        )
+        raise ValueError(f"s.shape[0]={s.shape[0]} does not match freq_hz.size={freq_hz.size}")
     if s.shape[1] != s.shape[2]:
         raise ValueError(f"s must be square in port axes, got {s.shape}")
 
@@ -80,15 +77,11 @@ def sparams_at(
     """
     f = network.f  # already in Hz
     if freq_hz < f.min() or freq_hz > f.max():
-        raise ValueError(
-            f"freq_hz={freq_hz} outside sweep [{f.min()}, {f.max()}]"
-        )
+        raise ValueError(f"freq_hz={freq_hz} outside sweep [{f.min()}, {f.max()}]")
     if not interp:
         idx = int(np.argmin(np.abs(f - freq_hz)))
         if not np.isclose(f[idx], freq_hz):
-            raise ValueError(
-                f"freq_hz={freq_hz} not in sweep and interp=False"
-            )
+            raise ValueError(f"freq_hz={freq_hz} not in sweep and interp=False")
         return np.asarray(network.s[idx])
 
     nports = network.nports

@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 import pytest
+
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
@@ -16,7 +17,6 @@ from mcp_ltspice.synthesis import (
     lc_ladder,
     synthesize_lc_lpf,
 )
-
 
 # ---------------------------------------------------------------------------
 # g-coefficient tables from Pozar "Microwave Engineering" 4th ed., Tables 8.3, 8.4
@@ -70,7 +70,6 @@ def test_lc_ladder_pi_topology_swaps_ls_and_cs() -> None:
     g, _ = g_coefficients("butterworth", order=3)
     fc = 1e9
     z0 = 50.0
-    t_comps = lc_ladder(g, fc, z0, Topology.SERIES_FIRST)
     pi_comps = lc_ladder(g, fc, z0, Topology.SHUNT_FIRST)
     # In Pi: position 1 is shunt C, position 2 is series L, position 3 is shunt C
     assert "C1" in pi_comps and "L2" in pi_comps and "C3" in pi_comps
@@ -109,9 +108,7 @@ def test_butterworth_n5_response() -> None:
 def test_chebyshev1_n5_passband_ripple() -> None:
     fc = 500e6
     ripple = 0.1
-    design = synthesize_lc_lpf(
-        "chebyshev1", order=5, cutoff_hz=fc, ripple_db=ripple, z0=50.0
-    )
+    design = synthesize_lc_lpf("chebyshev1", order=5, cutoff_hz=fc, ripple_db=ripple, z0=50.0)
     f = np.linspace(fc * 0.01, fc, 200)
     s21 = _s21_db(design.components, f, topology="series_first")
     # Ripple bound: passband |S21| stays within [-ripple, 0] dB
@@ -148,14 +145,21 @@ def test_elliptic_n5_has_finite_transmission_zeros() -> None:
 def test_elliptic_n7_passband_and_stopband() -> None:
     fc = 1.4e9
     design = synthesize_lc_lpf(
-        "elliptic", order=7, cutoff_hz=fc,
-        ripple_db=0.1, stopband_atten_db=40,
+        "elliptic",
+        order=7,
+        cutoff_hz=fc,
+        ripple_db=0.1,
+        stopband_atten_db=40,
     )
     # Sample the response analytically
     f = np.array(
         [
-            fc * 0.1, fc * 0.5, fc * 0.9,  # passband
-            fc * 1.5, fc * 2.0, fc * 3.0,  # stopband
+            fc * 0.1,
+            fc * 0.5,
+            fc * 0.9,  # passband
+            fc * 1.5,
+            fc * 2.0,
+            fc * 3.0,  # stopband
         ]
     )
     s21 = _s21_db(design.components, f, topology="series_first", transmission_zeros=True)

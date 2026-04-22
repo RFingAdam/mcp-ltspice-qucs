@@ -41,12 +41,16 @@ def test_evaluate_filter_spec_tool_returns_ok(tmp_path) -> None:
     )
     spec = {
         "passband": {
-            "f_start": 1e6, "f_stop": 500e6, "il_max_db": 0.5, "rl_min_db": 15,
+            "f_start": 1e6,
+            "f_stop": 500e6,
+            "il_max_db": 0.5,
+            "rl_min_db": 15,
         },
         "stopband_targets": [{"freq": 3e9, "rejection_min_db": 30, "label": "deep"}],
     }
     env = server.evaluate_filter_spec_tool(
-        s2p_path=synth.data["s2p_path"], spec=spec,
+        s2p_path=synth.data["s2p_path"],
+        spec=spec,
     )
     assert env.status == "ok"
     assert env.data["overall"] == "pass"

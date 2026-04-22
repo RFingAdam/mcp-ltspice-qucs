@@ -71,8 +71,7 @@ def set_trap_frequency(
     c_key = f"C{trap_index}"
     if l_key not in new_comps or c_key not in new_comps:
         raise KeyError(
-            f"Trap {trap_index} not found in components "
-            f"(missing {l_key} and/or {c_key})"
+            f"Trap {trap_index} not found in components (missing {l_key} and/or {c_key})"
         )
 
     l_new, c_new = trap_lc_for_freq(
@@ -115,8 +114,11 @@ def place_transmission_zero(
         raise KeyError(f"Trap {trap_index} (need {l_key}+{c_key}) not in components")
 
     new = set_trap_frequency(
-        components, trap_index, target_freq_hz,
-        preserve_ratio=preserve_ratio, snap_series=snap_series,
+        components,
+        trap_index,
+        target_freq_hz,
+        preserve_ratio=preserve_ratio,
+        snap_series=snap_series,
     )
     l_new = new[l_key]
     c_new = new[c_key]
