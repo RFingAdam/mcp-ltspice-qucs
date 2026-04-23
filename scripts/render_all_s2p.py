@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from rf_mcp_common.touchstone import read_touchstone
 
 from mcp_ltspice.render import render_response
+from rf_mcp_common.touchstone import read_touchstone
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = ROOT / "examples"
@@ -80,7 +80,8 @@ def main() -> int:
             markers = _markers_for(s2p)
             title = f"{s2p.parent.name} / {s2p.stem}"
             render_response(
-                s2p, png,
+                s2p,
+                png,
                 markers=markers,
                 title=title,
                 show_s11=True,
@@ -91,9 +92,7 @@ def main() -> int:
             print(f"  ✗ {s2p.relative_to(ROOT)}: {e}")
             n_failed += 1
 
-    print(
-        f"\nDone: {n_rendered} rendered, {n_skipped} skipped, {n_failed} failed."
-    )
+    print(f"\nDone: {n_rendered} rendered, {n_skipped} skipped, {n_failed} failed.")
     return 0 if n_failed == 0 else 1
 
 
