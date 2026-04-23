@@ -24,6 +24,7 @@ import numpy as np
 
 from mcp_ltspice.analog import cascaded_lpf_design
 from mcp_ltspice.analog.cascade import transfer_function_db
+from mcp_ltspice.schematic_render import render_cascaded_lpf_schematic
 from mcp_ltspice.vendors import find_opamp_for_application
 
 HERE = Path(__file__).parent
@@ -97,7 +98,17 @@ def main() -> None:
     rejection_at_nyquist = float(np.interp(48_000, f, h))
     print(f"  Rejection at Nyquist (48 kHz): {rejection_at_nyquist:.1f} dB")
 
-    # 4. Write report
+    # 4. Render publication-quality Sallen-Key schematic for each stage
+    print("\n  Rendering per-stage schematics...")
+    schematic_paths = render_cascaded_lpf_schematic(
+        design,
+        output_dir=HERE,
+        base_name="schematic_stage",
+    )
+    for p in schematic_paths:
+        print(f"  Wrote: {p.name}")
+
+    # 5. Write report
     _write_report(HERE / "report.md", design, chosen, rejection_at_nyquist)
     print("  Wrote: report.md")
 
