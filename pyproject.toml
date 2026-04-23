@@ -64,6 +64,7 @@ ignore = [
     "RUF001",   # ambiguous unicode chars (math symbols × σ – are intentional)
     "RUF002",
     "RUF003",
+    "SIM108",   # ternaries aren't always more readable than if/else blocks
 ]
 
 [tool.ruff.lint.per-file-ignores]
