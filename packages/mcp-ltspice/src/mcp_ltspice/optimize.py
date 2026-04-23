@@ -43,8 +43,15 @@ def _evaluate_loss(
     transmission_zeros: bool,
     f_grid: np.ndarray,
     z0: float,
+    passband_weight: float = 5.0,
 ) -> tuple[float, list[dict[str, Any]]]:
-    """Evaluate spec loss = sum of (-margin) for failing criteria only."""
+    """Evaluate spec loss = weighted sum of (-margin) for failing criteria.
+
+    Passband margins (IL + RL) get ``passband_weight`` × the weight of
+    stopband margins. This biases the optimizer toward keeping passband
+    healthy, which matches engineering intent: a filter that meets
+    every stopband target but blows the insertion loss is useless.
+    """
     elements = components_dict_to_elements(
         components, transmission_zeros=transmission_zeros, topology="series_first"
     )
@@ -65,9 +72,9 @@ def _evaluate_loss(
         margins.append({"label": "Passband IL", "margin_db": il_margin, "measured": worst_il})
         margins.append({"label": "Passband RL", "margin_db": rl_margin, "measured": worst_rl})
         if il_margin < 0:
-            loss += -il_margin
+            loss += passband_weight * (-il_margin)
         if rl_margin < 0:
-            loss += -rl_margin
+            loss += passband_weight * (-rl_margin)
 
     for tgt in spec.stopband_targets:
         if tgt.freq < f_grid.min() or tgt.freq > f_grid.max():
@@ -101,6 +108,7 @@ def optimize_filter(
     bound_to_vendor: bool = False,
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
+    passband_weight: float = 5.0,
     f_grid_npoints: int = 801,
 ) -> OptimizeResult:
     """Optimize component values to satisfy a filter spec.
@@ -144,6 +152,7 @@ def optimize_filter(
             transmission_zeros=transmission_zeros,
             f_grid=f_grid,
             z0=z0,
+            passband_weight=passband_weight,
         )
         return loss
 
