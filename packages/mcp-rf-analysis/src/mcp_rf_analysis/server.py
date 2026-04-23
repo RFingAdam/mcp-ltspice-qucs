@@ -24,6 +24,20 @@ from mcp_rf_analysis.coex import (
 from mcp_rf_analysis.coex import (
     lookup_harmonic_victims as _lookup_harmonic_victims,
 )
+
+# Phase 7
+from mcp_rf_analysis.emc import (
+    cispr_limit_at as _cispr_limit_at,
+)
+from mcp_rf_analysis.emc import (
+    fcc_part15_radiated_limit_at as _fcc_radiated_limit,
+)
+from mcp_rf_analysis.emc import (
+    predict_conducted_emissions as _predict_conducted,
+)
+from mcp_rf_analysis.emc import (
+    predict_radiated_emissions_loop as _predict_radiated,
+)
 from mcp_rf_analysis.link import (
     compute_antenna_isolation_estimate as _compute_antenna_isolation_estimate,
 )
@@ -47,6 +61,18 @@ from mcp_rf_analysis.network_ops import (
 )
 from mcp_rf_analysis.network_ops import (
     smith_chart_data as _smith_chart_data,
+)
+from mcp_rf_analysis.si import (
+    estimate_fext_db as _estimate_fext,
+)
+from mcp_rf_analysis.si import (
+    estimate_next_db as _estimate_next,
+)
+from mcp_rf_analysis.si import (
+    eye_diagram_from_s2p as _eye_diagram,
+)
+from mcp_rf_analysis.si import (
+    tdr_from_s11 as _tdr,
 )
 from mcp_rf_analysis.spec_eval import (
     check_passband_compliance as _check_passband_compliance,
@@ -344,6 +370,197 @@ def fit_equivalent_circuit(
     topology: str = "series_l_shunt_c",
 ) -> Envelope[dict[str, Any]]:
     return _wrap(_fit_equivalent_circuit, s2p_path, topology=topology)
+
+
+# ===========================================================================
+# Phase 7: Signal Integrity + EMC pre-compliance
+# ===========================================================================
+
+
+# ----- Signal integrity ----------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Time-Domain Reflectometry from S11. Inverse-FFT to time domain "
+        "and convert to Z(distance) profile via the substrate's phase "
+        "velocity. Useful for locating impedance discontinuities."
+    ),
+)
+def tdr_from_s11(
+    s2p_path: str,
+    er_eff: Annotated[float, Field(gt=0)] = 4.0,
+    window: str = "hann",
+) -> Envelope[dict[str, Any]]:
+    return _wrap(_tdr, s2p_path, er_eff=er_eff, window=window)
+
+
+@mcp.tool(
+    description=(
+        "Compute eye-diagram metrics for a channel given its S2P. "
+        "Returns eye height, width (UI), worst-case ISI."
+    ),
+)
+def eye_diagram_from_s2p(
+    s2p_path: str,
+    bitrate_gbps: Annotated[float, Field(gt=0)],
+    n_bits: Annotated[int, Field(gt=0, le=10000)] = 1024,
+    swing_v: Annotated[float, Field(gt=0)] = 1.0,
+    rise_time_ps: float | None = None,
+    seed: int = 0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        m = _eye_diagram(
+            s2p_path,
+            bitrate_gbps=bitrate_gbps,
+            n_bits=n_bits,
+            swing_v=swing_v,
+            rise_time_ps=rise_time_ps,
+            seed=seed,
+        )
+        return ok(
+            {
+                "bitrate_gbps": m.bitrate_gbps,
+                "n_bits": m.n_bits,
+                "eye_height_v": m.eye_height_v,
+                "eye_width_ui": m.eye_width_ui,
+                "isi_pp_v": m.isi_pp_v,
+                "sample_point_v_top": m.sample_point_v_top,
+                "sample_point_v_bot": m.sample_point_v_bot,
+                "notes": m.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"eye_diagram_from_s2p failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Near-End Crosstalk (NEXT) estimate for two coupled traces.")
+def estimate_next_db(
+    coupling_length_mm: Annotated[float, Field(gt=0)],
+    trace_separation_mm: Annotated[float, Field(gt=0)],
+    substrate_height_mm: Annotated[float, Field(gt=0)],
+    rise_time_ps: Annotated[float, Field(gt=0)],
+    er: Annotated[float, Field(gt=0)] = 4.0,
+) -> Envelope[dict[str, float]]:
+    return _wrap(
+        _estimate_next,
+        coupling_length_mm=coupling_length_mm,
+        trace_separation_mm=trace_separation_mm,
+        substrate_height_mm=substrate_height_mm,
+        rise_time_ps=rise_time_ps,
+        er=er,
+    )
+
+
+@mcp.tool(description="Far-End Crosstalk (FEXT) estimate for two coupled traces.")
+def estimate_fext_db(
+    coupling_length_mm: Annotated[float, Field(gt=0)],
+    trace_separation_mm: Annotated[float, Field(gt=0)],
+    substrate_height_mm: Annotated[float, Field(gt=0)],
+    rise_time_ps: Annotated[float, Field(gt=0)],
+    er: Annotated[float, Field(gt=0)] = 4.0,
+) -> Envelope[dict[str, float]]:
+    return _wrap(
+        _estimate_fext,
+        coupling_length_mm=coupling_length_mm,
+        trace_separation_mm=trace_separation_mm,
+        substrate_height_mm=substrate_height_mm,
+        rise_time_ps=rise_time_ps,
+        er=er,
+    )
+
+
+# ----- EMC pre-compliance --------------------------------------------------
+
+
+@mcp.tool(description="Conducted-emissions limit (dBuV) at a frequency for CISPR 22 / FCC 15B.")
+def cispr_limit_at(
+    freq_hz: Annotated[float, Field(gt=0)],
+    standard: str = "cispr22_b",
+) -> Envelope[dict[str, float]]:
+    timer = Timer()
+    try:
+        limit = _cispr_limit_at(freq_hz, standard=standard)  # type: ignore[arg-type]
+        return ok(
+            {"freq_hz": freq_hz, "standard": standard, "limit_dbuv": limit},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"cispr_limit_at failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Convert an AC line-current spectrum to LISN voltage and check "
+        "against CISPR 22 / FCC 15B conducted-emissions limits."
+    ),
+)
+def predict_conducted_emissions(
+    line_current_spectrum: list[list[float]],
+    standard: str = "cispr22_b",
+    margin_db: Annotated[float, Field(ge=0)] = 6.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        spectrum = [(float(f), float(i)) for f, i in line_current_spectrum]
+        return ok(
+            _predict_conducted(spectrum, standard=standard, margin_db=margin_db),  # type: ignore[arg-type]
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"predict_conducted_emissions failed: {e}",
+            tool_version=__version__,
+        )
+
+
+@mcp.tool(description="FCC Part 15.109 Class B radiated-emissions limit (dBuV/m) at distance.")
+def fcc_part15_radiated_limit_at(
+    freq_hz: Annotated[float, Field(gt=0)],
+    distance_m: Annotated[float, Field(gt=0)] = 3.0,
+) -> Envelope[dict[str, float]]:
+    timer = Timer()
+    try:
+        return ok(
+            {
+                "freq_hz": freq_hz,
+                "distance_m": distance_m,
+                "limit_dbuv_per_m": _fcc_radiated_limit(freq_hz, distance_m=distance_m),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"fcc_part15_radiated_limit_at failed: {e}",
+            tool_version=__version__,
+        )
+
+
+@mcp.tool(
+    description=(
+        "Estimate radiated E-field from a current-carrying loop (small-loop "
+        "approximation). Useful first-order radiated-EMI check."
+    ),
+)
+def predict_radiated_emissions_loop(
+    current_a: Annotated[float, Field(gt=0)],
+    loop_area_cm2: Annotated[float, Field(gt=0)],
+    freq_hz: Annotated[float, Field(gt=0)],
+    measurement_distance_m: Annotated[float, Field(gt=0)] = 3.0,
+) -> Envelope[dict[str, float]]:
+    return _wrap(
+        _predict_radiated,
+        current_a=current_a,
+        loop_area_cm2=loop_area_cm2,
+        freq_hz=freq_hz,
+        measurement_distance_m=measurement_distance_m,
+    )
 
 
 def main() -> None:
