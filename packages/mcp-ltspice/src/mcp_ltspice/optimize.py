@@ -19,6 +19,7 @@ from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
 )
+from mcp_ltspice.vendor_models import list_vendor_parts
 from rf_mcp_common.ecomp import ESeries, snap_to_eseries
 
 
@@ -81,6 +82,12 @@ def _evaluate_loss(
     return loss, margins
 
 
+def _snap_to_vendor(value: float, vendor: str, kind: Literal["L", "C"]) -> float:
+    """Snap a continuous value to the nearest entry in the vendor's catalog."""
+    catalog = list_vendor_parts(vendor)
+    return min(catalog, key=lambda v: abs(v - value))
+
+
 def optimize_filter(
     initial_components: dict[str, float],
     spec: FilterSpec | dict,
@@ -91,6 +98,9 @@ def optimize_filter(
     method: Literal["Nelder-Mead", "Powell", "L-BFGS-B"] = "Nelder-Mead",
     max_iter: int = 500,
     snap_series: ESeries | str | None = ESeries.E24,
+    bound_to_vendor: bool = False,
+    inductor_vendor: str = "coilcraft_0402hp",
+    capacitor_vendor: str = "murata_gjm_c0g",
     f_grid_npoints: int = 801,
 ) -> OptimizeResult:
     """Optimize component values to satisfy a filter spec.
@@ -137,18 +147,56 @@ def optimize_filter(
         )
         return loss
 
-    res = minimize(
-        _loss,
-        x0,
-        method=method,
-        options={"maxiter": max_iter, "xatol": 1e-15, "fatol": 1e-4, "adaptive": True},
-    )
+    if bound_to_vendor:
+        # Constrain the search to the convex hull of the vendor catalog
+        # for each component. This stops the optimizer wandering outside
+        # the realizable range (e.g. a 0.6 nH inductor when the smallest
+        # 0402HP is 1 nH).
+        from scipy.optimize import differential_evolution
+
+        bounds: list[tuple[float, float]] = []
+        for r in refs:
+            kind = "L" if r.startswith("L") else "C"
+            vendor = inductor_vendor if kind == "L" else capacitor_vendor
+            catalog = list_vendor_parts(vendor)
+            bounds.append((min(catalog), max(catalog)))
+
+        de_res = differential_evolution(
+            _loss,
+            bounds,
+            maxiter=max(50, max_iter // 10),
+            popsize=15,
+            seed=0,
+            tol=1e-6,
+            polish=True,
+        )
+        res = de_res
+    else:
+        res = minimize(
+            _loss,
+            x0,
+            method=method,
+            options={
+                "maxiter": max_iter,
+                "xatol": 1e-15,
+                "fatol": 1e-4,
+                "adaptive": True,
+            },
+        )
     optimized = dict(initial_components)
     for r, v in zip(refs, res.x, strict=True):
         optimized[r] = float(v)
 
     snapped = dict(optimized)
-    if snap_series is not None:
+    if bound_to_vendor:
+        # Snap each tuned component to the nearest vendor catalog value.
+        # This guarantees the final values are actually purchasable, at
+        # the cost of slightly worse spec margins than continuous opt.
+        for r in refs:
+            kind = "L" if r.startswith("L") else "C"
+            vendor = inductor_vendor if kind == "L" else capacitor_vendor
+            snapped[r] = _snap_to_vendor(optimized[r], vendor, kind)  # type: ignore[arg-type]
+    elif snap_series is not None:
         for r, v in optimized.items():
             if r in refs:
                 snapped[r] = snap_to_eseries(v, snap_series).snapped
@@ -167,8 +215,8 @@ def optimize_filter(
         snapped_components=snapped,
         initial_loss=initial_loss,
         final_loss=final_loss,
-        n_iterations=int(res.nit),
-        converged=bool(res.success),
+        n_iterations=int(getattr(res, "nit", 0)),
+        converged=bool(getattr(res, "success", False)),
         margins_initial=margins_initial,
         margins_final=margins_final,
     )
