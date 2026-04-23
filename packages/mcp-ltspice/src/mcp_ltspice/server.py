@@ -78,6 +78,7 @@ from mcp_ltspice.power import (
 )
 from mcp_ltspice.power.ldo import required_psrr_for_ripple_target as _required_psrr
 from mcp_ltspice.render import render_response as _render_response
+from mcp_ltspice.report_pdf import build_design_report_pdf as _build_design_report_pdf
 from mcp_ltspice.runner import RunResult, Simulator
 from mcp_ltspice.runner import run_simulation as _run_simulation
 from mcp_ltspice.schematic_render import (
@@ -1572,6 +1573,32 @@ def render_asc_as_schematic(
     except Exception as e:
         return error(
             f"render_asc_as_schematic failed: {e}",
+            tool_version=__version__,
+        )
+
+
+@mcp.tool(
+    description=(
+        "Bundle a design directory's artifacts (schematics, response plots, "
+        "and report.md) into a single shareable PDF."
+    ),
+)
+def build_design_report_pdf(
+    design_dir: Annotated[str, Field(description="Directory containing PNGs and report.md.")],
+    output_pdf: Annotated[str, Field(description="Output PDF path.")],
+    title: str | None = None,
+) -> Envelope[dict[str, str]]:
+    timer = Timer()
+    try:
+        out = _build_design_report_pdf(design_dir, output_pdf, title=title)
+        return ok(
+            {"path": str(out)},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"build_design_report_pdf failed: {e}",
             tool_version=__version__,
         )
 

@@ -78,6 +78,8 @@ site/
 examples/halow_lpf/
 examples/private/
 examples/_local/
+# Generated bundle PDFs — re-buildable from each example's design.py
+examples/**/report.pdf
 
 # pre-commit
 .pre-commit-cache/
