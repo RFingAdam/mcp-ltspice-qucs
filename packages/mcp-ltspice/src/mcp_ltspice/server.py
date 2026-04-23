@@ -35,6 +35,7 @@ from mcp_ltspice.asc_io import (
     read_components,
     update_component,
 )
+from mcp_ltspice.compare import compare_filter_orders as _compare_orders
 from mcp_ltspice.digital import (
     DigitalAggressor,
     TimingPath,
@@ -1426,6 +1427,84 @@ def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
         )
     except Exception as e:
         return error(f"lookup_reference failed: {e}", tool_version=__version__)
+
+
+# ----- Filter order comparison (the most-shippable picker) ----------------
+
+
+@mcp.tool(
+    description=(
+        "Run the synthesize -> place zeros -> vendor-snap -> optimize -> MC "
+        "yield workflow for several filter orders side-by-side and return "
+        "the most shippable. Default scoring favors all-pass + high yield + "
+        "low SRF risk + few components."
+    ),
+)
+def compare_filter_orders(
+    orders: list[int],
+    cutoff_hz: Annotated[float, Field(gt=0)],
+    spec: dict,
+    zero_targets_hz: list[float],
+    ripple_db: Annotated[float, Field(gt=0)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 50.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    inductor_vendor: str = "coilcraft_0402hp",
+    capacitor_vendor: str = "murata_gjm_c0g",
+    optimize_max_iter: Annotated[int, Field(gt=0, le=10000)] = 1500,
+    passband_weight: Annotated[float, Field(gt=0)] = 30.0,
+    mc_n_runs: Annotated[int, Field(gt=0, le=10000)] = 1000,
+    mc_tolerance_pct: Annotated[float, Field(gt=0, le=20)] = 2.0,
+    s2p_dir: str | None = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _compare_orders(
+            orders=orders,
+            cutoff_hz=cutoff_hz,
+            spec=spec,
+            zero_targets_hz=zero_targets_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            inductor_vendor=inductor_vendor,
+            capacitor_vendor=capacitor_vendor,
+            optimize_max_iter=optimize_max_iter,
+            passband_weight=passband_weight,
+            mc_n_runs=mc_n_runs,
+            mc_tolerance_pct=mc_tolerance_pct,
+            s2p_dir=s2p_dir,
+        )
+        return ok(
+            {
+                "orders_evaluated": result.orders_evaluated,
+                "winner_order": result.winner_order,
+                "winner_rationale": result.winner_rationale,
+                "results": [
+                    {
+                        "order": r.order,
+                        "n_components": r.n_components,
+                        "n_traps_used": r.n_traps_used,
+                        "components": r.components,
+                        "spec_overall": r.spec_overall,
+                        "criteria": r.criteria,
+                        "srf_severity": r.srf_severity,
+                        "n_srf_flagged": r.n_srf_flagged,
+                        "mc_yield_pct": r.mc_yield_pct,
+                        "mc_failures": r.mc_failures,
+                        "most_sensitive_component": r.most_sensitive_component,
+                        "transmission_zeros": r.transmission_zeros,
+                        "score": r.score,
+                        "rationale": r.rationale,
+                        "s2p_path": r.s2p_path,
+                    }
+                    for r in result.results
+                ],
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"compare_filter_orders failed: {e}", tool_version=__version__)
 
 
 # ----- Schematic rendering (publication-quality SVG/PNG via schemdraw) ----
