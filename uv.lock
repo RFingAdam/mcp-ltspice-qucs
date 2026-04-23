@@ -1520,6 +1520,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "rf-mcp-common" },
+    { name = "schemdraw" },
     { name = "scipy" },
     { name = "spicelib" },
 ]
@@ -1531,6 +1532,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "rf-mcp-common", editable = "packages/rf-mcp-common" },
+    { name = "schemdraw", specifier = ">=0.22" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "spicelib", specifier = ">=1.4.0" },
 ]
@@ -2770,6 +2772,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/88/27/0195d15fe7a897cbcba0904792c4b7c9fdd958456c3a17d2ea6093716a9a/ruff-0.15.11-py3-none-win32.whl", hash = "sha256:476a2aa56b7da0b73a3ee80b6b2f0e19cce544245479adde7baa65466664d5f3", size = 10655535, upload-time = "2026-04-16T18:46:12.47Z" },
     { url = "https://files.pythonhosted.org/packages/3a/5e/c927b325bd4c1d3620211a4b96f47864633199feed60fa936025ab27e090/ruff-0.15.11-py3-none-win_amd64.whl", hash = "sha256:8b6756d88d7e234fb0c98c91511aae3cd519d5e3ed271cae31b20f39cb2a12a3", size = 11779692, upload-time = "2026-04-16T18:46:17.268Z" },
     { url = "https://files.pythonhosted.org/packages/63/b6/aeadee5443e49baa2facd51131159fd6301cc4ccfc1541e4df7b021c37dd/ruff-0.15.11-py3-none-win_arm64.whl", hash = "sha256:063fed18cc1bbe0ee7393957284a6fe8b588c6a406a285af3ee3f46da2391ee4", size = 11032614, upload-time = "2026-04-16T18:46:34.487Z" },
+]
+
+[[package]]
+name = "schemdraw"
+version = "0.22"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/0e/3d2a9c2541ced42877e8b6049fb17c093329ccb81344529dc12a33d4c118/schemdraw-0.22.tar.gz", hash = "sha256:59d1fcfe817f93f8bfc37a3f4645186dc03316bbcfd9ac68804fd6cb3aa69f51", size = 10881350, upload-time = "2025-11-30T23:45:03.279Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/ab/b281071bc11555670a82c538e4be35e7f5ad5e4cb4de7ac356a05a4b2c6a/schemdraw-0.22-py3-none-any.whl", hash = "sha256:fb294fe086b89a7dc9bedce43dc39014a9b9e369864eab438f22009c9f0e1175", size = 148359, upload-time = "2025-11-30T23:42:04.794Z" },
 ]
 
 [[package]]
