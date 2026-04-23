@@ -210,69 +210,105 @@ def render_sallen_key_schematic(
 ) -> Path:
     """Render a Sallen-Key 2nd-order LPF schematic with op-amp triangle.
 
-    If ``R3``/``R4`` are provided the op-amp is wired as a non-inverting
-    amplifier with gain ``1 + R3/R4``; otherwise unity-gain buffer.
+    If ``R3``/``R4`` are provided the op-amp is a non-inverting amplifier
+    with gain ``1 + R3/R4`` (R3 in feedback to V-, R4 from V- to ground);
+    otherwise unity-gain buffer (V- tied to V_out).
+
+    Topology::
+
+        V_in -- R1 -- [A] -- R2 -- [B] -- opamp V+
+                       |                       |
+                       C1 ----- to V_out -----+
+                                              |
+                       C2 from [B] to GND     V_out -- (opamp output)
     """
     out = Path(output_path).expanduser().resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
 
     d = schemdraw.Drawing(show=False, fontsize=fontsize)
-    if title:
-        d.add(elm.Label().label(title, halign="center", fontsize=fontsize + 2))
-        d.move(0, -0.5)
 
-    # Input + R1
+    # Op-amp first so we know where the inputs / output are.
+    # Schemdraw's Opamp has in1 = top input (-) and in2 = bottom input (+)
+    op = d.add(elm.Opamp(leads=True))
+    # depending on the version. We need to confirm and use the + input.
+    # In schemdraw 0.22, Opamp default has '-' on top (in1) and '+' on
+    # bottom (in2). For Sallen-Key we drive V+ (in2).
+
+    # Place the input chain to the left of the op-amp's V+ input
+    d.move_from(op.in2, dx=-3.5, dy=0)
     d += elm.Dot().label("V$_{in}$", loc="left")
-    d += elm.Resistor().right().label(f"R1\n{_fmt_value(R1, 'R')}")
-    n1 = d.add(elm.Dot())
+    d += elm.Resistor().right().length(2.0).label(f"R1\n{_fmt_value(R1, 'R')}")
+    node_a = d.add(elm.Dot())
+    d += elm.Resistor().right().length(2.0).label(f"R2\n{_fmt_value(R2, 'R')}")
+    node_b = d.add(elm.Dot())
+    # Connect node_b to op-amp V+ (in2)
+    d += elm.Line().right().to(op.in2)
 
-    # R2 between n1 and the V+ input of the op-amp
-    d += elm.Resistor().right().label(f"R2\n{_fmt_value(R2, 'R')}")
-    d += elm.Dot()
-
-    # C1 from n1 to op-amp output (positive feedback)
-    d.push()
-    d.move_from(n1.end, dy=2.0)
-    d += elm.Capacitor().right().length(3).label(f"C1\n{_fmt_value(C1, 'C')}")
-    d.pop()
-
-    # C2 from n2 to ground
+    # C2 from node B to ground (drops down). Label on left to avoid
+    # overlapping with the R2 label that's already on the right.
+    d.move_from(node_b.absanchors["start"], dx=0, dy=0)
     d.push()
     d += (
         elm.Capacitor()
         .down()
-        .length(2)
+        .length(2.0)
         .label(
             f"C2\n{_fmt_value(C2, 'C')}",
-            loc="right",
+            loc="left",
         )
     )
     d += elm.Ground()
     d.pop()
 
-    # Op-amp
-    op = d.add(elm.Opamp(leads=True).anchor("in1"))
-    d.move_from(op.in1, dx=-0.5, dy=0)
-    d += elm.Line().left()  # connect n2 (V+) to op-amp +in (in1)
-
-    # Output node
-    d.move_from(op.out, dx=0.5, dy=0)
-    d += elm.Dot().label("V$_{out}$", loc="right")
-
-    # Feedback: op-amp output → V- (in2) directly (unity gain) or via R3+R4
+    # Output side: V_out from op-amp output, going right
     d.move_from(op.out, dx=0.5, dy=0)
     d += elm.Line().right().length(0.5)
+    vout = d.add(elm.Dot().label("V$_{out}$", loc="right"))
+
+    # C1 (positive feedback): from node A up + over to V_out node
+    d.move_from(node_a.absanchors["start"], dx=0, dy=0)
     d.push()
-    d += elm.Line().down().length(2)
-    d += elm.Line().left().length(3)
+    d += elm.Line().up().length(2.0)
+    # Over to a point above V_out
+    a_top = d.here
+    d += (
+        elm.Capacitor()
+        .right()
+        .length(
+            # Distance from a_top.x to vout.x, accounting for capacitor length
+            max(2.0, vout.absanchors["start"].x - a_top.x - 0.5)
+        )
+        .label(f"C1\n{_fmt_value(C1, 'C')}")
+    )
+    # Drop down to V_out
+    d += elm.Line().down().to(vout.absanchors["start"])
+    d.pop()
+
+    # Feedback: V_out → V- (in1)
     if R3 is not None and R4 is not None:
-        # Non-inverting: feedback through R3, gnd via R4
-        d += elm.Resistor().left().label(f"R3\n{_fmt_value(R3, 'R')}")
+        # Non-inverting amplifier: feedback through R3, V- to GND via R4
+        d.move_from(vout.absanchors["start"], dx=0.5, dy=0)
         d.push()
+        d += elm.Line().down().length(2.5)
+        # Over to below V- (op.in1)
+        below_vmin = d.here
+        d += (
+            elm.Resistor()
+            .left()
+            .length(
+                max(1.5, below_vmin.x - op.in1.x - 0.5),
+            )
+            .label(f"R3\n{_fmt_value(R3, 'R')}")
+        )
+        feedback_node = d.add(elm.Dot())
+        # Up to V-
+        d += elm.Line().up().to(op.in1)
+        # R4 from feedback node to ground
+        d.move_from(feedback_node.absanchors["start"], dx=0, dy=0)
         d += (
             elm.Resistor()
             .down()
-            .length(1.5)
+            .length(2.0)
             .label(
                 f"R4\n{_fmt_value(R4, 'R')}",
                 loc="right",
@@ -280,8 +316,31 @@ def render_sallen_key_schematic(
         )
         d += elm.Ground()
         d.pop()
-    d += elm.Line().up().to(op.in2)
-    d.pop()
+    else:
+        # Unity-gain buffer: V- tied directly to V_out via a path that
+        # routes UP and OVER the op-amp body so it doesn't cross through
+        # the triangle.
+        vout_pt = vout.absanchors["start"]
+        vmin_pt = op.absanchors["in1"]
+        # Y-coordinate above the op-amp body
+        top_y = max(vout_pt.y, vmin_pt.y) + 2.5
+        d.move_from(vout_pt, dx=0, dy=0)
+        d.push()
+        d += elm.Line().up().toy(top_y)
+        d += elm.Line().left().tox(vmin_pt.x - 0.5)
+        d += elm.Line().down().toy(vmin_pt.y)
+        d += elm.Line().right().tox(vmin_pt.x)
+        d.pop()
+
+    if title:
+        # Place title above the schematic by drawing first then post-titling
+        # via matplotlib axis. schemdraw doesn't have a great Title element
+        # so we add an annotation.
+        d.add(
+            elm.Label()
+            .label(title, halign="center", fontsize=fontsize + 2)
+            .at((node_a.absanchors["start"].x, max(op.absanchors["out"].y + 3, 5)))
+        )
 
     if str(out).endswith(".svg"):
         d.save(str(out))
@@ -294,6 +353,49 @@ def render_sallen_key_schematic(
 # ---------------------------------------------------------------------------
 # Convenience: render an existing .asc by parsing components
 # ---------------------------------------------------------------------------
+
+
+def render_cascaded_lpf_schematic(
+    cascaded_design: dict,
+    output_dir: str | Path,
+    *,
+    base_name: str = "stage",
+) -> list[Path]:
+    """Render every 2nd-order stage of a cascaded LPF as a separate SVG.
+
+    Takes the dict that :func:`mcp_ltspice.analog.cascaded_lpf_design`
+    returns and emits one schematic per Sallen-Key section, named
+    ``{base_name}_1.svg``, ``{base_name}_2.svg``, ... — plus a
+    matching .png for inline viewing.
+
+    First-order tail stages (single-pole RC) are skipped (no schematic
+    drawn), since they're a single resistor + cap, not a Sallen-Key.
+    Returns the list of file paths in stage order.
+    """
+    out_dir = Path(output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    paths: list[Path] = []
+    for stage in cascaded_design.get("stages", []):
+        if stage.get("components") is None:
+            continue  # 1st-order stage, skip
+        comps = stage["components"]
+        idx = stage["stage_index"]
+        title = f"Stage {idx} — Sallen-Key, fc={stage['fc_hz'] / 1e3:.2f} kHz, Q={stage['q']:.3f}"
+        for ext in (".svg", ".png"):
+            out = out_dir / f"{base_name}_{idx}{ext}"
+            render_sallen_key_schematic(
+                R1=comps["R1"],
+                R2=comps["R2"],
+                C1=comps["C1"],
+                C2=comps["C2"],
+                R3=comps.get("R3"),
+                R4=comps.get("R4"),
+                output_path=out,
+                title=title,
+            )
+            paths.append(out)
+    return paths
 
 
 def render_asc_as_schematic(
