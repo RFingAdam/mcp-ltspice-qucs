@@ -10,10 +10,46 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from mcp_ltspice import __version__
+
+# Phase 7 modules
+from mcp_ltspice.analog import (
+    cascaded_lpf_design as _cascaded_lpf,
+)
+from mcp_ltspice.analog import (
+    mfb_band_pass as _mfb_bpf,
+)
+from mcp_ltspice.analog import (
+    mfb_low_pass as _mfb_lpf,
+)
+from mcp_ltspice.analog import (
+    sallen_key_band_pass as _sk_bpf,
+)
+from mcp_ltspice.analog import (
+    sallen_key_high_pass as _sk_hpf,
+)
+from mcp_ltspice.analog import (
+    sallen_key_low_pass as _sk_lpf,
+)
 from mcp_ltspice.asc_io import (
     generate_lpf_asc,
     read_components,
     update_component,
+)
+from mcp_ltspice.digital import (
+    DigitalAggressor,
+    TimingPath,
+)
+from mcp_ltspice.digital import (
+    check_setup_hold as _check_setup_hold,
+)
+from mcp_ltspice.digital import (
+    estimate_digital_to_analog_crosstalk as _digital_xtalk,
+)
+from mcp_ltspice.digital import (
+    estimate_supply_noise_injection as _supply_noise,
+)
+from mcp_ltspice.digital import (
+    propagation_delay as _prop_delay,
 )
 from mcp_ltspice.eval import FilterSpec, evaluate_filter_spec
 from mcp_ltspice.extract import (
@@ -24,10 +60,36 @@ from mcp_ltspice.extract import (
 from mcp_ltspice.find_zeros import find_transmission_zeros as _find_zeros
 from mcp_ltspice.montecarlo import monte_carlo_analysis as _monte_carlo
 from mcp_ltspice.optimize import optimize_filter as _optimize
+from mcp_ltspice.power import (
+    analyze_ldo as _analyze_ldo,
+)
+from mcp_ltspice.power import (
+    compute_phase_margin as _phase_margin,
+)
+from mcp_ltspice.power import (
+    design_boost as _design_boost,
+)
+from mcp_ltspice.power import (
+    design_buck as _design_buck,
+)
+from mcp_ltspice.power import (
+    type2_compensator as _type2_comp,
+)
+from mcp_ltspice.power.ldo import required_psrr_for_ripple_target as _required_psrr
 from mcp_ltspice.render import render_response as _render_response
 from mcp_ltspice.runner import RunResult, Simulator
 from mcp_ltspice.runner import run_simulation as _run_simulation
+from mcp_ltspice.srf_check import srf_audit as _srf_audit
 from mcp_ltspice.stability import stability_check as _stability_check
+from mcp_ltspice.sweep import (
+    corner_analysis as _corner_analysis,
+)
+from mcp_ltspice.sweep import (
+    parameter_sweep as _parameter_sweep,
+)
+from mcp_ltspice.sweep import (
+    sensitivity_analysis as _sensitivity,
+)
 from mcp_ltspice.synthesis import (
     Topology,
     synthesize_lc_lpf,
@@ -40,6 +102,42 @@ from mcp_ltspice.vendor_models import (
 )
 from mcp_ltspice.vendor_models import (
     substitute_real_components as _substitute_real,
+)
+from mcp_ltspice.vendors import (
+    find_mosfet_for_application as _find_mosfet,
+)
+from mcp_ltspice.vendors import (
+    find_opamp_for_application as _find_opamp,
+)
+from mcp_ltspice.vendors import (
+    list_bjts as _list_bjts,
+)
+from mcp_ltspice.vendors import (
+    list_diodes as _list_diodes,
+)
+from mcp_ltspice.vendors import (
+    list_mosfets as _list_mosfets,
+)
+from mcp_ltspice.vendors import (
+    list_opamps as _list_opamps,
+)
+from mcp_ltspice.vendors import (
+    list_references as _list_refs,
+)
+from mcp_ltspice.vendors import (
+    lookup_bjt as _lookup_bjt,
+)
+from mcp_ltspice.vendors import (
+    lookup_diode as _lookup_diode,
+)
+from mcp_ltspice.vendors import (
+    lookup_mosfet as _lookup_mosfet,
+)
+from mcp_ltspice.vendors import (
+    lookup_opamp as _lookup_opamp,
+)
+from mcp_ltspice.vendors import (
+    lookup_reference as _lookup_ref,
 )
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
 from rf_mcp_common.logging import get_logger
@@ -524,6 +622,804 @@ def stability_check(
         )
     except Exception as e:
         return error(f"stability_check failed: {e}", tool_version=__version__)
+
+
+# ===========================================================================
+# Phase 7 tools: sweep / SRF / analog / power / digital / vendor catalogs
+# ===========================================================================
+
+
+def _wrap(func, *args, **kwargs):
+    """Run a callable inside the standard envelope contract."""
+    timer = Timer()
+    try:
+        return ok(
+            func(*args, **kwargs),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"{func.__name__} failed: {e}", tool_version=__version__)
+
+
+# ----- DOE / sweep ---------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Sweep one or more component values across a Cartesian product grid "
+        "and report per-point spec margins + overall yield."
+    ),
+)
+def parameter_sweep(
+    components: dict[str, float],
+    sweep: dict[str, list[float]],
+    spec: dict,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    transmission_zeros: bool = True,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _parameter_sweep(
+            components,
+            sweep,
+            spec,
+            z0=z0,
+            transmission_zeros=transmission_zeros,
+        )
+        return ok(
+            {
+                "n_points": result.n_points,
+                "n_passing": result.n_passing,
+                "yield_pct": result.yield_pct,
+                "points": [
+                    {
+                        "parameters": p.parameters,
+                        "margins": p.margins,
+                        "overall": p.overall,
+                    }
+                    for p in result.points
+                ],
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"parameter_sweep failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Evaluate a filter spec at named corners (e.g. TT/SS/FF or "
+        "application-specific stress combinations). Each corner is a dict "
+        "of refdes -> multiplier."
+    ),
+)
+def corner_analysis(
+    components: dict[str, float],
+    corners: dict[str, dict[str, float]],
+    spec: dict,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    transmission_zeros: bool = True,
+) -> Envelope[dict[str, Any]]:
+    return _wrap(
+        _corner_analysis,
+        components,
+        corners,
+        spec,
+        z0=z0,
+        transmission_zeros=transmission_zeros,
+    )
+
+
+@mcp.tool(
+    description=(
+        "Perturb each component by +/-pct and report the dB/% sensitivity of "
+        "every spec criterion. Ranks components by total influence so you "
+        "know which ones to grade tightly."
+    ),
+)
+def sensitivity_analysis(
+    components: dict[str, float],
+    spec: dict,
+    perturbation_pct: Annotated[float, Field(gt=0, le=10)] = 1.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    transmission_zeros: bool = True,
+) -> Envelope[dict[str, Any]]:
+    return _wrap(
+        _sensitivity,
+        components,
+        spec,
+        perturbation_pct=perturbation_pct,
+        z0=z0,
+        transmission_zeros=transmission_zeros,
+    )
+
+
+# ----- SRF audit -----------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Flag inductors / capacitors whose self-resonant frequency is within "
+        "margin_pct of the highest spec target. Above SRF the analytical "
+        "model isn't predictive of real measurement."
+    ),
+)
+def srf_audit(
+    components: dict[str, float],
+    spec: dict,
+    inductor_vendor: str = "coilcraft_0402hp",
+    capacitor_vendor: str = "murata_gjm_c0g",
+    margin_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
+) -> Envelope[dict[str, Any]]:
+    return _wrap(
+        _srf_audit,
+        components,
+        spec,
+        inductor_vendor=inductor_vendor,
+        capacitor_vendor=capacitor_vendor,
+        margin_pct=margin_pct,
+    )
+
+
+# ----- Analog active filters ----------------------------------------------
+
+
+@mcp.tool(description="Synthesize a Sallen-Key 2nd-order LPF (op-amp + 2R + 2C).")
+def sallen_key_low_pass(
+    fc_hz: Annotated[float, Field(gt=0)],
+    q: Annotated[float, Field(gt=0)] = 0.7071,
+    gain_v_v: Annotated[float, Field(gt=0)] = 1.0,
+    c_pf: Annotated[float, Field(gt=0)] = 1000.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _sk_lpf(fc_hz, q=q, gain_v_v=gain_v_v, c_pf=c_pf)
+        return ok(
+            {
+                "topology": d.topology,
+                "fc_hz": d.fc_hz,
+                "q": d.q,
+                "gain_v_v": d.gain_v_v,
+                "R1": d.R1,
+                "R2": d.R2,
+                "R3": d.R3,
+                "R4": d.R4,
+                "C1": d.C1,
+                "C2": d.C2,
+                "op_amp_min_gbw_hz": d.op_amp_min_gbw_hz,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"sallen_key_low_pass failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Synthesize a Sallen-Key 2nd-order HPF.")
+def sallen_key_high_pass(
+    fc_hz: Annotated[float, Field(gt=0)],
+    q: Annotated[float, Field(gt=0)] = 0.7071,
+    r_kohm: Annotated[float, Field(gt=0)] = 10.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _sk_hpf(fc_hz, q=q, r_kohm=r_kohm)
+        return ok(
+            {
+                "topology": d.topology,
+                "fc_hz": d.fc_hz,
+                "q": d.q,
+                "R1": d.R1,
+                "R2": d.R2,
+                "C1": d.C1,
+                "C2": d.C2,
+                "op_amp_min_gbw_hz": d.op_amp_min_gbw_hz,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"sallen_key_high_pass failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Synthesize a Sallen-Key 2nd-order BPF (single op-amp).")
+def sallen_key_band_pass(
+    fc_hz: Annotated[float, Field(gt=0)],
+    q: Annotated[float, Field(gt=0)] = 1.0,
+    r_kohm: Annotated[float, Field(gt=0)] = 10.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _sk_bpf(fc_hz, q=q, r_kohm=r_kohm)
+        return ok(
+            {
+                "topology": d.topology,
+                "fc_hz": d.fc_hz,
+                "q": d.q,
+                "gain_v_v": d.gain_v_v,
+                "R1": d.R1,
+                "R2": d.R2,
+                "R3": d.R3,
+                "R4": d.R4,
+                "C1": d.C1,
+                "C2": d.C2,
+                "op_amp_min_gbw_hz": d.op_amp_min_gbw_hz,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"sallen_key_band_pass failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Synthesize a Multiple-Feedback (MFB) 2nd-order LPF.")
+def mfb_low_pass(
+    fc_hz: Annotated[float, Field(gt=0)],
+    q: Annotated[float, Field(gt=0)] = 0.7071,
+    gain_v_v: Annotated[float, Field(gt=0)] = 1.0,
+    c_pf: Annotated[float, Field(gt=0)] = 1000.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _mfb_lpf(fc_hz, q=q, gain_v_v=gain_v_v, c_pf=c_pf)
+        return ok(
+            {
+                "topology": d.topology,
+                "fc_hz": d.fc_hz,
+                "q": d.q,
+                "gain_v_v": d.gain_v_v,
+                "R1": d.R1,
+                "R2": d.R2,
+                "R3": d.R3,
+                "C1": d.C1,
+                "C2": d.C2,
+                "op_amp_min_gbw_hz": d.op_amp_min_gbw_hz,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"mfb_low_pass failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Synthesize a Multiple-Feedback (MFB) 2nd-order BPF.")
+def mfb_band_pass(
+    fc_hz: Annotated[float, Field(gt=0)],
+    q: Annotated[float, Field(gt=0)] = 5.0,
+    gain_v_v: Annotated[float, Field(gt=0)] = 1.0,
+    c_pf: Annotated[float, Field(gt=0)] = 100.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _mfb_bpf(fc_hz, q=q, gain_v_v=gain_v_v, c_pf=c_pf)
+        return ok(
+            {
+                "topology": d.topology,
+                "fc_hz": d.fc_hz,
+                "q": d.q,
+                "gain_v_v": d.gain_v_v,
+                "R1": d.R1,
+                "R2": d.R2,
+                "R3": d.R3,
+                "C1": d.C1,
+                "C2": d.C2,
+                "op_amp_min_gbw_hz": d.op_amp_min_gbw_hz,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"mfb_band_pass failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Cascaded nth-order Butterworth or Bessel LPF as 2nd-order stages "
+        "(Sallen-Key). Returns per-stage component values + required op-amp GBW."
+    ),
+)
+def cascaded_lpf_design(
+    fc_hz: Annotated[float, Field(gt=0)],
+    order: Annotated[int, Field(ge=2, le=8)],
+    response: str = "butterworth",
+    c_pf: Annotated[float, Field(gt=0)] = 1000.0,
+) -> Envelope[dict[str, Any]]:
+    return _wrap(_cascaded_lpf, fc_hz, order, response=response, c_pf=c_pf)  # type: ignore[arg-type]
+
+
+# ----- Power supply tools --------------------------------------------------
+
+
+@mcp.tool(
+    description="Analyze an LDO at one operating point: efficiency, dropout, dissipation, output ripple."
+)
+def analyze_ldo(
+    v_in_v: Annotated[float, Field(gt=0)],
+    v_out_v: Annotated[float, Field(gt=0)],
+    i_out_a: Annotated[float, Field(ge=0)],
+    dropout_v: Annotated[float, Field(gt=0)] = 0.3,
+    psrr_db: Annotated[float, Field(gt=0)] = 60.0,
+    v_ripple_in_mvpp: float | None = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        r = _analyze_ldo(
+            v_in_v=v_in_v,
+            v_out_v=v_out_v,
+            i_out_a=i_out_a,
+            dropout_v=dropout_v,
+            psrr_db=psrr_db,
+            v_ripple_in_mvpp=v_ripple_in_mvpp,
+        )
+        return ok(
+            {
+                "v_in_v": r.v_in_v,
+                "v_out_v": r.v_out_v,
+                "i_out_a": r.i_out_a,
+                "headroom_v": r.headroom_v,
+                "dissipation_w": r.dissipation_w,
+                "efficiency_pct": r.efficiency_pct,
+                "output_ripple_uvpp": r.output_ripple_uvpp,
+                "notes": r.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"analyze_ldo failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Compute the PSRR (dB) an LDO needs to meet an output-ripple target.")
+def required_psrr_for_ripple(
+    v_ripple_in_mvpp: Annotated[float, Field(gt=0)],
+    v_ripple_out_uvpp_max: Annotated[float, Field(gt=0)],
+) -> Envelope[dict[str, float]]:
+    timer = Timer()
+    try:
+        psrr = _required_psrr(
+            v_ripple_in_mvpp=v_ripple_in_mvpp,
+            v_ripple_out_uvpp_max=v_ripple_out_uvpp_max,
+        )
+        return ok(
+            {"required_psrr_db": psrr},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"required_psrr_for_ripple failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Size a Buck (step-down) SMPS: L, Cout, ESR limit, peak/RMS currents.")
+def design_buck(
+    v_in_v: Annotated[float, Field(gt=0)],
+    v_out_v: Annotated[float, Field(gt=0)],
+    i_out_a: Annotated[float, Field(gt=0)],
+    f_sw_hz: Annotated[float, Field(gt=0)] = 1e6,
+    inductor_ripple_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
+    output_ripple_mvpp: Annotated[float, Field(gt=0)] = 20.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _design_buck(
+            v_in_v=v_in_v,
+            v_out_v=v_out_v,
+            i_out_a=i_out_a,
+            f_sw_hz=f_sw_hz,
+            inductor_ripple_pct=inductor_ripple_pct,
+            output_ripple_mvpp=output_ripple_mvpp,
+        )
+        return ok(
+            {
+                "v_in_v": d.v_in_v,
+                "v_out_v": d.v_out_v,
+                "i_out_a": d.i_out_a,
+                "f_sw_hz": d.f_sw_hz,
+                "duty_cycle": d.duty_cycle,
+                "L_h": d.L_h,
+                "Cout_f": d.Cout_f,
+                "Cout_esr_max_ohm": d.Cout_esr_max_ohm,
+                "inductor_peak_a": d.inductor_peak_a,
+                "inductor_rms_a": d.inductor_rms_a,
+                "expected_efficiency_pct": d.expected_efficiency_pct,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"design_buck failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Size a Boost (step-up) SMPS: L, Cout, ESR limit, peak/RMS currents.")
+def design_boost(
+    v_in_v: Annotated[float, Field(gt=0)],
+    v_out_v: Annotated[float, Field(gt=0)],
+    i_out_a: Annotated[float, Field(gt=0)],
+    f_sw_hz: Annotated[float, Field(gt=0)] = 500e3,
+    inductor_ripple_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
+    output_ripple_mvpp: Annotated[float, Field(gt=0)] = 50.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _design_boost(
+            v_in_v=v_in_v,
+            v_out_v=v_out_v,
+            i_out_a=i_out_a,
+            f_sw_hz=f_sw_hz,
+            inductor_ripple_pct=inductor_ripple_pct,
+            output_ripple_mvpp=output_ripple_mvpp,
+        )
+        return ok(
+            {
+                "v_in_v": d.v_in_v,
+                "v_out_v": d.v_out_v,
+                "i_out_a": d.i_out_a,
+                "f_sw_hz": d.f_sw_hz,
+                "duty_cycle": d.duty_cycle,
+                "L_h": d.L_h,
+                "Cout_f": d.Cout_f,
+                "Cout_esr_max_ohm": d.Cout_esr_max_ohm,
+                "inductor_peak_a": d.inductor_peak_a,
+                "inductor_rms_a": d.inductor_rms_a,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"design_boost failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Type-II compensator design (1 zero + 1 pole) for current-mode SMPS loops.")
+def type2_compensator(
+    crossover_hz: Annotated[float, Field(gt=0)],
+    plant_zero_hz: Annotated[float, Field(gt=0)],
+    plant_pole_hz: Annotated[float, Field(gt=0)],
+    phase_boost_deg: Annotated[float, Field(gt=0, lt=90)] = 60.0,
+    rfb_kohm: Annotated[float, Field(gt=0)] = 10.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        d = _type2_comp(
+            crossover_hz=crossover_hz,
+            plant_zero_hz=plant_zero_hz,
+            plant_pole_hz=plant_pole_hz,
+            phase_boost_deg=phase_boost_deg,
+            rfb_kohm=rfb_kohm,
+        )
+        return ok(
+            {
+                "topology": d.topology,
+                "crossover_hz": d.crossover_hz,
+                "phase_margin_deg": d.phase_margin_deg,
+                "components": d.components,
+                "transfer_function_hz": d.transfer_function_hz,
+                "transfer_function_db": d.transfer_function_db,
+                "transfer_function_phase_deg": d.transfer_function_phase_deg,
+                "notes": d.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"type2_compensator failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Compute crossover freq + phase margin from open-loop Bode arrays.")
+def compute_phase_margin(
+    open_loop_freq_hz: list[float],
+    open_loop_mag_db: list[float],
+    open_loop_phase_deg: list[float],
+) -> Envelope[dict[str, Any]]:
+    return _wrap(
+        _phase_margin,
+        open_loop_freq_hz,
+        open_loop_mag_db,
+        open_loop_phase_deg,
+    )
+
+
+# ----- Digital + mixed-signal ---------------------------------------------
+
+
+@mcp.tool(description="Setup/hold timing check on a synchronous digital path.")
+def check_setup_hold(
+    name: str,
+    clk_period_ns: Annotated[float, Field(gt=0)],
+    t_clk_q_ns: Annotated[float, Field(ge=0)],
+    t_comb_ns: Annotated[float, Field(ge=0)],
+    t_setup_ns: Annotated[float, Field(ge=0)],
+    t_hold_ns: Annotated[float, Field(ge=0)],
+    t_skew_ns: float = 0.0,
+    t_jitter_ns: Annotated[float, Field(ge=0)] = 0.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        path = TimingPath(
+            name=name,
+            clk_period_ns=clk_period_ns,
+            t_clk_q_ns=t_clk_q_ns,
+            t_comb_ns=t_comb_ns,
+            t_setup_ns=t_setup_ns,
+            t_hold_ns=t_hold_ns,
+            t_skew_ns=t_skew_ns,
+            t_jitter_ns=t_jitter_ns,
+        )
+        r = _check_setup_hold(path)
+        return ok(
+            {
+                "setup_slack_ns": r.setup_slack_ns,
+                "hold_slack_ns": r.hold_slack_ns,
+                "setup_status": r.setup_status,
+                "hold_status": r.hold_status,
+                "max_safe_clock_mhz": r.max_safe_clock_mhz,
+                "notes": r.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"check_setup_hold failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Estimate combinational propagation delay (gates + wires + fanout).")
+def propagation_delay(
+    n_gates: Annotated[int, Field(gt=0)],
+    t_gate_avg_ns: Annotated[float, Field(gt=0)],
+    t_wire_per_mm_ns: Annotated[float, Field(ge=0)] = 0.005,
+    wire_length_mm: Annotated[float, Field(ge=0)] = 0.0,
+    fanout: Annotated[int, Field(ge=1)] = 1,
+    t_per_fanout_ns: Annotated[float, Field(ge=0)] = 0.05,
+) -> Envelope[dict[str, float]]:
+    return _wrap(
+        _prop_delay,
+        n_gates=n_gates,
+        t_gate_avg_ns=t_gate_avg_ns,
+        t_wire_per_mm_ns=t_wire_per_mm_ns,
+        wire_length_mm=wire_length_mm,
+        fanout=fanout,
+        t_per_fanout_ns=t_per_fanout_ns,
+    )
+
+
+@mcp.tool(description="Estimate digital-to-analog crosstalk via mutual capacitance.")
+def estimate_digital_to_analog_crosstalk(
+    aggressor_swing_v: Annotated[float, Field(gt=0)],
+    aggressor_rise_time_ns: Annotated[float, Field(gt=0)],
+    aggressor_load_pf: Annotated[float, Field(gt=0)],
+    aggressor_switching_freq_mhz: Annotated[float, Field(gt=0)],
+    coupling_capacitance_ff: Annotated[float, Field(gt=0)],
+    victim_impedance_ohm: Annotated[float, Field(gt=0)],
+    aggressor_name: str = "aggressor",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        agg = DigitalAggressor(
+            name=aggressor_name,
+            swing_v=aggressor_swing_v,
+            rise_time_ns=aggressor_rise_time_ns,
+            switching_freq_mhz=aggressor_switching_freq_mhz,
+            capacitance_load_pf=aggressor_load_pf,
+        )
+        return ok(
+            _digital_xtalk(agg, coupling_capacitance_ff, victim_impedance_ohm),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"estimate_digital_to_analog_crosstalk failed: {e}",
+            tool_version=__version__,
+        )
+
+
+@mcp.tool(description="Estimate supply-rail droop from digital switching activity.")
+def estimate_supply_noise_injection(
+    aggressor_swing_v: Annotated[float, Field(gt=0)],
+    aggressor_rise_time_ns: Annotated[float, Field(gt=0)],
+    aggressor_load_pf: Annotated[float, Field(gt=0)],
+    aggressor_switching_freq_mhz: Annotated[float, Field(gt=0)],
+    supply_inductance_nh: Annotated[float, Field(gt=0)] = 5.0,
+    supply_resistance_mohm: Annotated[float, Field(ge=0)] = 10.0,
+    n_simultaneous_switches: Annotated[int, Field(ge=1)] = 1,
+    aggressor_name: str = "aggressor",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        agg = DigitalAggressor(
+            name=aggressor_name,
+            swing_v=aggressor_swing_v,
+            rise_time_ns=aggressor_rise_time_ns,
+            switching_freq_mhz=aggressor_switching_freq_mhz,
+            capacitance_load_pf=aggressor_load_pf,
+        )
+        return ok(
+            _supply_noise(
+                agg,
+                supply_inductance_nh=supply_inductance_nh,
+                supply_resistance_mohm=supply_resistance_mohm,
+                n_simultaneous_switches=n_simultaneous_switches,
+            ),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"estimate_supply_noise_injection failed: {e}",
+            tool_version=__version__,
+        )
+
+
+# ----- Vendor catalogs (active devices) -----------------------------------
+
+
+def _model_to_dict(m: Any) -> dict[str, Any]:
+    """Dataclass -> dict (skips None)."""
+    from dataclasses import asdict
+
+    return asdict(m)
+
+
+@mcp.tool(description="List all op-amp part numbers in the bundled catalog.")
+def list_opamps() -> Envelope[list[str]]:
+    return _wrap(_list_opamps)
+
+
+@mcp.tool(description="Look up an op-amp by part number (returns full datasheet params).")
+def lookup_opamp(part_number: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _model_to_dict(_lookup_opamp(part_number)),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"lookup_opamp failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Filter the op-amp catalog by spec constraints (GBW, noise, offset, "
+        "supply, RRIO flags, family) and return ranked candidates."
+    ),
+)
+def find_opamp_for_application(
+    min_gbw_mhz: Annotated[float, Field(ge=0)] = 0.0,
+    max_input_noise_nv_per_rthz: Annotated[float, Field(gt=0)] = 1000.0,
+    max_input_offset_uv: Annotated[float, Field(gt=0)] = 1e9,
+    min_supply_max_v: Annotated[float, Field(ge=0)] = 0.0,
+    rail_to_rail_input: bool | None = None,
+    rail_to_rail_output: bool | None = None,
+    family: str | None = None,
+    sort_by: str = "gbw_mhz",
+) -> Envelope[list[dict[str, Any]]]:
+    timer = Timer()
+    try:
+        results = _find_opamp(
+            min_gbw_mhz=min_gbw_mhz,
+            max_input_noise_nv_per_rthz=max_input_noise_nv_per_rthz,
+            max_input_offset_uv=max_input_offset_uv,
+            min_supply_max_v=min_supply_max_v,
+            rail_to_rail_input=rail_to_rail_input,
+            rail_to_rail_output=rail_to_rail_output,
+            family=family,
+            sort_by=sort_by,
+        )
+        return ok(
+            [_model_to_dict(r) for r in results],
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"find_opamp_for_application failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="List all MOSFET part numbers in the bundled catalog.")
+def list_mosfets() -> Envelope[list[str]]:
+    return _wrap(_list_mosfets)
+
+
+@mcp.tool(description="Look up a MOSFET by part number.")
+def lookup_mosfet(part_number: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _model_to_dict(_lookup_mosfet(part_number)),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"lookup_mosfet failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="Filter the MOSFET catalog by polarity, Vds, Id, Rds_on, Vgs threshold.")
+def find_mosfet_for_application(
+    polarity: str = "N",
+    min_vds_v: Annotated[float, Field(ge=0)] = 0.0,
+    min_id_a: Annotated[float, Field(ge=0)] = 0.0,
+    max_rds_on_mohm: Annotated[float, Field(gt=0)] = 1e9,
+    max_vgs_threshold_v: Annotated[float, Field(gt=0)] = 1e9,
+    sort_by: str = "rds_on_max_mohm",
+) -> Envelope[list[dict[str, Any]]]:
+    timer = Timer()
+    try:
+        results = _find_mosfet(
+            polarity=polarity,  # type: ignore[arg-type]
+            min_vds_v=min_vds_v,
+            min_id_a=min_id_a,
+            max_rds_on_mohm=max_rds_on_mohm,
+            max_vgs_threshold_v=max_vgs_threshold_v,
+            sort_by=sort_by,
+        )
+        return ok(
+            [_model_to_dict(r) for r in results],
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"find_mosfet_for_application failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="List all BJT part numbers.")
+def list_bjts() -> Envelope[list[str]]:
+    return _wrap(_list_bjts)
+
+
+@mcp.tool(description="Look up a BJT by part number.")
+def lookup_bjt(part_number: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _model_to_dict(_lookup_bjt(part_number)),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"lookup_bjt failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="List all diode part numbers (signal / Schottky / TVS / zener / ESD).")
+def list_diodes() -> Envelope[list[str]]:
+    return _wrap(_list_diodes)
+
+
+@mcp.tool(description="Look up a diode by part number.")
+def lookup_diode(part_number: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _model_to_dict(_lookup_diode(part_number)),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"lookup_diode failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="List all voltage reference part numbers.")
+def list_references() -> Envelope[list[str]]:
+    return _wrap(_list_refs)
+
+
+@mcp.tool(description="Look up a voltage reference by part number.")
+def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _model_to_dict(_lookup_ref(part_number)),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"lookup_reference failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
