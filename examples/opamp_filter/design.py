@@ -24,6 +24,7 @@ import numpy as np
 
 from mcp_ltspice.analog import cascaded_lpf_design
 from mcp_ltspice.analog.cascade import transfer_function_db
+from mcp_ltspice.report_pdf import build_design_report_pdf
 from mcp_ltspice.schematic_render import render_cascaded_lpf_schematic
 from mcp_ltspice.vendors import find_opamp_for_application
 
@@ -111,6 +112,10 @@ def main() -> None:
     # 5. Write report
     _write_report(HERE / "report.md", design, chosen, rejection_at_nyquist)
     print("  Wrote: report.md")
+
+    # 6. Bundle every artifact into a single shareable PDF
+    pdf_path = build_design_report_pdf(HERE, HERE / "report.pdf")
+    print(f"  Wrote: {pdf_path.name}")
 
 
 def _write_report(path, design, chosen, rejection_at_nyquist) -> None:
