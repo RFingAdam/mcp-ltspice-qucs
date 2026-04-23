@@ -1,0 +1,15 @@
+{
+  "_purpose": "Generic LPF spec for the filter-order comparison example. Targets are arbitrary-but-realistic for a sub-GHz transmitter: passband through ~700 MHz, two stopband notches between 1.5-2.5 GHz, deep rejection above 3 GHz. Adapt freely.",
+  "passband": {
+    "f_start": 1000000,
+    "f_stop": 700000000,
+    "il_max_db": 1.0,
+    "rl_min_db": 10
+  },
+  "stopband_targets": [
+    {"freq": 1600000000, "rejection_min_db": 40, "label": "stopband 1"},
+    {"freq": 2000000000, "rejection_min_db": 45, "label": "stopband 2"},
+    {"freq": 2500000000, "rejection_min_db": 35, "label": "stopband 3"},
+    {"freq": 3500000000, "rejection_min_db": 30, "label": "deep stopband"}
+  ]
+}
