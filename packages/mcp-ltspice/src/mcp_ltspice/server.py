@@ -79,6 +79,12 @@ from mcp_ltspice.power.ldo import required_psrr_for_ripple_target as _required_p
 from mcp_ltspice.render import render_response as _render_response
 from mcp_ltspice.runner import RunResult, Simulator
 from mcp_ltspice.runner import run_simulation as _run_simulation
+from mcp_ltspice.schematic_render import (
+    render_asc_as_schematic as _render_asc_schematic,
+)
+from mcp_ltspice.schematic_render import (
+    render_lc_ladder_schematic as _render_lc_schematic,
+)
 from mcp_ltspice.srf_check import srf_audit as _srf_audit
 from mcp_ltspice.stability import stability_check as _stability_check
 from mcp_ltspice.sweep import (
@@ -1420,6 +1426,75 @@ def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
         )
     except Exception as e:
         return error(f"lookup_reference failed: {e}", tool_version=__version__)
+
+
+# ----- Schematic rendering (publication-quality SVG/PNG via schemdraw) ----
+
+
+@mcp.tool(
+    description=(
+        "Render a clean publication-quality schematic of an LC ladder "
+        "filter. Output format chosen from extension (.svg or .png)."
+    ),
+)
+def render_lc_ladder_schematic(
+    components: dict[str, float],
+    output_path: Annotated[str, Field(description="Output .svg or .png path.")],
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    transmission_zeros: bool = False,
+    title: str | None = None,
+) -> Envelope[dict[str, str]]:
+    timer = Timer()
+    try:
+        out = _render_lc_schematic(
+            components,
+            output_path,
+            z0=z0,
+            transmission_zeros=transmission_zeros,
+            title=title,
+        )
+        return ok(
+            {"path": str(out)},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"render_lc_ladder_schematic failed: {e}",
+            tool_version=__version__,
+        )
+
+
+@mcp.tool(
+    description=(
+        "Parse an existing LTspice .asc and re-render it as a clean "
+        "schemdraw SVG/PNG (the .asc only renders inside LTspice)."
+    ),
+)
+def render_asc_as_schematic(
+    asc_path: str,
+    output_path: str,
+    transmission_zeros: bool = True,
+    title: str | None = None,
+) -> Envelope[dict[str, str]]:
+    timer = Timer()
+    try:
+        out = _render_asc_schematic(
+            asc_path,
+            output_path,
+            transmission_zeros=transmission_zeros,
+            title=title,
+        )
+        return ok(
+            {"path": str(out)},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(
+            f"render_asc_as_schematic failed: {e}",
+            tool_version=__version__,
+        )
 
 
 # ---------------------------------------------------------------------------
