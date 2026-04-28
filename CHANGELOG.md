@@ -9,6 +9,10 @@ grouped by package.
 
 ## [Unreleased]
 
+(no changes yet — next stream picks up from the v0.2.0 roadmap)
+
+## [0.2.0] — 2026-04-28
+
 ### Filter synthesis — HPF / BPF / BSF (`mcp-ltspice`)
 
 Closes the biggest user-visible gap in filter coverage. Three new top-level synthesis functions backed by classical Pozar §8.5 frequency transformations from the LPF prototype:
@@ -174,5 +178,6 @@ Initial release of the four-package monorepo.
   elliptic LPF for 802.11ah HaLow + multi-radio coex. Passes all 8 spec
   criteria with 86.6% Monte Carlo yield at 2% component tolerance.
 
-[Unreleased]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/releases/tag/v0.1.0
