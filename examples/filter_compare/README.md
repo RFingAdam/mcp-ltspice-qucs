@@ -10,7 +10,7 @@ the pipeline runs unchanged.
 ## Run
 
 ```bash
-uv run python examples/filter_compare/run.py
+uv run python examples/filter_compare/design.py
 ```
 
 Takes ~3-5 minutes (most of it Monte Carlo at 500 trials per order).

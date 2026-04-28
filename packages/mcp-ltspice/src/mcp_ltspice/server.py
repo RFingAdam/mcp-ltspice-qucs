@@ -76,6 +76,21 @@ from mcp_ltspice.power import (
 from mcp_ltspice.power import (
     type2_compensator as _type2_comp,
 )
+from mcp_ltspice.power.emc import (
+    design_cm_choke as _design_cm_choke,
+)
+from mcp_ltspice.power.emc import (
+    design_dm_input_filter as _design_dm_input_filter,
+)
+from mcp_ltspice.power.emc import (
+    design_pi_output_filter as _design_pi_output_filter,
+)
+from mcp_ltspice.power.emc import (
+    design_rc_snubber as _design_rc_snubber,
+)
+from mcp_ltspice.power.emc import (
+    predict_conducted_emissions as _predict_conducted_emissions,
+)
 from mcp_ltspice.power.ldo import required_psrr_for_ripple_target as _required_psrr
 from mcp_ltspice.render import render_response as _render_response
 from mcp_ltspice.report_pdf import build_design_report_pdf as _build_design_report_pdf
@@ -100,6 +115,9 @@ from mcp_ltspice.sweep import (
 )
 from mcp_ltspice.synthesis import (
     Topology,
+    synthesize_lc_bpf,
+    synthesize_lc_bsf,
+    synthesize_lc_hpf,
     synthesize_lc_lpf,
 )
 from mcp_ltspice.synthesis import (
@@ -308,6 +326,162 @@ def synthesize_lc_filter(
         return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"synthesize_lc_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a high-pass LC ladder via the LPF→HPF frequency transformation "
+        "(Pozar §8.5). Series inductors become series capacitors; shunt capacitors "
+        "become shunt inductors. Components emitted as C1, L2, C3, L4, ... (T-topology). "
+        "Currently supports Butterworth and Chebyshev I (elliptic HPF not implemented)."
+    ),
+)
+def synthesize_lc_hpf_filter(
+    filter_type: Annotated[
+        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+    ],
+    order: Annotated[int, Field(ge=1, le=15)],
+    cutoff_hz: Annotated[float, Field(gt=0, description="-3 dB cutoff frequency.")],
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: Annotated[
+        str, Field(description="'series_first' (T) or 'shunt_first' (Pi).")
+    ] = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        design = synthesize_lc_hpf(
+            filter_type,  # type: ignore[arg-type]
+            order,
+            cutoff_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
+        )
+        return ok(
+            {
+                "components": design.components,
+                "g_coefficients": design.g,
+                "topology": design.topology.value,
+                "cutoff_hz": design.cutoff_hz,
+                "z0": z0,
+                "metadata": design.metadata,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"synthesize_lc_hpf_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a band-pass LC ladder via the LPF→BPF frequency transformation "
+        "(Pozar §8.5). Series inductors become series-LC tanks (resonant at f₀); "
+        "shunt capacitors become shunt-LC tanks (parallel-resonant). Component count "
+        "doubles vs. the LPF prototype. f₀ = √(f_low · f_high) (geometric mean); "
+        "fractional bandwidth Δ = (f_high - f_low) / f₀. Components emitted with "
+        "'_s' suffix on series-LC pairs. Butterworth / Chebyshev I only."
+    ),
+)
+def synthesize_lc_bpf_filter(
+    filter_type: Annotated[
+        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+    ],
+    order: Annotated[int, Field(ge=1, le=15)],
+    f_low_hz: Annotated[float, Field(gt=0, description="Lower band edge.")],
+    f_high_hz: Annotated[float, Field(gt=0, description="Upper band edge.")],
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: Annotated[
+        str, Field(description="'series_first' or 'shunt_first'.")
+    ] = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        design = synthesize_lc_bpf(
+            filter_type,  # type: ignore[arg-type]
+            order,
+            f_low_hz,
+            f_high_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
+        )
+        return ok(
+            {
+                "components": design.components,
+                "g_coefficients": design.g,
+                "topology": design.topology.value,
+                "f_0_hz": design.metadata["f_0_hz"],
+                "f_low_hz": design.metadata["f_low_hz"],
+                "f_high_hz": design.metadata["f_high_hz"],
+                "fractional_bandwidth": design.metadata["fractional_bandwidth"],
+                "z0": z0,
+                "metadata": design.metadata,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"synthesize_lc_bpf_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a band-stop LC ladder via the LPF→BSF frequency transformation "
+        "(Pozar §8.5). Series inductors become parallel-LC anti-resonators (open at f₀); "
+        "shunt capacitors become series-LC resonators (short at f₀). Used to notch out "
+        "a specific band (e.g., LO leakage, image rejection). Butterworth / Chebyshev I only."
+    ),
+)
+def synthesize_lc_bsf_filter(
+    filter_type: Annotated[
+        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+    ],
+    order: Annotated[int, Field(ge=1, le=15)],
+    f_low_hz: Annotated[float, Field(gt=0, description="Lower stopband edge.")],
+    f_high_hz: Annotated[float, Field(gt=0, description="Upper stopband edge.")],
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: Annotated[
+        str, Field(description="'series_first' or 'shunt_first'.")
+    ] = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        design = synthesize_lc_bsf(
+            filter_type,  # type: ignore[arg-type]
+            order,
+            f_low_hz,
+            f_high_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
+        )
+        return ok(
+            {
+                "components": design.components,
+                "g_coefficients": design.g,
+                "topology": design.topology.value,
+                "f_0_hz": design.metadata["f_0_hz"],
+                "f_low_hz": design.metadata["f_low_hz"],
+                "f_high_hz": design.metadata["f_high_hz"],
+                "fractional_bandwidth": design.metadata["fractional_bandwidth"],
+                "z0": z0,
+                "metadata": design.metadata,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"synthesize_lc_bsf_filter failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
@@ -583,7 +757,10 @@ def optimize_filter(
 @mcp.tool(
     description=(
         "Run Monte Carlo trials with Gaussian-distributed component tolerances. "
-        "Reports yield (% passing the spec) and per-metric mean/std/percentiles."
+        "Reports yield (% passing the spec) and per-metric mean/std/percentiles. "
+        "Set trace=True to also emit a JSONL file with one record per trial "
+        "(seed, components, metrics, passed, failures) for root-cause analysis "
+        "of yield loss."
     ),
 )
 def monte_carlo_analysis(
@@ -594,6 +771,8 @@ def monte_carlo_analysis(
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool = True,
     n_jobs: int = -1,
+    trace: bool = False,
+    trace_path: str | None = None,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -605,6 +784,8 @@ def monte_carlo_analysis(
             z0=z0,
             transmission_zeros=transmission_zeros,
             n_jobs=n_jobs,
+            trace=trace,
+            trace_path=trace_path,
         )
         return ok(
             {
@@ -613,6 +794,7 @@ def monte_carlo_analysis(
                 "yield_pct": result.yield_pct,
                 "per_metric_stats": result.per_metric_stats,
                 "failing_criteria_counts": result.failing_criteria_counts,
+                "trace_path": result.trace_path,
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -1148,6 +1330,250 @@ def compute_phase_margin(
     )
 
 
+# ----- Power-supply EMC pre-compliance ------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Size a Pi-section LC output filter (C-L-C) for additional SMPS "
+        "ripple attenuation downstream of the converter's built-in Cout. "
+        "Returns L, C_in, C_out, predicted attenuation, and damping advice."
+    ),
+)
+def design_pi_output_filter(
+    f_switching_hz: Annotated[float, Field(gt=0)],
+    attenuation_target_db: Annotated[float, Field(gt=0)] = 40.0,
+    f_target_hz: Annotated[float | None, Field(gt=0)] = None,
+    i_out_a: Annotated[float, Field(gt=0)] = 1.0,
+    c_in_initial_f: Annotated[float, Field(gt=0)] = 10e-6,
+    cap_voltage_rating_v: Annotated[float, Field(gt=0)] = 25.0,
+    z0_load_ohm: Annotated[float, Field(gt=0)] = 1.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _design_pi_output_filter(
+            f_switching_hz=f_switching_hz,
+            f_target_hz=f_target_hz,
+            attenuation_target_db=attenuation_target_db,
+            i_out_a=i_out_a,
+            c_in_initial_f=c_in_initial_f,
+            cap_voltage_rating_v=cap_voltage_rating_v,
+            z0_load_ohm=z0_load_ohm,
+        )
+        return ok(
+            {
+                "L_h": result.L_h,
+                "C_in_f": result.C_in_f,
+                "C_out_f": result.C_out_f,
+                "f_resonance_hz": result.f_resonance_hz,
+                "attenuation_at_f_target_db": result.attenuation_at_f_target_db,
+                "attenuation_at_f_sw_db": result.attenuation_at_f_sw_db,
+                "damping_resistor_advice": result.damping_resistor_advice,
+                "notes": result.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"design_pi_output_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Size a 2nd-order LC differential-mode input EMI filter for "
+        "conducted-emissions compliance, with the Middlebrook stability check "
+        "(|Z_out_filter| < |Z_in_converter| with safety_factor margin) so the "
+        "filter doesn't destabilise the converter's loop."
+    ),
+)
+def design_dm_input_filter(
+    f_switching_hz: Annotated[float, Field(gt=0)],
+    attenuation_target_db: Annotated[float, Field(gt=0)] = 40.0,
+    i_in_a: Annotated[float, Field(gt=0)] = 1.0,
+    converter_input_impedance_ohm: Annotated[float, Field(gt=0)] = 1.0,
+    lisn_impedance_ohm: Annotated[float, Field(gt=0)] = 50.0,
+    safety_factor: Annotated[float, Field(gt=1)] = 6.0,
+    c_initial_f: Annotated[float, Field(gt=0)] = 4.7e-6,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _design_dm_input_filter(
+            f_switching_hz=f_switching_hz,
+            attenuation_target_db=attenuation_target_db,
+            i_in_a=i_in_a,
+            converter_input_impedance_ohm=converter_input_impedance_ohm,
+            lisn_impedance_ohm=lisn_impedance_ohm,
+            safety_factor=safety_factor,
+            c_initial_f=c_initial_f,
+        )
+        return ok(
+            {
+                "L_h": result.L_h,
+                "C_f": result.C_f,
+                "f_corner_hz": result.f_corner_hz,
+                "attenuation_at_f_sw_db": result.attenuation_at_f_sw_db,
+                "damping_resistor_ohm": result.damping_resistor_ohm,
+                "damping_cap_f": result.damping_cap_f,
+                "middlebrook_margin_db": result.middlebrook_margin_db,
+                "middlebrook_stable": result.middlebrook_stable,
+                "notes": result.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"design_dm_input_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Predict conducted-emission spectrum at the LISN port for an SMPS "
+        "and compare to CISPR 22 / 32 limits (Class A / B, QP / AVG detector). "
+        "Models the switching node as a trapezoidal voltage waveform with "
+        "duty cycle and rise time. Optional input-filter rolloff applied."
+    ),
+)
+def predict_conducted_emissions(
+    f_switching_hz: Annotated[float, Field(gt=0)],
+    switch_voltage_v: Annotated[float, Field(gt=0)],
+    rise_time_s: Annotated[float, Field(gt=0)],
+    duty_cycle: Annotated[float, Field(gt=0, lt=1)] = 0.5,
+    n_harmonics: Annotated[int, Field(gt=0, le=10000)] = 100,
+    filter_attenuation_db_at_f_sw: Annotated[float, Field(ge=0)] = 0.0,
+    filter_attenuation_slope_db_per_decade: Annotated[float, Field(ge=0)] = 40.0,
+    cispr_class: str = "class_b",
+    cispr_detector: str = "qp",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _predict_conducted_emissions(
+            f_switching_hz=f_switching_hz,
+            duty_cycle=duty_cycle,
+            switch_voltage_v=switch_voltage_v,
+            rise_time_s=rise_time_s,
+            n_harmonics=n_harmonics,
+            filter_attenuation_db_at_f_sw=filter_attenuation_db_at_f_sw,
+            filter_attenuation_slope_db_per_decade=filter_attenuation_slope_db_per_decade,
+            cispr_class=cispr_class,  # type: ignore[arg-type]
+            cispr_detector=cispr_detector,  # type: ignore[arg-type]
+        )
+        return ok(
+            {
+                "freq_hz": result.freq_hz.tolist(),
+                "emission_dbuv": result.emission_dbuv.tolist(),
+                "limit_dbuv": [None if not np.isfinite(v) else float(v) for v in result.limit_dbuv],
+                "margin_db": [None if not np.isfinite(v) else float(v) for v in result.margin_db],
+                "cispr_class": result.cispr_class,
+                "cispr_detector": result.cispr_detector,
+                "worst_margin_db": result.worst_margin_db,
+                "worst_margin_freq_hz": result.worst_margin_freq_hz,
+                "pass_status": result.pass_status,
+                "n_harmonics": result.n_harmonics,
+                "notes": result.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"predict_conducted_emissions failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Design an RC snubber that damps switch-node ringing. Inputs: "
+        "parasitic loop inductance, switch C_oss, peak switch voltage, "
+        "switching frequency. Returns R, C, ring frequency, damping factor, "
+        "and per-cycle dissipation."
+    ),
+)
+def design_rc_snubber(
+    parasitic_l_h: Annotated[float, Field(gt=0)],
+    coss_f: Annotated[float, Field(gt=0)],
+    peak_voltage_v: Annotated[float, Field(ge=0)],
+    f_switching_hz: Annotated[float, Field(gt=0)],
+    target_damping: Annotated[float, Field(gt=0, le=1.0)] = 0.7,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _design_rc_snubber(
+            parasitic_l_h=parasitic_l_h,
+            coss_f=coss_f,
+            peak_voltage_v=peak_voltage_v,
+            f_switching_hz=f_switching_hz,
+            target_damping=target_damping,
+        )
+        return ok(
+            {
+                "R_ohm": result.R_ohm,
+                "C_f": result.C_f,
+                "f_ring_hz": result.f_ring_hz,
+                "damping_factor": result.damping_factor,
+                "dissipation_w": result.dissipation_w,
+                "notes": result.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"design_rc_snubber failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Pick a common-mode choke from a curated catalogue (Würth WE-CMB, "
+        "TDK ZJYS / ACT, Murata DLW). Filters by DC current rating, target "
+        "CM impedance at the design frequency, and DM-leakage cap."
+    ),
+)
+def design_cm_choke(
+    i_dc_a: Annotated[float, Field(ge=0)],
+    target_z_cm_ohm: Annotated[float, Field(gt=0)],
+    target_freq_hz: Annotated[float, Field(gt=0)] = 1e6,
+    max_dm_leakage_h: Annotated[float, Field(gt=0)] = 50e-6,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _design_cm_choke(
+            i_dc_a=i_dc_a,
+            target_z_cm_ohm=target_z_cm_ohm,
+            target_freq_hz=target_freq_hz,
+            max_dm_leakage_h=max_dm_leakage_h,
+        )
+        chosen_dict = None
+        if result.chosen is not None:
+            chosen_dict = {
+                "part_number": result.chosen.part_number,
+                "L_cm_h": result.chosen.L_cm_h,
+                "L_dm_leakage_h": result.chosen.L_dm_leakage_h,
+                "i_dc_max_a": result.chosen.i_dc_max_a,
+                "z_cm_at_1mhz_ohm": result.chosen.z_cm_at_1mhz_ohm,
+                "package": result.chosen.package,
+            }
+        return ok(
+            {
+                "chosen": chosen_dict,
+                "candidates": [
+                    {
+                        "part_number": c.part_number,
+                        "L_cm_h": c.L_cm_h,
+                        "L_dm_leakage_h": c.L_dm_leakage_h,
+                        "i_dc_max_a": c.i_dc_max_a,
+                        "z_cm_at_1mhz_ohm": c.z_cm_at_1mhz_ohm,
+                        "package": c.package,
+                    }
+                    for c in result.candidates
+                ],
+                "target_z_cm_ohm": result.target_z_cm_ohm,
+                "target_freq_hz": result.target_freq_hz,
+                "notes": result.notes,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"design_cm_choke failed: {e}", tool_version=__version__)
+
+
 # ----- Digital + mixed-signal ---------------------------------------------
 
 
@@ -1632,6 +2058,9 @@ def build_design_report_pdf(
 NAMESPACE_ALIASES: dict[str, str] = {
     # filter.* — RF / lumped-LC filter design + analysis
     "synthesize_lc_filter": "filter.synthesize_lc",
+    "synthesize_lc_hpf_filter": "filter.synthesize_lc_hpf",
+    "synthesize_lc_bpf_filter": "filter.synthesize_lc_bpf",
+    "synthesize_lc_bsf_filter": "filter.synthesize_lc_bsf",
     "place_transmission_zero": "filter.place_transmission_zero",
     "find_transmission_zeros": "filter.find_transmission_zeros",
     "evaluate_filter_spec_tool": "filter.evaluate_spec",
@@ -1656,13 +2085,18 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "mfb_low_pass": "analog.mfb_lpf",
     "mfb_band_pass": "analog.mfb_bpf",
     "cascaded_lpf_design": "analog.cascaded_lpf",
-    # power.* — SMPS, LDO, control-loop analysis
+    # power.* — SMPS, LDO, control-loop analysis, EMC pre-compliance
     "analyze_ldo": "power.analyze_ldo",
     "required_psrr_for_ripple": "power.required_psrr",
     "design_buck": "power.design_buck",
     "design_boost": "power.design_boost",
     "type2_compensator": "power.type2_compensator",
     "compute_phase_margin": "power.compute_phase_margin",
+    "design_pi_output_filter": "power.design_pi_output_filter",
+    "design_dm_input_filter": "power.design_dm_input_filter",
+    "predict_conducted_emissions": "power.predict_conducted_emissions",
+    "design_rc_snubber": "power.design_rc_snubber",
+    "design_cm_choke": "power.design_cm_choke",
     # digital.* — timing, crosstalk, supply-noise injection
     "check_setup_hold": "digital.check_setup_hold",
     "propagation_delay": "digital.propagation_delay",

@@ -71,6 +71,22 @@ See [`docs/installation.md`](docs/installation.md) for ngspice / LTspice /
 Qucs-S setup, and [`docs/architecture.md`](docs/architecture.md) for the
 interop contract between servers.
 
+## Scope and related MCP servers
+
+This MCP suite is **circuit-level + filter-synthesis** focused. It deliberately
+stops at the antenna port and at the schematic-to-layout boundary. For domains
+this suite does *not* cover:
+
+- **Antenna design** (radiation patterns, NEC2, FDTD) → use **`nec2-antenna`** or **`openems`**
+- **PCB-level EMC / SI / PI** (impedance from layout, decoupling, return paths,
+  crosstalk from geometry) → use **`pcb-emcopilot`**
+- **Regulatory standards lookup** (CISPR / FCC / ETSI / 3GPP / IEC / ISO,
+  certification matrix, market requirements) → use **`emc-regulations`**
+- **Physical-layer testing** (BLE / WiFi / HaLow on real hardware) → use **`rf-test`**
+
+See [`docs/related-mcp-servers.md`](docs/related-mcp-servers.md) for the full
+boundary statement, decision flow, and cross-MCP workflow examples.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).

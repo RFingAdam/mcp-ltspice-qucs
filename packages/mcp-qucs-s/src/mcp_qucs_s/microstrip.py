@@ -76,22 +76,86 @@ def _impedance(w_h: float, er_eff: float) -> float:
     return z
 
 
+def _dielectric_loss_db_per_m(
+    er: float,
+    er_eff: float,
+    tan_d: float,
+    freq_hz: float,
+) -> float:
+    """Dielectric loss for a microstrip line (Pozar §3.8.1, Eq 3.197).
+
+    α_d (Np/m) = (k₀ · ε_r · (ε_eff − 1) · tan_d) / (2·√ε_eff · (ε_r − 1))
+
+    Returns dB/m. Multiply by 8.686 to convert Np → dB.
+    """
+    if er <= 1 or tan_d <= 0:
+        return 0.0
+    k0 = 2.0 * math.pi * freq_hz / C0
+    alpha_np = (k0 * er * (er_eff - 1) * tan_d) / (2.0 * math.sqrt(er_eff) * (er - 1))
+    return 8.686 * alpha_np  # dB/m
+
+
+def _conductor_loss_db_per_m(
+    z0_ohm: float,
+    width_mm: float,
+    freq_hz: float,
+    sigma_s_per_m: float = 5.8e7,
+) -> float:
+    """Conductor loss for a microstrip line (Pozar §3.8.1, simplified).
+
+    α_c (Np/m) = R_s / (Z₀ · w) where R_s = √(π·f·μ₀/σ) is the surface
+    resistance. Default σ = 5.8 × 10⁷ S/m (copper).
+
+    Returns dB/m. Approximation neglects current crowding at trace edges
+    (Hammerstad-Jensen K_a correction); accurate to ~1 dB/m up to a few GHz.
+    """
+    if width_mm <= 0 or z0_ohm <= 0 or sigma_s_per_m <= 0:
+        return 0.0
+    mu0 = 4.0 * math.pi * 1e-7
+    rs = math.sqrt(math.pi * freq_hz * mu0 / sigma_s_per_m)  # Ω/sq
+    alpha_np = rs / (z0_ohm * (width_mm * 1e-3))
+    return 8.686 * alpha_np  # dB/m
+
+
 def analyze_microstrip(
-    width_mm: float, substrate: Substrate, freq_hz: float = 1e9
+    width_mm: float,
+    substrate: Substrate,
+    freq_hz: float = 1e9,
+    *,
+    sigma_s_per_m: float = 5.8e7,
 ) -> dict[str, float]:
-    """Compute Z₀, ε_eff, and wavelength for a given microstrip width."""
+    """Compute Z₀, ε_eff, wavelength, and per-mm loss for a given microstrip width.
+
+    Returns a dict with:
+    - ``z0_ohm`` — characteristic impedance
+    - ``er_eff`` — effective dielectric constant
+    - ``w_h_ratio`` — width-to-substrate-height ratio
+    - ``wavelength_eff_mm`` — effective guided wavelength
+    - ``phase_velocity_m_s`` — phase velocity
+    - ``alpha_d_db_per_mm`` — dielectric loss (uses substrate ``tan_d``)
+    - ``alpha_c_db_per_mm`` — conductor loss (default copper σ = 5.8e7 S/m)
+    - ``alpha_total_db_per_mm`` — sum
+
+    ``sigma_s_per_m`` defaults to copper. Override for gold (4.1e7),
+    aluminium (3.5e7), or measured plating.
+    """
     if width_mm <= 0:
         raise ValueError(f"width_mm must be positive, got {width_mm}")
     w_h = width_mm / substrate.h_mm
     er_eff = _eff_permittivity(w_h, substrate.er)
     z0 = _impedance(w_h, er_eff)
     wavelength_eff_m = C0 / (freq_hz * math.sqrt(er_eff))
+    alpha_d_db_per_m = _dielectric_loss_db_per_m(substrate.er, er_eff, substrate.tan_d, freq_hz)
+    alpha_c_db_per_m = _conductor_loss_db_per_m(z0, width_mm, freq_hz, sigma_s_per_m)
     return {
         "z0_ohm": z0,
         "er_eff": er_eff,
         "w_h_ratio": w_h,
         "wavelength_eff_mm": wavelength_eff_m * 1000.0,
         "phase_velocity_m_s": C0 / math.sqrt(er_eff),
+        "alpha_d_db_per_mm": alpha_d_db_per_m / 1000.0,
+        "alpha_c_db_per_mm": alpha_c_db_per_m / 1000.0,
+        "alpha_total_db_per_mm": (alpha_d_db_per_m + alpha_c_db_per_m) / 1000.0,
     }
 
 
