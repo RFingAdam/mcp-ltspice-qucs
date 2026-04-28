@@ -9,6 +9,18 @@ grouped by package.
 
 ## [Unreleased]
 
+### `mcp-ltspice` — power-supply EMC pre-compliance toolkit
+
+Five new tools fill the gap between SMPS sizing (existing buck / boost / LDO) and a real product passing conducted-emissions:
+
+- **`design_pi_output_filter`** (`power.design_pi_output_filter`) — Pi-section LC output filter (C-L-C, 3rd-order LPF) sized for an attenuation target at a given frequency. Returns L, C_in, C_out, resonant frequency, achieved attenuation at f_target / f_sw, plus a damping-resistor recipe and BOM notes (inductor saturation, MLCC DC-bias derating).
+- **`design_dm_input_filter`** (`power.design_dm_input_filter`) — 2nd-order differential-mode LC input filter sized for a conducted-emissions target. Includes the Middlebrook stability check (|Z_out_filter| < |Z_in_converter| / safety_factor) so the filter doesn't destabilise the converter's loop, and surfaces a damping-branch recipe (R_d, C_d) per Erickson & Maksimović §10.4.
+- **`predict_conducted_emissions`** (`power.predict_conducted_emissions`) — harmonic decomposition of a trapezoidal switching waveform with two-sinc envelope (duty-cycle and edge-rate cutoffs), LISN-loaded prediction, CISPR 22 / 32 Class A or B limit overlay (QP or AVG detector). Returns per-harmonic frequency / emission / limit / margin arrays plus a worst-margin pass/fail summary.
+- **`design_rc_snubber`** (`power.design_rc_snubber`) — RC snubber for switch-node ringing. Inputs: parasitic loop inductance, switch C_oss, peak voltage, switching frequency. Returns R, C, ring frequency, achieved damping factor, and per-cycle dissipation. Standard recipe: C_snub = C_oss, R_snub = √(L_par/C_oss) × 2ζ.
+- **`design_cm_choke`** (`power.design_cm_choke`) — common-mode choke selection from a curated catalogue (Würth WE-CMB, TDK ZJYS / ACT, Murata DLW). Filters by DC current rating, target CM impedance at design frequency, and DM-leakage cap. Returns ranked candidate list plus the highest-margin pick.
+
+All five register under both their flat names and `power.*` namespaced aliases. Tests in `test_power_emc.py` (31 cases) cover return-shape, math correctness (resonance / attenuation / dissipation scaling), CISPR class / detector relationships, and edge cases.
+
 ### `mcp-qucs-s` — implementation status corrections
 
 Earlier `[Unreleased]` notes claimed "Implemented all 4 simulator-driven tools with graceful degradation." This is corrected to the actual status:
