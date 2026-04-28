@@ -134,6 +134,41 @@ class TestBpfSynthesis:
             synthesize_lc_bpf("elliptic", order=5, f_low_hz=900e6, f_high_hz=1100e6)
 
 
+class TestBpfResponse:
+    """Verify BPF response shape via the analytical ABCD chain."""
+
+    def _bpf_response(self, order: int, f_low: float, f_high: float):
+        d = synthesize_lc_bpf("butterworth", order=order, f_low_hz=f_low, f_high_hz=f_high)
+        elements = components_dict_to_elements(
+            d.components, kind="bandpass", topology="series_first"
+        )
+        f = np.geomspace(0.01 * d.metadata["f_0_hz"], 100 * d.metadata["f_0_hz"], 2001)
+        s = ladder_sparams_from_components(elements, f, z0=50.0)
+        s21_db = 20.0 * np.log10(np.maximum(np.abs(s[:, 1, 0]), 1e-12))
+        return f, s21_db, d.metadata["f_0_hz"]
+
+    def test_passband_lossless_at_f0(self):
+        f, s21, f0 = self._bpf_response(3, 900e6, 1100e6)
+        idx = int(np.argmin(np.abs(f - f0)))
+        assert s21[idx] > -0.5, f"BPF at f_0 should be near 0 dB; got {s21[idx]:.2f} dB"
+
+    def test_neg_3db_at_band_edges(self):
+        f, s21, _ = self._bpf_response(3, 900e6, 1100e6)
+        for f_edge in (900e6, 1100e6):
+            idx = int(np.argmin(np.abs(f - f_edge)))
+            assert -4.5 < s21[idx] < -1.5, (
+                f"BPF at edge {f_edge / 1e6:.0f} MHz should be near -3 dB; got {s21[idx]:.2f} dB"
+            )
+
+    def test_stopband_attenuation(self):
+        """At one decade outside the band, BPF should attenuate >> 30 dB."""
+        f, s21, f0 = self._bpf_response(3, 900e6, 1100e6)
+        idx_low = int(np.argmin(np.abs(f - f0 / 10)))
+        idx_high = int(np.argmin(np.abs(f - f0 * 10)))
+        assert s21[idx_low] < -40, f"BPF should reject 1 decade below; got {s21[idx_low]:.1f} dB"
+        assert s21[idx_high] < -40, f"BPF should reject 1 decade above; got {s21[idx_high]:.1f} dB"
+
+
 # ---------------------------------------------------------------------------
 # BSF synthesis
 # ---------------------------------------------------------------------------
@@ -157,6 +192,47 @@ class TestBsfSynthesis:
             elif l_key in d.components and c_key in d.components:
                 f_res = 1.0 / (2 * math.pi * math.sqrt(d.components[l_key] * d.components[c_key]))
                 assert f_res == pytest.approx(f0, rel=1e-3)
+
+
+class TestBsfResponse:
+    """Verify BSF response shape via the analytical ABCD chain."""
+
+    def _bsf_response(self, order: int, f_low: float, f_high: float):
+        d = synthesize_lc_bsf("butterworth", order=order, f_low_hz=f_low, f_high_hz=f_high)
+        elements = components_dict_to_elements(
+            d.components, kind="bandstop", topology="series_first"
+        )
+        f = np.geomspace(0.01 * d.metadata["f_0_hz"], 100 * d.metadata["f_0_hz"], 2001)
+        s = ladder_sparams_from_components(elements, f, z0=50.0)
+        s21_db = 20.0 * np.log10(np.maximum(np.abs(s[:, 1, 0]), 1e-12))
+        return f, s21_db, d.metadata["f_0_hz"]
+
+    def test_deep_notch_at_f0(self):
+        """At f_0 the BSF should show a deep notch (>> 60 dB rejection)."""
+        f, s21, f0 = self._bsf_response(3, 900e6, 1100e6)
+        idx = int(np.argmin(np.abs(f - f0)))
+        assert s21[idx] < -60, f"BSF at f_0 should notch deeply; got {s21[idx]:.1f} dB"
+
+    def test_passband_outside_stopband(self):
+        """At one decade outside the stopband, BSF should pass cleanly."""
+        f, s21, f0 = self._bsf_response(3, 900e6, 1100e6)
+        idx_low = int(np.argmin(np.abs(f - f0 / 10)))
+        idx_high = int(np.argmin(np.abs(f - f0 * 10)))
+        assert s21[idx_low] > -1.0, (
+            f"BSF passband should be lossless 1 decade below; got {s21[idx_low]:.2f} dB"
+        )
+        assert s21[idx_high] > -1.0, (
+            f"BSF passband should be lossless 1 decade above; got {s21[idx_high]:.2f} dB"
+        )
+
+    def test_neg_3db_at_band_edges(self):
+        """The stopband is bounded by -3 dB at f_low / f_high."""
+        f, s21, _ = self._bsf_response(3, 900e6, 1100e6)
+        for f_edge in (900e6, 1100e6):
+            idx = int(np.argmin(np.abs(f - f_edge)))
+            assert -4.5 < s21[idx] < -1.5, (
+                f"BSF at edge {f_edge / 1e6:.0f} MHz should be near -3 dB; got {s21[idx]:.2f} dB"
+            )
 
 
 # ---------------------------------------------------------------------------
