@@ -115,6 +115,9 @@ from mcp_ltspice.sweep import (
 )
 from mcp_ltspice.synthesis import (
     Topology,
+    synthesize_lc_bpf,
+    synthesize_lc_bsf,
+    synthesize_lc_hpf,
     synthesize_lc_lpf,
 )
 from mcp_ltspice.synthesis import (
@@ -323,6 +326,162 @@ def synthesize_lc_filter(
         return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"synthesize_lc_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a high-pass LC ladder via the LPF→HPF frequency transformation "
+        "(Pozar §8.5). Series inductors become series capacitors; shunt capacitors "
+        "become shunt inductors. Components emitted as C1, L2, C3, L4, ... (T-topology). "
+        "Currently supports Butterworth and Chebyshev I (elliptic HPF not implemented)."
+    ),
+)
+def synthesize_lc_hpf_filter(
+    filter_type: Annotated[
+        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+    ],
+    order: Annotated[int, Field(ge=1, le=15)],
+    cutoff_hz: Annotated[float, Field(gt=0, description="-3 dB cutoff frequency.")],
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: Annotated[
+        str, Field(description="'series_first' (T) or 'shunt_first' (Pi).")
+    ] = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        design = synthesize_lc_hpf(
+            filter_type,  # type: ignore[arg-type]
+            order,
+            cutoff_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
+        )
+        return ok(
+            {
+                "components": design.components,
+                "g_coefficients": design.g,
+                "topology": design.topology.value,
+                "cutoff_hz": design.cutoff_hz,
+                "z0": z0,
+                "metadata": design.metadata,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"synthesize_lc_hpf_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a band-pass LC ladder via the LPF→BPF frequency transformation "
+        "(Pozar §8.5). Series inductors become series-LC tanks (resonant at f₀); "
+        "shunt capacitors become shunt-LC tanks (parallel-resonant). Component count "
+        "doubles vs. the LPF prototype. f₀ = √(f_low · f_high) (geometric mean); "
+        "fractional bandwidth Δ = (f_high - f_low) / f₀. Components emitted with "
+        "'_s' suffix on series-LC pairs. Butterworth / Chebyshev I only."
+    ),
+)
+def synthesize_lc_bpf_filter(
+    filter_type: Annotated[
+        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+    ],
+    order: Annotated[int, Field(ge=1, le=15)],
+    f_low_hz: Annotated[float, Field(gt=0, description="Lower band edge.")],
+    f_high_hz: Annotated[float, Field(gt=0, description="Upper band edge.")],
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: Annotated[
+        str, Field(description="'series_first' or 'shunt_first'.")
+    ] = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        design = synthesize_lc_bpf(
+            filter_type,  # type: ignore[arg-type]
+            order,
+            f_low_hz,
+            f_high_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
+        )
+        return ok(
+            {
+                "components": design.components,
+                "g_coefficients": design.g,
+                "topology": design.topology.value,
+                "f_0_hz": design.metadata["f_0_hz"],
+                "f_low_hz": design.metadata["f_low_hz"],
+                "f_high_hz": design.metadata["f_high_hz"],
+                "fractional_bandwidth": design.metadata["fractional_bandwidth"],
+                "z0": z0,
+                "metadata": design.metadata,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"synthesize_lc_bpf_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a band-stop LC ladder via the LPF→BSF frequency transformation "
+        "(Pozar §8.5). Series inductors become parallel-LC anti-resonators (open at f₀); "
+        "shunt capacitors become series-LC resonators (short at f₀). Used to notch out "
+        "a specific band (e.g., LO leakage, image rejection). Butterworth / Chebyshev I only."
+    ),
+)
+def synthesize_lc_bsf_filter(
+    filter_type: Annotated[
+        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+    ],
+    order: Annotated[int, Field(ge=1, le=15)],
+    f_low_hz: Annotated[float, Field(gt=0, description="Lower stopband edge.")],
+    f_high_hz: Annotated[float, Field(gt=0, description="Upper stopband edge.")],
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 40.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: Annotated[
+        str, Field(description="'series_first' or 'shunt_first'.")
+    ] = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        design = synthesize_lc_bsf(
+            filter_type,  # type: ignore[arg-type]
+            order,
+            f_low_hz,
+            f_high_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=Topology(topology),
+        )
+        return ok(
+            {
+                "components": design.components,
+                "g_coefficients": design.g,
+                "topology": design.topology.value,
+                "f_0_hz": design.metadata["f_0_hz"],
+                "f_low_hz": design.metadata["f_low_hz"],
+                "f_high_hz": design.metadata["f_high_hz"],
+                "fractional_bandwidth": design.metadata["fractional_bandwidth"],
+                "z0": z0,
+                "metadata": design.metadata,
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"synthesize_lc_bsf_filter failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
@@ -598,7 +757,10 @@ def optimize_filter(
 @mcp.tool(
     description=(
         "Run Monte Carlo trials with Gaussian-distributed component tolerances. "
-        "Reports yield (% passing the spec) and per-metric mean/std/percentiles."
+        "Reports yield (% passing the spec) and per-metric mean/std/percentiles. "
+        "Set trace=True to also emit a JSONL file with one record per trial "
+        "(seed, components, metrics, passed, failures) for root-cause analysis "
+        "of yield loss."
     ),
 )
 def monte_carlo_analysis(
@@ -609,6 +771,8 @@ def monte_carlo_analysis(
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool = True,
     n_jobs: int = -1,
+    trace: bool = False,
+    trace_path: str | None = None,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -620,6 +784,8 @@ def monte_carlo_analysis(
             z0=z0,
             transmission_zeros=transmission_zeros,
             n_jobs=n_jobs,
+            trace=trace,
+            trace_path=trace_path,
         )
         return ok(
             {
@@ -628,6 +794,7 @@ def monte_carlo_analysis(
                 "yield_pct": result.yield_pct,
                 "per_metric_stats": result.per_metric_stats,
                 "failing_criteria_counts": result.failing_criteria_counts,
+                "trace_path": result.trace_path,
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -1891,6 +2058,9 @@ def build_design_report_pdf(
 NAMESPACE_ALIASES: dict[str, str] = {
     # filter.* — RF / lumped-LC filter design + analysis
     "synthesize_lc_filter": "filter.synthesize_lc",
+    "synthesize_lc_hpf_filter": "filter.synthesize_lc_hpf",
+    "synthesize_lc_bpf_filter": "filter.synthesize_lc_bpf",
+    "synthesize_lc_bsf_filter": "filter.synthesize_lc_bsf",
     "place_transmission_zero": "filter.place_transmission_zero",
     "find_transmission_zeros": "filter.find_transmission_zeros",
     "evaluate_filter_spec_tool": "filter.evaluate_spec",
