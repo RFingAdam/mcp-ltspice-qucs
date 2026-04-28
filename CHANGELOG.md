@@ -9,18 +9,46 @@ grouped by package.
 
 ## [Unreleased]
 
-### `mcp-qucs-s`
-- Implemented all 4 closed-form synthesis tools (no Qucs-S install required):
+### `mcp-qucs-s` — implementation status corrections
+
+Earlier `[Unreleased]` notes claimed "Implemented all 4 simulator-driven tools with graceful degradation." This is corrected to the actual status:
+
+- **Implemented (4 closed-form synthesis tools, no Qucs-S install required):**
   - `synthesize_microstrip_line` — Hammerstad-Jensen W/L from Z₀
   - `analyze_microstrip_tool` — Z₀ / ε_eff / wavelength from W
-  - `synthesize_coupler` — branch-line / rat-race / coupled-line / Lange
+  - `synthesize_coupler` — branch-line / rat-race / coupled-line / Lange (single-line approximation; coupled-line gap synthesis pending)
   - `lumped_to_distributed` — Richards transformation + Kuroda identities
-- Implemented all 4 simulator-driven tools with graceful degradation:
-  - `run_sp_analysis`, `extract_noise_parameters`, `export_touchstone`,
-    `run_harmonic_balance` return clean error envelopes when Qucs-S /
-    Xyce are missing instead of crashing
-- Added `status` tool for capability discovery
-- Qucs-S `.dat` parser + Touchstone exporter
+- **Implemented (2 simulator-driven tools, require Qucs-S):**
+  - `run_sp_analysis` — Qucs-S `.dat` parser + Touchstone exporter
+  - `export_touchstone` — Run + export `.s2p` in one call
+- **Scaffolded — return `error("not yet implemented")` envelope (Tier-6 roadmap):**
+  - `run_harmonic_balance` — detects Xyce, but Xyce-netlist generation and harmonic-content parsing (IM3 / IIP3 / 1 dB compression) are pending
+  - `extract_noise_parameters` — detects Qucs-S, but noise-analysis dataset parser (Fmin / Γopt / Rn / NF50) is pending
+
+Both scaffolded tools previously returned `ok()` envelopes with a `"note: scaffolded"` field — calling agents could mistake this for success. They now return `error()` envelopes with clear "not yet implemented" messages.
+
+- The README's tool table previously listed `synthesize_microstrip_filter` (stepped-impedance / hairpin / interdigital filter realisations) — the tool was never implemented. The row has been removed; filter synthesis in the distributed domain is on the Tier-6 roadmap.
+
+### Architecture hygiene (`mcp-ltspice`)
+
+- Vendor catalogue: `JOHANSON_L` and `TDK_MLG` were `COILCRAFT_0402HP.copy()` — alias-only, not real data. Replaced with measured tables for the Johanson L-07W series (0402) and TDK MLK1005S series.
+- `compare_filter_orders` now accepts `srf_margin` and `max_value_drift_pct` and passes them through to the inner `substitute_real_components` call. Previous behaviour ran the comparison with legacy semantics, so winners could differ from a final design that enabled SRF gating.
+- Tool namespacing: every flat tool name now has a namespaced alias (`filter.*` / `analog.*` / `power.*` / `digital.*` / `vendor.*` / `sim.*` / `coex.*`). Old names continue to work but emit a one-shot `DeprecationWarning` per process pointing to the namespaced equivalent. Removal in a later major release.
+
+### Correctness fixes (`mcp-ltspice`)
+
+- `components_dict_to_elements(components, transmission_zeros=...)` — the `transmission_zeros` flag now defaults to `None` (auto-infer from the components dict) instead of `False`. Prior default silently produced wrong S-parameters when an elliptic ladder was passed without the flag set explicitly. Explicit `False` on elliptic-shape components now emits a `RuntimeWarning`.
+- `place_transmission_zero` and `trap_lc_for_freq` — the `preserve_ratio: bool` parameter is replaced by `mode: Literal["preserve_ratio", "hold_l", "hold_c"]`. The old API with `preserve_ratio=False` and both `l_existing` and `c_existing` provided fell through none of the conditional branches and silently substituted `L=1 nH` — that bug is fixed. Legacy `preserve_ratio` calls continue to work via a deprecation shim.
+- Elliptic synthesis (`synthesize_lc_lpf` filter_type="elliptic") — the reported `transmission_zeros_hz` field was inconsistent with the actual `1/(2π√(L_k C_k))` of the synthesised trap pairs at certain orders. Root cause: `_fit_lc_to_prototype` was an unconstrained least-squares fit over (L, C) pairs that drifted the L·C product away from the target trap resonance. Fix: each trap now has only `L_trap` as an optimisation variable; `C_trap` is computed as `1/(ω_zk² · L_trap)` so the resonance is pinned exactly to the prototype's transmission zero. New regression test (`test_elliptic_synth_consistency.py`) covers orders 3 / 5 / 7 / 9 across multiple `(fc, ripple, stopband)` combinations and asserts the reported and achieved TZ frequencies agree to within 1 %.
+
+### Vendor catalogue (`mcp-ltspice`) — Johanson L-07W and TDK MLK1005S replacements
+
+The previous `JOHANSON_L = COILCRAFT_0402HP.copy()` and `TDK_MLG = COILCRAFT_0402HP.copy()` aliases were misleading — they suggested broader vendor coverage than the package actually had. Replaced with nominal datasheet-derived tables for:
+
+- **Johanson L-07W series (0402)** — 19 values from 1.0 nH to 39 nH, with SRFs ~10–15 % higher than Coilcraft 0402HP at equal inductance (wirewound construction). Extends the available value range upward.
+- **TDK MLK1005S series (0402)** — 19 values from 0.6 nH to 22 nH, extending the catalogue to sub-nH values that Coilcraft 0402HP doesn't carry.
+
+These are first-order parasitic estimates suitable for synthesis-time sims; for design-final precision, fetch a real S-parameter file from the vendor (planned via the `vendor.fetch_*` tools on the Tier-3 roadmap).
 
 ### Docs / branding
 - Logo SVG (full and mark variants) under `assets/`
