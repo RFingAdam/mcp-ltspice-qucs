@@ -123,30 +123,89 @@ def ladder_sparams_from_components(
     return s
 
 
+def _idx(name: str) -> int:
+    """Numeric index from a refdes like ``L3`` or ``C12``."""
+    m = re.match(r"[LC](\d+)", name)
+    if not m:
+        raise ValueError(f"Bad refdes: {name}")
+    return int(m.group(1))
+
+
+def infer_transmission_zeros(components: dict[str, float]) -> bool:
+    """Detect whether a components dict represents an elliptic ladder.
+
+    An elliptic LC ladder has L+C pairs at even indices (the shunt-LC
+    traps). Butterworth / Chebyshev ladders have lone Ls and lone Cs
+    alternating, with no even-indexed L+C pair.
+
+    Returns ``True`` if any even-indexed ``Lk + Ck`` pair coexists.
+    """
+    for name in components:
+        idx = _idx(name)
+        if idx % 2 != 0:
+            continue
+        l_key = f"L{idx}"
+        c_key = f"C{idx}"
+        if l_key in components and c_key in components:
+            return True
+    return False
+
+
 def components_dict_to_elements(
     components: dict[str, float],
     *,
     topology: str = "series_first",
-    transmission_zeros: bool = False,
+    transmission_zeros: bool | None = None,
 ) -> list[tuple[ElementType, dict[str, float]]]:
     """Convert the synthesis-style component dict into an ordered element
     list suitable for :func:`ladder_sparams_from_components`.
 
-    For Butterworth/Chebyshev (``transmission_zeros=False``):
-    components are L1, C2, L3, C4, ... (series_first) or C1, L2, ...
-    (shunt_first). Indices encode position; we walk in numeric order.
+    Topology cases:
 
-    For elliptic (``transmission_zeros=True``):
-    components are L1, L2+C2 (trap), L3, L4+C4 (trap), L5, ...
-    Pairs (Lk, Ck) for even k form shunt LC traps; lone Lk are series.
+    - **Butterworth / Chebyshev** — components are ``L1, C2, L3, C4, ...``
+      (``series_first``) or ``C1, L2, C3, L4, ...`` (``shunt_first``).
+      Indices encode position; we walk in numeric order.
+
+    - **Elliptic** — components are ``L1, L2+C2 (trap), L3, L4+C4 (trap), L5, ...``.
+      ``Lk + Ck`` pairs at even ``k`` form shunt LC traps; lone ``Lk`` are series.
+
+    The ``transmission_zeros`` flag selects which interpretation to apply:
+
+    - ``None`` (default) — auto-infer from the components dict using
+      :func:`infer_transmission_zeros`. **This is the recommended default.**
+    - ``True`` — force elliptic (trap) interpretation
+    - ``False`` — force Butterworth / Chebyshev interpretation
+
+    If an explicit flag disagrees with what auto-inference would have
+    chosen, a :class:`RuntimeWarning` is emitted recommending the user
+    re-check their topology choice (typically, forgetting ``True`` for
+    an elliptic ladder silently produces wrong S-parameters).
     """
+    inferred = infer_transmission_zeros(components)
+    if transmission_zeros is None:
+        transmission_zeros = inferred
+    elif transmission_zeros != inferred:
+        import warnings
 
-    # Sort by numeric refdes index
-    def _idx(name: str) -> int:
-        m = re.match(r"[LC](\d+)", name)
-        if not m:
-            raise ValueError(f"Bad refdes: {name}")
-        return int(m.group(1))
+        if inferred and not transmission_zeros:
+            warnings.warn(
+                "components_dict_to_elements: explicit transmission_zeros=False, "
+                "but the components dict has even-indexed L+C pairs (elliptic "
+                "topology). The forced Butterworth/Chebyshev interpretation will "
+                "produce wrong S-parameters. Pass transmission_zeros=True or "
+                "leave it unset to auto-infer.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        elif transmission_zeros and not inferred:
+            warnings.warn(
+                "components_dict_to_elements: explicit transmission_zeros=True, "
+                "but the components dict has no even-indexed L+C pairs. There "
+                "are no traps to pair up; the elliptic-mode walk will produce "
+                "the same elements as the Butterworth/Chebyshev interpretation.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
     sorted_names = sorted(components.keys(), key=_idx)
     elements: list[tuple[ElementType, dict[str, float]]] = []
@@ -197,10 +256,14 @@ def write_sparams_touchstone(
     *,
     z0: float = 50.0,
     topology: str = "series_first",
-    transmission_zeros: bool = False,
+    transmission_zeros: bool | None = None,
     name: str | None = None,
 ) -> Path:
-    """Convenience: synthesize → S-params → write .s2p."""
+    """Convenience: synthesize → S-params → write .s2p.
+
+    ``transmission_zeros`` defaults to ``None`` (auto-infer); pass an
+    explicit ``bool`` to override. See :func:`components_dict_to_elements`.
+    """
     elements = components_dict_to_elements(
         components, topology=topology, transmission_zeros=transmission_zeros
     )
