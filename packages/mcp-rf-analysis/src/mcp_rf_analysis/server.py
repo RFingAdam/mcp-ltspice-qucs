@@ -207,19 +207,38 @@ def list_spec_templates_tool() -> Envelope[list[str]]:
 # -------- Regulatory / coex DB --------
 
 
-@mcp.tool(description="List LTE bands. Optional ``region`` substring filter.")
+@mcp.tool(
+    description=(
+        "List LTE bands. Optional ``region`` substring filter. NOTE: this is a "
+        "filter-design helper backed by a curated subset; for the authoritative "
+        "regulatory band table prefer `lte_bands_list` from the **emc-regulations** MCP."
+    )
+)
 def list_lte_bands_tool(
     region: str | None = None,
 ) -> Envelope[list[dict[str, Any]]]:
     return _wrap(list_lte_bands, region)
 
 
-@mcp.tool(description="List 5G NR bands. ``family`` is 'fr1' or 'fr2'.")
+@mcp.tool(
+    description=(
+        "List 5G NR bands. ``family`` is 'fr1' or 'fr2'. NOTE: filter-design helper; "
+        "for authoritative regulatory band data prefer `nr_bands_list` from the "
+        "**emc-regulations** MCP."
+    )
+)
 def list_5gnr_bands_tool(family: str = "fr1") -> Envelope[list[dict[str, Any]]]:
     return _wrap(list_5gnr_bands, family)
 
 
-@mcp.tool(description="List GNSS signals (GPS / GLONASS / Galileo / BeiDou).")
+@mcp.tool(
+    description=(
+        "List GNSS signals (GPS / GLONASS / Galileo / BeiDou). Filter-design helper "
+        "with sensitivity / bandwidth metadata used by `lookup_harmonic_victims` and "
+        "`check_coex_matrix`. For broader regulatory queries see the "
+        "**emc-regulations** MCP."
+    )
+)
 def list_gnss_bands_tool(
     system: str | None = None,
 ) -> Envelope[list[dict[str, Any]]]:
@@ -227,7 +246,11 @@ def list_gnss_bands_tool(
 
 
 @mcp.tool(
-    description="List ISM band allocations. ``region`` is the ITU region (1=EMEA, 2=Americas, 3=APAC)."
+    description=(
+        "List ISM band allocations. ``region`` is the ITU region (1=EMEA, 2=Americas, 3=APAC). "
+        "NOTE: filter-design helper; for authoritative regulatory band tables prefer "
+        "`ism_bands_list` from the **emc-regulations** MCP."
+    )
 )
 def list_ism_bands_tool(
     region: int | None = None,
@@ -236,20 +259,36 @@ def list_ism_bands_tool(
 
 
 @mcp.tool(
-    description="List 802.11ah HaLow channels for a region (US, EU, JP, KR, CN, SG, AU_NZ, IN)."
+    description=(
+        "List 802.11ah HaLow channels for a region (US, EU, JP, KR, CN, SG, AU_NZ, IN). "
+        "Bundled here because no other MCP carries HaLow channel grids; data feeds "
+        "`lookup_harmonic_victims` and `check_coex_matrix`."
+    )
 )
 def list_halow_channels_tool(region: str = "US") -> Envelope[dict[str, Any]]:
     return _wrap(list_halow_channels, region)
 
 
-@mcp.tool(description="Find every band/system that contains a given frequency.")
+@mcp.tool(
+    description=(
+        "Find every band/system that contains a given frequency. "
+        "Returns a structured dict mapping {lte_ul, lte_dl, 5gnr_ul, 5gnr_dl, gnss, ism, halow} "
+        "→ list of matching entries. The reverse-lookup direction is unique to this MCP."
+    )
+)
 def lookup_band_by_freq_tool(
     freq_hz: Annotated[float, Field(gt=0)],
 ) -> Envelope[dict[str, Any]]:
     return _wrap(lookup_band_by_freq, freq_hz)
 
 
-@mcp.tool(description="List FCC §15.205 restricted bands.")
+@mcp.tool(
+    description=(
+        "List FCC §15.205 restricted bands. NOTE: filter-design helper used by "
+        "`lookup_harmonic_victims`; for authoritative regulatory queries prefer "
+        "`fcc_restricted_bands_list` from the **emc-regulations** MCP."
+    )
+)
 def list_fcc_restricted_bands_tool() -> Envelope[list[dict[str, Any]]]:
     return _wrap(list_fcc_restricted_bands)
 
