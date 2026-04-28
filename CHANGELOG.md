@@ -9,6 +9,53 @@ grouped by package.
 
 ## [Unreleased]
 
+### Filter synthesis — HPF / BPF / BSF (`mcp-ltspice`)
+
+Closes the biggest user-visible gap in filter coverage. Three new top-level synthesis functions backed by classical Pozar §8.5 frequency transformations from the LPF prototype:
+
+- **`synthesize_lc_hpf`** (`filter.synthesize_lc_hpf`) — high-pass via series-L → series-C and shunt-C → shunt-L. Component count equals the LPF prototype's. -3 dB at the specified cutoff (Butterworth) or equiripple edge (Chebyshev).
+- **`synthesize_lc_bpf`** (`filter.synthesize_lc_bpf`) — band-pass via series-L → series-LC tank, shunt-C → shunt-LC tank. Component count doubles. f₀ = √(f_low · f_high), Δ = (f_high − f_low) / f₀; each LC pair resonates at f₀ exactly.
+- **`synthesize_lc_bsf`** (`filter.synthesize_lc_bsf`) — band-stop via series-L → series parallel-LC (anti-resonant), shunt-C → shunt series-LC (resonant). Used to notch a specific band (LO leakage, image rejection).
+
+Currently supports Butterworth and Chebyshev I across all three. Elliptic HPF/BPF/BSF needs a separate transformation for finite transmission zeros and is on the roadmap.
+
+**Analytical S-parameter analysis is wired up for all four kinds** (LPF, HPF, BPF, BSF). `components_dict_to_elements` extended with a `kind` parameter (`"lowpass"`, `"highpass"`, `"bandpass"`, `"bandstop"`). Three new ABCD element types added to support BPF/BSF resonator topologies:
+
+- `series_lc_series` — series-LC in main path (BPF series section). `Z = sL + 1/(sC)` — dips at f₀.
+- `shunt_lc_parallel` — parallel-LC to ground (BPF shunt section). `Y = sC + 1/(sL)` — dips at f₀.
+- `series_lc_parallel` — parallel-LC in main path (BSF series section). `Z = sL/(s²LC+1)` — peaks at f₀.
+
+The existing `shunt_lc_trap` kind (series-LC to ground; elliptic LPF trap) doubles as the BSF shunt section. Verified BPF response: -3 dB at band edges, deep stopband > 50 dB one decade out. Verified BSF response: > 60 dB notch at f₀, lossless passband one decade out.
+
+### Substrate preset library + microstrip loss (`mcp-qucs-s`)
+
+- New `mcp_qucs_s.substrates` module with **16 curated presets** covering FR-4 (4 thicknesses), Rogers RO4350B (3), Rogers RO4003C (2), RT/Duroid 5880 (2) + 6002, PTFE, Isola FR408HR (2), Taconic TLY5. Each carries documented εr / h_mm / t_um / tan_d from the manufacturer datasheet.
+- New `list_substrate_presets_tool` MCP tool returns the full catalogue with descriptions.
+- `synthesize_microstrip_line` and `analyze_microstrip_tool` now accept a **preset name string** (e.g. `"Rogers4350B_0508"`) as the `substrate` argument in addition to the parameter dict. Saves engineers from re-typing `{er, h_mm, t_um, tan_d}` every call.
+- `analyze_microstrip` now uses the substrate's `tan_d` (previously accepted but ignored) to compute **conductor + dielectric attenuation in dB/mm**, surfaced as `alpha_d_db_per_mm`, `alpha_c_db_per_mm`, `alpha_total_db_per_mm`. Pozar §3.8.1 dielectric formula plus skin-effect conductor loss (default σ = 5.8 × 10⁷ S/m for copper; override for gold / aluminium / measured plating). Verified against published values for FR-4 / Rogers / Duroid at 5 GHz.
+
+### Monte Carlo trace mode (`mcp-ltspice`)
+
+`monte_carlo_analysis` gains a `trace=True` flag that emits a JSONL file (one record per trial: seed, sampled components, metrics, pass/fail status, failures list). Lets engineers do offline sensitivity / root-cause analysis of yield loss without re-running MC. Default path is `mc_trace_<base_seed>.jsonl` in cwd; override via `trace_path`.
+
+`monte_carlo_analysis(transmission_zeros=...)` default changed from `True` to `None` — now auto-infers topology from the components dict (matches the `components_dict_to_elements` behaviour added earlier in this Unreleased stream). Old code passing `True`/`False` continues to work unchanged.
+
+### Tests
+
+30 new tests across `test_hpf_bpf_bsf_synthesis.py`, `test_substrate_presets.py`, `test_mc_trace.py`. Total pass count 421 (+30 vs. prior 391 baseline), 0 regressions.
+
+### `mcp-ltspice` — power-supply EMC pre-compliance toolkit
+
+Five new tools fill the gap between SMPS sizing (existing buck / boost / LDO) and a real product passing conducted-emissions:
+
+- **`design_pi_output_filter`** (`power.design_pi_output_filter`) — Pi-section LC output filter (C-L-C, 3rd-order LPF) sized for an attenuation target at a given frequency. Returns L, C_in, C_out, resonant frequency, achieved attenuation at f_target / f_sw, plus a damping-resistor recipe and BOM notes (inductor saturation, MLCC DC-bias derating).
+- **`design_dm_input_filter`** (`power.design_dm_input_filter`) — 2nd-order differential-mode LC input filter sized for a conducted-emissions target. Includes the Middlebrook stability check (|Z_out_filter| < |Z_in_converter| / safety_factor) so the filter doesn't destabilise the converter's loop, and surfaces a damping-branch recipe (R_d, C_d) per Erickson & Maksimović §10.4.
+- **`predict_conducted_emissions`** (`power.predict_conducted_emissions`) — harmonic decomposition of a trapezoidal switching waveform with two-sinc envelope (duty-cycle and edge-rate cutoffs), LISN-loaded prediction, CISPR 22 / 32 Class A or B limit overlay (QP or AVG detector). Returns per-harmonic frequency / emission / limit / margin arrays plus a worst-margin pass/fail summary.
+- **`design_rc_snubber`** (`power.design_rc_snubber`) — RC snubber for switch-node ringing. Inputs: parasitic loop inductance, switch C_oss, peak voltage, switching frequency. Returns R, C, ring frequency, achieved damping factor, and per-cycle dissipation. Standard recipe: C_snub = C_oss, R_snub = √(L_par/C_oss) × 2ζ.
+- **`design_cm_choke`** (`power.design_cm_choke`) — common-mode choke selection from a curated catalogue (Würth WE-CMB, TDK ZJYS / ACT, Murata DLW). Filters by DC current rating, target CM impedance at design frequency, and DM-leakage cap. Returns ranked candidate list plus the highest-margin pick.
+
+All five register under both their flat names and `power.*` namespaced aliases. Tests in `test_power_emc.py` (31 cases) cover return-shape, math correctness (resonance / attenuation / dissipation scaling), CISPR class / detector relationships, and edge cases.
+
 ### `mcp-qucs-s` — implementation status corrections
 
 Earlier `[Unreleased]` notes claimed "Implemented all 4 simulator-driven tools with graceful degradation." This is corrected to the actual status:

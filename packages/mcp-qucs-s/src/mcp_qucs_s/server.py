@@ -24,6 +24,12 @@ from mcp_qucs_s.runner import (
     run_qucs,
 )
 from mcp_qucs_s.sparams import dat_to_touchstone
+from mcp_qucs_s.substrates import (
+    get_substrate as _get_substrate_preset,
+)
+from mcp_qucs_s.substrates import (
+    list_substrate_presets as _list_substrate_presets,
+)
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
 from rf_mcp_common.logging import get_logger
 
@@ -31,7 +37,15 @@ mcp = FastMCP(name="mcp-qucs-s", version=__version__)
 log = get_logger("mcp_qucs_s.server")
 
 
-def _substrate(d: dict[str, float]) -> Substrate:
+def _substrate(d: dict[str, float] | str) -> Substrate:
+    """Coerce either a preset-name string or a parameter dict into a Substrate.
+
+    String inputs look up `mcp_qucs_s.substrates.SUBSTRATE_PRESETS`. Dict
+    inputs require `er` and `h_mm` keys; `t_um` and `tan_d` default to
+    35 µm and 0.02 if absent.
+    """
+    if isinstance(d, str):
+        return _get_substrate_preset(d)
     return Substrate(
         er=d["er"],
         h_mm=d["h_mm"],
@@ -43,6 +57,27 @@ def _substrate(d: dict[str, float]) -> Substrate:
 # ---------------------------------------------------------------------------
 # Status / capability discovery
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "List curated substrate presets (FR4, Rogers RO4350B / RO4003C, "
+        "Duroid 5880 / 6002, PTFE, Isola FR408HR, Taconic TLY5) with their "
+        "{er, h_mm, t_um, tan_d} values. Pass a preset name as the `substrate` "
+        "argument to `synthesize_microstrip_line` and `analyze_microstrip_tool` "
+        "instead of the full dict."
+    )
+)
+def list_substrate_presets_tool() -> Envelope[list[dict[str, Any]]]:
+    timer = Timer()
+    try:
+        return ok(
+            _list_substrate_presets(),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"list_substrate_presets failed: {e}", tool_version=__version__)
 
 
 @mcp.tool(description="Report whether Qucs-S and Xyce are installed and discoverable.")
@@ -77,7 +112,10 @@ def status() -> Envelope[dict[str, Any]]:
 @mcp.tool(
     description=(
         "Synthesize microstrip line dimensions for a target characteristic "
-        "impedance and electrical length. Hammerstad-Jensen closed form."
+        "impedance and electrical length. Hammerstad-Jensen closed form. "
+        "NOTE: this is the **synthesis** direction (Z₀, length, freq → W, L). "
+        "For impedance **analysis** of an existing trace from PCB geometry, "
+        "prefer `pcb_calc_microstrip_impedance` from the **pcb-emcopilot** MCP."
     ),
 )
 def synthesize_microstrip_line(
@@ -85,8 +123,14 @@ def synthesize_microstrip_line(
     electrical_length_deg: Annotated[float, Field(ge=0, le=720)],
     freq_hz: Annotated[float, Field(gt=0)],
     substrate: Annotated[
-        dict[str, float],
-        Field(description=("Substrate dict: {er, h_mm, t_um (default 35), tan_d (default 0.02)}")),
+        dict[str, float] | str,
+        Field(
+            description=(
+                "Either a preset name (e.g. 'FR4_0254', 'Rogers4350B_0508', "
+                "'Duroid5880_0508' — see `list_substrate_presets_tool`) OR a "
+                "parameter dict {er, h_mm, t_um (default 35), tan_d (default 0.02)}."
+            )
+        ),
     ],
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
@@ -109,10 +153,18 @@ def synthesize_microstrip_line(
         return error(f"synthesize_microstrip_line failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Analyze an existing microstrip line: Z0, eps_eff, wavelength.")
+@mcp.tool(
+    description=(
+        "Analyze an existing microstrip line: Z0, eps_eff, wavelength. "
+        "Hammerstad-Jensen closed form. NOTE: for PCB impedance analysis from "
+        "stackup + trace data, prefer `pcb_calc_microstrip_impedance` "
+        "from the **pcb-emcopilot** MCP — that tool integrates with the wider "
+        "PCB analysis workflow (CPW, stripline, differential, eye-diagram)."
+    )
+)
 def analyze_microstrip_tool(
     width_mm: Annotated[float, Field(gt=0)],
-    substrate: dict[str, float],
+    substrate: dict[str, float] | str,
     freq_hz: Annotated[float, Field(gt=0)] = 1e9,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
