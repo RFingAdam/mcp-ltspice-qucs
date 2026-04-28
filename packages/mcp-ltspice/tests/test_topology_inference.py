@@ -14,14 +14,12 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
-import pytest
 
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     infer_transmission_zeros,
     ladder_sparams_from_components,
 )
-
 
 # Butterworth/Chebyshev 5th-order series-first: L1, C2, L3, C4, L5
 BUTTER_LIKE = {
@@ -108,7 +106,8 @@ class TestExplicitFlagDisagreement:
             warnings.simplefilter("always")
             components_dict_to_elements(BUTTER_LIKE, transmission_zeros=True)
         assert any(
-            issubclass(rec.category, RuntimeWarning) and "no even-indexed L+C pairs" in str(rec.message)
+            issubclass(rec.category, RuntimeWarning)
+            and "no even-indexed L+C pairs" in str(rec.message)
             for rec in w
         )
 
@@ -131,9 +130,7 @@ class TestSpRegression:
     def test_s_params_match_between_default_and_explicit_true(self):
         f = np.geomspace(100e6, 5e9, 401)
         elements_auto = components_dict_to_elements(ELLIPTIC_LIKE)
-        elements_explicit = components_dict_to_elements(
-            ELLIPTIC_LIKE, transmission_zeros=True
-        )
+        elements_explicit = components_dict_to_elements(ELLIPTIC_LIKE, transmission_zeros=True)
         s_auto = ladder_sparams_from_components(elements_auto, f, z0=50.0)
         s_explicit = ladder_sparams_from_components(elements_explicit, f, z0=50.0)
         assert np.allclose(s_auto, s_explicit)
@@ -146,9 +143,7 @@ class TestSpRegression:
         elements_correct = components_dict_to_elements(ELLIPTIC_LIKE)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            elements_wrong = components_dict_to_elements(
-                ELLIPTIC_LIKE, transmission_zeros=False
-            )
+            elements_wrong = components_dict_to_elements(ELLIPTIC_LIKE, transmission_zeros=False)
         s_correct = ladder_sparams_from_components(elements_correct, f, z0=50.0)
         s_wrong = ladder_sparams_from_components(elements_wrong, f, z0=50.0)
         # The two interpretations should produce visibly different S21 magnitudes

@@ -235,7 +235,6 @@ def run_harmonic_balance(
     harmonics: int = 5,
     input_power_dbm: float = 0.0,
 ) -> Envelope[dict[str, Any]]:
-    timer = Timer()
     try:
         if not is_xyce_available():
             return error(
@@ -294,7 +293,6 @@ def extract_noise_parameters(
     f_start_hz: Annotated[float, Field(gt=0)],
     f_stop_hz: Annotated[float, Field(gt=0)],
 ) -> Envelope[dict[str, Any]]:
-    timer = Timer()
     try:
         if not is_qucs_available():
             return error("Qucs-S not installed.", tool_version=__version__)

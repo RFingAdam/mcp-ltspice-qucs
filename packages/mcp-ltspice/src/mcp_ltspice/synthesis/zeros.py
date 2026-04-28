@@ -98,9 +98,7 @@ def trap_lc_for_freq(
 
     if resolved == "preserve_ratio":
         if l_existing is None or c_existing is None:
-            raise ValueError(
-                "mode='preserve_ratio' requires both l_existing and c_existing"
-            )
+            raise ValueError("mode='preserve_ratio' requires both l_existing and c_existing")
         omega_old_sq = 1.0 / (l_existing * c_existing)
         alpha = math.sqrt(omega_old_sq / omega_target_sq)
         return l_existing * alpha, c_existing * alpha

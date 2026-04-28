@@ -26,12 +26,12 @@ def _trap_resonance_hz(L: float, C: float) -> float:
 
 @pytest.mark.parametrize("order", [3, 5, 7, 9])
 @pytest.mark.parametrize(
-    "fc, ripple, stopband",
+    ("fc", "ripple", "stopband"),
     [
-        (1.0e9, 0.1, 30.0),    # mild stopband
-        (928e6, 0.1, 55.0),    # the spec where the bug was first observed
-        (2.4e9, 0.05, 60.0),   # tighter ripple, deeper stopband
-        (100e6, 0.5, 40.0),    # lower freq + higher ripple
+        (1.0e9, 0.1, 30.0),  # mild stopband
+        (928e6, 0.1, 55.0),  # the spec where the bug was first observed
+        (2.4e9, 0.05, 60.0),  # tighter ripple, deeper stopband
+        (100e6, 0.5, 40.0),  # lower freq + higher ripple
     ],
 )
 def test_reported_tz_matches_achieved_resonance(
@@ -65,8 +65,8 @@ def test_reported_tz_matches_achieved_resonance(
     for r, a in zip(reported, achieved, strict=True):
         rel_err = abs(r - a) / r
         assert rel_err < 0.01, (
-            f"Reported TZ {r/1e6:.2f} MHz disagrees with achieved trap "
-            f"resonance {a/1e6:.2f} MHz by {rel_err*100:.3f} %."
+            f"Reported TZ {r / 1e6:.2f} MHz disagrees with achieved trap "
+            f"resonance {a / 1e6:.2f} MHz by {rel_err * 100:.3f} %."
         )
 
 
@@ -74,9 +74,13 @@ def test_high_order_no_drift():
     """At higher orders (more traps) the fit has more freedom; verify the
     constraint still holds exactly."""
     d = synthesize_lc_lpf(
-        "elliptic", order=9, cutoff_hz=1.0e9,
-        ripple_db=0.1, stopband_atten_db=50,
-        z0=50.0, topology=Topology.SERIES_FIRST,
+        "elliptic",
+        order=9,
+        cutoff_hz=1.0e9,
+        ripple_db=0.1,
+        stopband_atten_db=50,
+        z0=50.0,
+        topology=Topology.SERIES_FIRST,
     )
     reported = sorted(d.transmission_zeros_hz)
     achieved = []
@@ -85,5 +89,5 @@ def test_high_order_no_drift():
     achieved.sort()
     for r, a in zip(reported, achieved, strict=True):
         assert abs(r - a) / r < 1e-3, (
-            f"At order 9: reported {r/1e6:.2f} MHz vs achieved {a/1e6:.2f} MHz"
+            f"At order 9: reported {r / 1e6:.2f} MHz vs achieved {a / 1e6:.2f} MHz"
         )

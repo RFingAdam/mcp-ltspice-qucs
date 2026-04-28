@@ -203,9 +203,7 @@ def _fit_lc_to_prototype(
     x0 = np.asarray(x0_list)
 
     def _response_db(x: np.ndarray) -> np.ndarray:
-        return _ladder_response_db(
-            x, omega, n_series, n_traps, "series_first", omega_zk
-        )
+        return _ladder_response_db(x, omega, n_series, n_traps, "series_first", omega_zk)
 
     def _residuals(x: np.ndarray) -> np.ndarray:
         if np.any(x[1:-1] <= 0):

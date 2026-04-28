@@ -57,7 +57,7 @@ class TestTrapLcForFreqModes:
             c_existing=8e-12,
             mode="hold_l",
         )
-        assert L == pytest.approx(2e-9, rel=1e-9)
+        assert pytest.approx(2e-9, rel=1e-9) == L
         assert math.isclose(_f_resonance(L, C), 2e9, rel_tol=1e-6)
 
     def test_hold_c_keeps_c(self):
@@ -67,14 +67,12 @@ class TestTrapLcForFreqModes:
             c_existing=8e-12,
             mode="hold_c",
         )
-        assert C == pytest.approx(8e-12, rel=1e-9)
+        assert pytest.approx(8e-12, rel=1e-9) == C
         assert math.isclose(_f_resonance(L, C), 2e9, rel_tol=1e-6)
 
     def test_default_mode_is_preserve_ratio(self):
         L1, C1 = trap_lc_for_freq(2e9, l_existing=2e-9, c_existing=8e-12)
-        L2, C2 = trap_lc_for_freq(
-            2e9, l_existing=2e-9, c_existing=8e-12, mode="preserve_ratio"
-        )
+        L2, C2 = trap_lc_for_freq(2e9, l_existing=2e-9, c_existing=8e-12, mode="preserve_ratio")
         assert (L1, C1) == (L2, C2)
 
     def test_invalid_freq_raises(self):
@@ -111,15 +109,13 @@ class TestFallThroughBugFixed:
             )
         # The shim maps preserve_ratio=False → mode='hold_c'.
         # So C is held and L is recomputed.
-        assert C == pytest.approx(8e-12, rel=1e-9)
+        assert pytest.approx(8e-12, rel=1e-9) == C
         # NOT L=1nH (the buggy fall-through default)
-        assert L != pytest.approx(1e-9, rel=1e-3)
+        assert pytest.approx(1e-9, rel=1e-3) != L
         # Achieved resonance is at target
         assert math.isclose(_f_resonance(L, C), 2e9, rel_tol=1e-6)
         # And a deprecation warning was emitted
-        assert any(
-            issubclass(rec.category, DeprecationWarning) for rec in w
-        )
+        assert any(issubclass(rec.category, DeprecationWarning) for rec in w)
 
 
 class TestDeprecationShim:
@@ -140,14 +136,12 @@ class TestDeprecationShim:
         )
         assert math.isclose(L_legacy, L_new, rel_tol=1e-12)
         assert math.isclose(C_legacy, C_new, rel_tol=1e-12)
-        assert any(
-            issubclass(rec.category, DeprecationWarning) for rec in w
-        )
+        assert any(issubclass(rec.category, DeprecationWarning) for rec in w)
 
     def test_both_mode_and_preserve_ratio_warns_mode_wins(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            L, C = trap_lc_for_freq(
+            _, C = trap_lc_for_freq(
                 2e9,
                 l_existing=2e-9,
                 c_existing=8e-12,
@@ -155,17 +149,18 @@ class TestDeprecationShim:
                 preserve_ratio=True,  # ignored
             )
         # mode='hold_c' wins → C is preserved
-        assert C == pytest.approx(8e-12, rel=1e-9)
-        assert any(
-            issubclass(rec.category, DeprecationWarning) for rec in w
-        )
+        assert pytest.approx(8e-12, rel=1e-9) == C
+        assert any(issubclass(rec.category, DeprecationWarning) for rec in w)
 
 
 class TestSetTrapFrequency:
     def test_modifies_only_target_trap(self):
         new = set_trap_frequency(
-            COMPONENTS, trap_index=2, target_freq_hz=1.8e9,
-            mode="preserve_ratio", snap_series=None,
+            COMPONENTS,
+            trap_index=2,
+            target_freq_hz=1.8e9,
+            mode="preserve_ratio",
+            snap_series=None,
         )
         # Only L2 + C2 changed
         assert new["L1"] == COMPONENTS["L1"]
@@ -179,22 +174,21 @@ class TestSetTrapFrequency:
 
     def test_missing_trap_raises(self):
         with pytest.raises(KeyError):
-            set_trap_frequency(
-                COMPONENTS, trap_index=10, target_freq_hz=2e9, mode="preserve_ratio"
-            )
+            set_trap_frequency(COMPONENTS, trap_index=10, target_freq_hz=2e9, mode="preserve_ratio")
 
 
 class TestPlaceTransmissionZero:
     def test_returns_diagnostic_info(self):
         result = place_transmission_zero(
-            COMPONENTS, trap_index=2, target_freq_hz=1.8e9,
-            mode="preserve_ratio", snap_series=None,
+            COMPONENTS,
+            trap_index=2,
+            target_freq_hz=1.8e9,
+            mode="preserve_ratio",
+            snap_series=None,
         )
         assert result["target_freq_hz"] == 1.8e9
         assert "achieved_freq_hz" in result
-        assert math.isclose(
-            result["achieved_freq_hz"], 1.8e9, rel_tol=1e-6
-        )
+        assert math.isclose(result["achieved_freq_hz"], 1.8e9, rel_tol=1e-6)
         assert "previous" in result
         assert result["previous"]["L2"] == COMPONENTS["L2"]
         assert result["previous"]["C2"] == COMPONENTS["C2"]
@@ -209,12 +203,11 @@ class TestPlaceTransmissionZero:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = place_transmission_zero(
-                COMPONENTS, trap_index=2, target_freq_hz=1.8e9,
-                preserve_ratio=True, snap_series=None,
+                COMPONENTS,
+                trap_index=2,
+                target_freq_hz=1.8e9,
+                preserve_ratio=True,
+                snap_series=None,
             )
-        assert math.isclose(
-            result["achieved_freq_hz"], 1.8e9, rel_tol=1e-6
-        )
-        assert any(
-            issubclass(rec.category, DeprecationWarning) for rec in w
-        )
+        assert math.isclose(result["achieved_freq_hz"], 1.8e9, rel_tol=1e-6)
+        assert any(issubclass(rec.category, DeprecationWarning) for rec in w)

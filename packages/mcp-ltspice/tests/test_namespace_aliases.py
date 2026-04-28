@@ -13,10 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from mcp_ltspice import server
-
 
 CATEGORIES = {"filter", "analog", "power", "digital", "vendor", "sim"}
 
@@ -32,18 +29,12 @@ def test_every_alias_resolves_to_a_real_tool():
     """Every namespaced alias must be registered alongside the flat name."""
     names = _registered_tool_names()
     missing_namespaced = [
-        ns_name
-        for ns_name in server.NAMESPACE_ALIASES.values()
-        if ns_name not in names
+        ns_name for ns_name in server.NAMESPACE_ALIASES.values() if ns_name not in names
     ]
     assert not missing_namespaced, (
         f"These namespaced aliases were not registered: {missing_namespaced}"
     )
-    missing_flat = [
-        flat_name
-        for flat_name in server.NAMESPACE_ALIASES
-        if flat_name not in names
-    ]
+    missing_flat = [flat_name for flat_name in server.NAMESPACE_ALIASES if flat_name not in names]
     assert not missing_flat, (
         f"These flat tool names disappeared from the MCP registry: {missing_flat}"
     )

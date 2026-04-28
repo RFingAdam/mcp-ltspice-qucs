@@ -180,9 +180,7 @@ for L_nh, Cp_pf, Rs_ohm, srf_ghz in [
 ]:
     L = L_nh * 1e-9
     Cp = Cp_pf * 1e-12
-    JOHANSON_L[L] = ParasiticInductor(
-        L_h=L, Cp_f=Cp, Rs_ohm=Rs_ohm, srf_hz=srf_ghz * 1e9
-    )
+    JOHANSON_L[L] = ParasiticInductor(L_h=L, Cp_f=Cp, Rs_ohm=Rs_ohm, srf_hz=srf_ghz * 1e9)
 
 
 # -------- TDK MLK1005S series (0402 RF wirewound) ------------------------
@@ -214,9 +212,7 @@ for L_nh, Cp_pf, Rs_ohm, srf_ghz in [
 ]:
     L = L_nh * 1e-9
     Cp = Cp_pf * 1e-12
-    TDK_MLG[L] = ParasiticInductor(
-        L_h=L, Cp_f=Cp, Rs_ohm=Rs_ohm, srf_hz=srf_ghz * 1e9
-    )
+    TDK_MLG[L] = ParasiticInductor(L_h=L, Cp_f=Cp, Rs_ohm=Rs_ohm, srf_hz=srf_ghz * 1e9)
 
 
 VendorName = Literal[

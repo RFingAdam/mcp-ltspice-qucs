@@ -186,6 +186,7 @@ def components_dict_to_elements(
         transmission_zeros = inferred
     elif transmission_zeros != inferred:
         import warnings
+
         if inferred and not transmission_zeros:
             warnings.warn(
                 "components_dict_to_elements: explicit transmission_zeros=False, "

@@ -59,7 +59,7 @@ def test_compare_param_set_supersets_substitute_real():
     )
 
 
-@pytest.mark.parametrize("srf_margin, max_drift", [(0.0, None), (1.2, 30.0)])
+@pytest.mark.parametrize(("srf_margin", "max_drift"), [(0.0, None), (1.2, 30.0)])
 def test_compare_runs_with_new_params(srf_margin: float, max_drift: float | None):
     """Smoke: compare_filter_orders accepts the new params and runs."""
     spec = {
