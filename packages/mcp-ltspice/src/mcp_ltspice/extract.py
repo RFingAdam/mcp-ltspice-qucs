@@ -24,7 +24,16 @@ from numpy.typing import NDArray
 
 from rf_mcp_common.touchstone import network_to_touchstone
 
-ElementType = Literal["series_l", "shunt_c", "shunt_l", "series_c", "shunt_lc_trap"]
+ElementType = Literal[
+    "series_l",
+    "shunt_c",
+    "shunt_l",
+    "series_c",
+    "shunt_lc_trap",  # series-LC to GND (BSF shunt; elliptic LPF trap)
+    "series_lc_series",  # series-LC in main path (BPF series-section)
+    "shunt_lc_parallel",  # parallel-LC to GND (BPF shunt-section)
+    "series_lc_parallel",  # parallel-LC in main path (BSF series-section)
+]
 
 
 def _abcd_series_z(z: NDArray[np.complex128]) -> NDArray[np.complex128]:
@@ -66,7 +75,10 @@ def ladder_sparams_from_components(
     - ``("series_c", {"C": 2.2e-12})``
     - ``("shunt_c", {"C": 2.2e-12})``
     - ``("shunt_l", {"L": 4.7e-9})``
-    - ``("shunt_lc_trap", {"L": 4.7e-9, "C": 1.8e-12})``  (series LC to GND)
+    - ``("shunt_lc_trap", {"L": ..., "C": ...})`` — series-LC to GND (BSF shunt; elliptic LPF trap). ``Y = sC / (s²LC + 1)``; admittance peaks at ω₀.
+    - ``("series_lc_series", {"L": ..., "C": ...})`` — series-LC in main path (BPF series-section). ``Z = sL + 1/(sC)``; impedance dips at ω₀.
+    - ``("shunt_lc_parallel", {"L": ..., "C": ...})`` — parallel-LC to GND (BPF shunt-section). ``Y = sC + 1/(sL)``; admittance dips at ω₀, blocking signal flow into the shunt branch in-band so it passes to the next series element.
+    - ``("series_lc_parallel", {"L": ..., "C": ...})`` — parallel-LC in main path (BSF series-section). ``Z = sL / (s²LC + 1)``; impedance peaks at ω₀.
 
     Returns S of shape (npoints, 2, 2).
     """
@@ -99,6 +111,32 @@ def ladder_sparams_from_components(
                 z_trap = np.where(np.abs(z_trap) < z_floor, z_floor + 0j, z_trap)
                 y = 1.0 / z_trap
             mat = _abcd_shunt_y(y)
+        elif kind == "series_lc_series":
+            # Series LC in main signal path: Z = sL + 1/(sC). Dips to 0 at ω₀.
+            l_t = params["L"]
+            c_t = params["C"]
+            z = s_axis * l_t + 1.0 / (s_axis * c_t)
+            mat = _abcd_series_z(z)
+        elif kind == "shunt_lc_parallel":
+            # Parallel LC to ground: Y = sC + 1/(sL). Dips to 0 at ω₀,
+            # peaks toward inf at DC and ∞. The branch acts as a shunt
+            # short to ground at low and high frequencies (blocking) and
+            # opens up in-band, letting signal pass through the main path.
+            l_t = params["L"]
+            c_t = params["C"]
+            y = s_axis * c_t + 1.0 / (s_axis * l_t)
+            mat = _abcd_shunt_y(y)
+        elif kind == "series_lc_parallel":
+            # Parallel LC in main signal path: Z = sL/(s²LC+1). Peaks to
+            # ∞ at ω₀ (anti-resonant — blocks in-band), goes to ~sL at DC
+            # and ~1/(sC) at high frequency.
+            l_t = params["L"]
+            c_t = params["C"]
+            z_par = s_axis * l_t / (s_axis**2 * l_t * c_t + 1.0)
+            # Clamp at resonance to avoid Inf
+            z_ceiling = 1e30
+            z_par = np.where(np.abs(z_par) > z_ceiling, z_ceiling + 0j, z_par)
+            mat = _abcd_series_z(z_par)
         else:
             raise ValueError(f"Unknown element type: {kind}")
         abcd = _chain(abcd, mat)
@@ -124,8 +162,13 @@ def ladder_sparams_from_components(
 
 
 def _idx(name: str) -> int:
-    """Numeric index from a refdes like ``L3`` or ``C12``."""
-    m = re.match(r"[LC](\d+)", name)
+    """Numeric index from a refdes like ``L3`` or ``C12`` or ``C2_s``.
+
+    BPF / BSF components carry an optional ``"_s"`` suffix on the cap
+    that pairs with an inductor to form a series-LC resonator. The
+    suffix is stripped for indexing so ``L2`` and ``C2_s`` share index 2.
+    """
+    m = re.match(r"[LC](\d+)(?:_s)?$", name)
     if not m:
         raise ValueError(f"Bad refdes: {name}")
     return int(m.group(1))
@@ -156,6 +199,7 @@ def components_dict_to_elements(
     *,
     topology: str = "series_first",
     transmission_zeros: bool | None = None,
+    kind: str = "lowpass",
 ) -> list[tuple[ElementType, dict[str, float]]]:
     """Convert the synthesis-style component dict into an ordered element
     list suitable for :func:`ladder_sparams_from_components`.
@@ -209,6 +253,101 @@ def components_dict_to_elements(
 
     sorted_names = sorted(components.keys(), key=_idx)
     elements: list[tuple[ElementType, dict[str, float]]] = []
+
+    # Bandpass: each LPF reactive maps to an LC pair.
+    # series-first ⇒ odd-k = series-LC-series (BPF series section),
+    #                 even-k = shunt-LC-parallel (BPF shunt section).
+    if kind == "bandpass":
+        seen: set[str] = set()
+        sorted_indices = sorted({_idx(n) for n in components})
+        for k in sorted_indices:
+            l_key = f"L{k}"
+            c_s_key = f"C{k}_s"
+            c_key = f"C{k}"
+            is_odd_k = k % 2 == 1
+            in_main_path = (is_odd_k and topology == "series_first") or (
+                not is_odd_k and topology == "shunt_first"
+            )
+            if l_key in components and c_s_key in components and in_main_path:
+                # series-LC pair in main path — BPF series section
+                elements.append(
+                    ("series_lc_series", {"L": components[l_key], "C": components[c_s_key]})
+                )
+                seen.update({l_key, c_s_key})
+            elif l_key in components and c_key in components and not in_main_path:
+                # parallel-LC pair to ground — BPF shunt section
+                elements.append(
+                    ("shunt_lc_parallel", {"L": components[l_key], "C": components[c_key]})
+                )
+                seen.update({l_key, c_key})
+            else:
+                raise ValueError(
+                    f"BPF kind: cannot pair components at index {k}; got "
+                    f"L_in_dict={l_key in components}, "
+                    f"C_in_dict={c_key in components}, "
+                    f"C_s_in_dict={c_s_key in components}, "
+                    f"in_main_path={in_main_path}"
+                )
+        return elements
+
+    # Bandstop: same component-pair shape as BPF but resonator types flip.
+    # series-first ⇒ odd-k = series-LC-parallel (anti-resonant in main path),
+    #                 even-k = shunt-LC-trap (series LC to ground).
+    if kind == "bandstop":
+        sorted_indices = sorted({_idx(n) for n in components})
+        for k in sorted_indices:
+            l_key = f"L{k}"
+            c_s_key = f"C{k}_s"
+            c_key = f"C{k}"
+            is_odd_k = k % 2 == 1
+            in_main_path = (is_odd_k and topology == "series_first") or (
+                not is_odd_k and topology == "shunt_first"
+            )
+            if l_key in components and c_s_key in components and in_main_path:
+                # parallel-LC in main path — BSF series section
+                elements.append(
+                    ("series_lc_parallel", {"L": components[l_key], "C": components[c_s_key]})
+                )
+            elif l_key in components and c_key in components and not in_main_path:
+                # series-LC to ground — BSF shunt section (== existing trap kind)
+                elements.append(("shunt_lc_trap", {"L": components[l_key], "C": components[c_key]}))
+            else:
+                raise ValueError(
+                    f"BSF kind: cannot pair components at index {k}; got "
+                    f"L_in_dict={l_key in components}, "
+                    f"C_in_dict={c_key in components}, "
+                    f"C_s_in_dict={c_s_key in components}, "
+                    f"in_main_path={in_main_path}"
+                )
+        return elements
+
+    # Highpass: odd-k = series-C, even-k = shunt-L (series_first); reversed for shunt_first.
+    if kind == "highpass":
+        for name in sorted_names:
+            idx = _idx(name)
+            value = components[name]
+            kind_letter = name[0]
+            is_odd_k = idx % 2 == 1
+            if topology == "series_first":
+                if is_odd_k:
+                    # series position — must be a C in HPF
+                    if kind_letter != "C":
+                        raise ValueError(f"HPF series_first expects C at odd index, got {name}")
+                    elements.append(("series_c", {"C": value}))
+                else:
+                    if kind_letter != "L":
+                        raise ValueError(f"HPF series_first expects L at even index, got {name}")
+                    elements.append(("shunt_l", {"L": value}))
+            else:  # shunt_first
+                if is_odd_k:
+                    if kind_letter != "L":
+                        raise ValueError(f"HPF shunt_first expects L at odd index, got {name}")
+                    elements.append(("shunt_l", {"L": value}))
+                else:
+                    if kind_letter != "C":
+                        raise ValueError(f"HPF shunt_first expects C at even index, got {name}")
+                    elements.append(("series_c", {"C": value}))
+        return elements
 
     if not transmission_zeros:
         # Walk and emit series_l / shunt_c per topology

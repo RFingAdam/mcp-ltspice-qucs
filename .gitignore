@@ -78,6 +78,7 @@ site/
 examples/halow_lpf/
 examples/private/
 examples/_local/
+examples/_archive/
 # Generated bundle PDFs — re-buildable from each example's design.py
 examples/**/report.pdf
 

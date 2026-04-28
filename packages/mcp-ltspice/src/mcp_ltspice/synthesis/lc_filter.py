@@ -410,7 +410,11 @@ def synthesize_lc_lpf(
     z0: float = 50.0,
     topology: Topology | str = Topology.SERIES_FIRST,
 ) -> FilterDesign:
-    """Top-level LPF synthesis. Returns a FilterDesign with components."""
+    """Top-level LPF synthesis. Returns a FilterDesign with components.
+
+    For HPF, BPF, BSF responses, see :func:`synthesize_lc_hpf`,
+    :func:`synthesize_lc_bpf`, :func:`synthesize_lc_bsf`.
+    """
     if isinstance(topology, str):
         topology = Topology(topology)
 
@@ -436,6 +440,282 @@ def synthesize_lc_lpf(
         components=components,
         transmission_zeros_hz=zeros_hz,
         metadata={
+            "ripple_db": ripple_db,
+            "stopband_atten_db": stopband_atten_db,
+        },
+    )
+
+
+# --------------------------------------------------------------------------
+# Frequency transformations: LPF → HPF, LPF → BPF, LPF → BSF
+# --------------------------------------------------------------------------
+
+
+def synthesize_lc_hpf(
+    filter_type: FilterType,
+    order: int,
+    cutoff_hz: float,
+    *,
+    ripple_db: float = 0.1,
+    stopband_atten_db: float = 30.0,
+    z0: float = 50.0,
+    topology: Topology | str = Topology.SERIES_FIRST,
+) -> FilterDesign:
+    """Synthesize a high-pass LC ladder via the classical LPF → HPF
+    frequency transformation (Pozar §8.5).
+
+    The LPF prototype maps as:
+        - Series inductor L_lpf becomes a series capacitor:
+          ``C = 1 / (g_k · Z_0 · ω_c)``
+        - Shunt capacitor C_lpf becomes a shunt inductor:
+          ``L = Z_0 / (g_k · ω_c)``
+
+    Refdes scheme (T-topology / series-first):
+        L1, C2, L3, C4, ...  →  C1, L2, C3, L4, ...
+
+    Currently supports Butterworth and Chebyshev I. Elliptic HPF is not
+    implemented (the transformation must also map finite transmission zeros
+    via ω_z → ω_c² / ω_z; see :func:`synthesize_lc_lpf` for elliptic
+    LPF).
+    """
+    if filter_type == "elliptic":
+        raise NotImplementedError(
+            "synthesize_lc_hpf does not support elliptic. Elliptic HPF "
+            "synthesis requires transforming finite transmission zeros and "
+            "is not yet implemented. Use Butterworth or Chebyshev I."
+        )
+    if isinstance(topology, str):
+        topology = Topology(topology)
+
+    g, _ = g_coefficients(filter_type, order, ripple_db, stopband_atten_db)
+    omega_c = 2.0 * math.pi * cutoff_hz
+
+    # Walk the prototype, swap each element kind: series-L → series-C, shunt-C → shunt-L
+    n_react = len(g) - 2
+    out: dict[str, float] = {}
+    if topology == Topology.SERIES_FIRST:
+        # LPF: g[1]=L1 series, g[2]=C2 shunt, g[3]=L3 series, ...
+        # HPF: g[1]→C1 series, g[2]→L2 shunt, g[3]→C3 series, ...
+        for k in range(1, n_react + 1):
+            gk = g[k]
+            if k % 2 == 1:
+                # was series L → becomes series C
+                out[f"C{k}"] = 1.0 / (gk * z0 * omega_c)
+            else:
+                # was shunt C → becomes shunt L
+                out[f"L{k}"] = z0 / (gk * omega_c)
+    else:  # SHUNT_FIRST
+        for k in range(1, n_react + 1):
+            gk = g[k]
+            if k % 2 == 1:
+                # was shunt C → becomes shunt L
+                out[f"L{k}"] = z0 / (gk * omega_c)
+            else:
+                # was series L → becomes series C
+                out[f"C{k}"] = 1.0 / (gk * z0 * omega_c)
+
+    return FilterDesign(
+        filter_type=filter_type,
+        order=order,
+        cutoff_hz=cutoff_hz,
+        z0=z0,
+        topology=topology,
+        g=g,
+        components=out,
+        transmission_zeros_hz=[],  # all zeros at DC (ω → 0)
+        metadata={
+            "kind": "highpass",
+            "ripple_db": ripple_db,
+            "stopband_atten_db": stopband_atten_db,
+        },
+    )
+
+
+def synthesize_lc_bpf(
+    filter_type: FilterType,
+    order: int,
+    f_low_hz: float,
+    f_high_hz: float,
+    *,
+    ripple_db: float = 0.1,
+    stopband_atten_db: float = 30.0,
+    z0: float = 50.0,
+    topology: Topology | str = Topology.SERIES_FIRST,
+) -> FilterDesign:
+    """Synthesize a band-pass LC ladder via the classical LPF → BPF
+    frequency transformation (Pozar §8.5).
+
+    Inputs ``f_low_hz`` and ``f_high_hz`` define the -3 dB band edges
+    (Butterworth) or the equiripple band edges (Chebyshev). The
+    transformation:
+
+    - Series inductor L_lpf becomes a series LC tank (resonant at ω_0):
+        L = g_k · Z_0 / (Δ · ω_0)
+        C = Δ / (g_k · Z_0 · ω_0)
+    - Shunt capacitor C_lpf becomes a shunt LC tank (parallel resonant
+      at ω_0):
+        L = Δ · Z_0 / (g_k · ω_0)
+        C = g_k / (Δ · Z_0 · ω_0)
+
+    where ω_0 = √(ω_low · ω_high) (geometric centre) and
+    Δ = (ω_high - ω_low) / ω_0 is the fractional bandwidth.
+
+    The ladder doubles in length: each LPF element becomes two BPF
+    elements, so a 5th-order LPF prototype maps to a 10th-order BPF.
+
+    Refdes scheme (T-topology / series-first):
+        L1, C2, L3, C4, L5  →  L1+C1' (series-LC), L2+C2 (shunt-LC),
+                                L3+C3' (series-LC), L4+C4 (shunt-LC),
+                                L5+C5' (series-LC).
+
+    To distinguish series-LC from shunt-LC pairs at the same index, the
+    series-LC components are emitted with a ``"_s"`` suffix (e.g.
+    ``L1`` and ``C1_s`` for the series-LC pair at position 1).
+
+    Currently supports Butterworth and Chebyshev I.
+    """
+    if filter_type == "elliptic":
+        raise NotImplementedError(
+            "synthesize_lc_bpf does not support elliptic. Use Butterworth or Chebyshev I."
+        )
+    if f_high_hz <= f_low_hz:
+        raise ValueError(f"f_high_hz ({f_high_hz}) must exceed f_low_hz ({f_low_hz})")
+    if isinstance(topology, str):
+        topology = Topology(topology)
+
+    g, _ = g_coefficients(filter_type, order, ripple_db, stopband_atten_db)
+    omega_low = 2.0 * math.pi * f_low_hz
+    omega_high = 2.0 * math.pi * f_high_hz
+    omega_0 = math.sqrt(omega_low * omega_high)
+    delta = (omega_high - omega_low) / omega_0  # fractional bandwidth
+
+    n_react = len(g) - 2
+    out: dict[str, float] = {}
+    if topology == Topology.SERIES_FIRST:
+        for k in range(1, n_react + 1):
+            gk = g[k]
+            if k % 2 == 1:
+                # series-L → series-LC: L_s and C_s in series
+                out[f"L{k}"] = gk * z0 / (delta * omega_0)
+                out[f"C{k}_s"] = delta / (gk * z0 * omega_0)
+            else:
+                # shunt-C → shunt-LC: L_p and C_p in parallel
+                out[f"L{k}"] = delta * z0 / (gk * omega_0)
+                out[f"C{k}"] = gk / (delta * z0 * omega_0)
+    else:  # SHUNT_FIRST
+        for k in range(1, n_react + 1):
+            gk = g[k]
+            if k % 2 == 1:
+                out[f"L{k}"] = delta * z0 / (gk * omega_0)
+                out[f"C{k}"] = gk / (delta * z0 * omega_0)
+            else:
+                out[f"L{k}"] = gk * z0 / (delta * omega_0)
+                out[f"C{k}_s"] = delta / (gk * z0 * omega_0)
+
+    f0_hz = omega_0 / (2.0 * math.pi)
+    return FilterDesign(
+        filter_type=filter_type,
+        order=2 * order,
+        cutoff_hz=f0_hz,
+        z0=z0,
+        topology=topology,
+        g=g,
+        components=out,
+        transmission_zeros_hz=[0.0],  # zero at DC and at infinity
+        metadata={
+            "kind": "bandpass",
+            "f_low_hz": f_low_hz,
+            "f_high_hz": f_high_hz,
+            "f_0_hz": f0_hz,
+            "fractional_bandwidth": delta,
+            "ripple_db": ripple_db,
+            "stopband_atten_db": stopband_atten_db,
+        },
+    )
+
+
+def synthesize_lc_bsf(
+    filter_type: FilterType,
+    order: int,
+    f_low_hz: float,
+    f_high_hz: float,
+    *,
+    ripple_db: float = 0.1,
+    stopband_atten_db: float = 30.0,
+    z0: float = 50.0,
+    topology: Topology | str = Topology.SERIES_FIRST,
+) -> FilterDesign:
+    """Synthesize a band-stop LC ladder via the classical LPF → BSF
+    frequency transformation (Pozar §8.5).
+
+    Inputs ``f_low_hz`` / ``f_high_hz`` define the band-stop edges. The
+    transformation produces:
+
+    - Series inductor L_lpf becomes a series-resonant LC (parallel)
+      that shorts at ω_0: L = g_k · Z_0 · Δ / ω_0,
+      C = 1 / (g_k · Z_0 · Δ · ω_0).
+    - Shunt capacitor C_lpf becomes a parallel-resonant LC (series)
+      that opens at ω_0: L = Z_0 / (g_k · Δ · ω_0),
+      C = g_k · Δ / (Z_0 · ω_0).
+
+    Series-LC components emitted with ``"_s"`` suffix as in BPF.
+
+    Currently supports Butterworth and Chebyshev I.
+    """
+    if filter_type == "elliptic":
+        raise NotImplementedError(
+            "synthesize_lc_bsf does not support elliptic. Use Butterworth or Chebyshev I."
+        )
+    if f_high_hz <= f_low_hz:
+        raise ValueError(f"f_high_hz ({f_high_hz}) must exceed f_low_hz ({f_low_hz})")
+    if isinstance(topology, str):
+        topology = Topology(topology)
+
+    g, _ = g_coefficients(filter_type, order, ripple_db, stopband_atten_db)
+    omega_low = 2.0 * math.pi * f_low_hz
+    omega_high = 2.0 * math.pi * f_high_hz
+    omega_0 = math.sqrt(omega_low * omega_high)
+    delta = (omega_high - omega_low) / omega_0
+
+    n_react = len(g) - 2
+    out: dict[str, float] = {}
+    if topology == Topology.SERIES_FIRST:
+        for k in range(1, n_react + 1):
+            gk = g[k]
+            if k % 2 == 1:
+                # series-L (LPF) → series-parallel-LC (BSF): L || C
+                out[f"L{k}"] = gk * z0 * delta / omega_0
+                out[f"C{k}_s"] = 1.0 / (gk * z0 * delta * omega_0)
+            else:
+                # shunt-C (LPF) → shunt-series-LC (BSF): L + C
+                out[f"L{k}"] = z0 / (gk * delta * omega_0)
+                out[f"C{k}"] = gk * delta / (z0 * omega_0)
+    else:  # SHUNT_FIRST
+        for k in range(1, n_react + 1):
+            gk = g[k]
+            if k % 2 == 1:
+                out[f"L{k}"] = z0 / (gk * delta * omega_0)
+                out[f"C{k}"] = gk * delta / (z0 * omega_0)
+            else:
+                out[f"L{k}"] = gk * z0 * delta / omega_0
+                out[f"C{k}_s"] = 1.0 / (gk * z0 * delta * omega_0)
+
+    f0_hz = omega_0 / (2.0 * math.pi)
+    return FilterDesign(
+        filter_type=filter_type,
+        order=2 * order,
+        cutoff_hz=f0_hz,
+        z0=z0,
+        topology=topology,
+        g=g,
+        components=out,
+        transmission_zeros_hz=[f0_hz],
+        metadata={
+            "kind": "bandstop",
+            "f_low_hz": f_low_hz,
+            "f_high_hz": f_high_hz,
+            "f_0_hz": f0_hz,
+            "fractional_bandwidth": delta,
             "ripple_db": ripple_db,
             "stopband_atten_db": stopband_atten_db,
         },
