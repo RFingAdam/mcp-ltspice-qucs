@@ -123,6 +123,8 @@ def _design_one(
     mc_n_runs: int,
     mc_tolerance_pct: float,
     s2p_dir: str | None,
+    srf_margin: float = 0.0,
+    max_value_drift_pct: float | None = None,
 ) -> OrderResult:
     """Synthesize → place zeros → vendor-substitute → optimize → audit."""
     design = synthesize_lc_lpf(
@@ -147,13 +149,21 @@ def _design_one(
             comps,
             trap_index=trap_index,
             target_freq_hz=freq,
-            preserve_ratio=True,
+            mode="preserve_ratio",
             snap_series=None,
         )
         comps = result["components"]
 
-    # Vendor substitute
-    parts = substitute_real_components(comps)
+    # Vendor substitute. SRF gating (if requested) applies here so that
+    # comparison and final-design behaviour stay consistent.
+    parts = substitute_real_components(
+        comps,
+        inductor_vendor=inductor_vendor,
+        capacitor_vendor=capacitor_vendor,
+        srf_margin=srf_margin,
+        max_value_drift_pct=max_value_drift_pct,
+        spec=spec.model_dump() if hasattr(spec, "model_dump") else spec,
+    )
     real_comps = {ref: info["snapped_value"] for ref, info in parts.items()}
 
     # Vendor-bounded optimization with passband weight
@@ -280,6 +290,8 @@ def compare_filter_orders(
     mc_n_runs: int = 1000,
     mc_tolerance_pct: float = 2.0,
     s2p_dir: str | None = None,
+    srf_margin: float = 0.0,
+    max_value_drift_pct: float | None = None,
 ) -> CompareResult:
     """Run the full design-compare workflow for several orders.
 
@@ -287,7 +299,10 @@ def compare_filter_orders(
         1. Synthesize the elliptic prototype at fc = ``cutoff_hz``
         2. Place transmission zeros at ``zero_targets_hz`` (up to the
            number of traps the order supports)
-        3. Substitute Coilcraft + Murata real parts
+        3. Substitute vendor real parts (with optional SRF gating via
+           ``srf_margin`` / ``max_value_drift_pct`` — passed through to
+           :func:`substitute_real_components` so the comparison uses the
+           same gating as the final design)
         4. Optimize with vendor-bounded DE and passband weight
         5. Evaluate against ``spec``
         6. Run SRF audit + sensitivity analysis + Monte Carlo
@@ -318,6 +333,8 @@ def compare_filter_orders(
                 mc_n_runs=mc_n_runs,
                 mc_tolerance_pct=mc_tolerance_pct,
                 s2p_dir=s2p_dir,
+                srf_margin=srf_margin,
+                max_value_drift_pct=max_value_drift_pct,
             )
         )
 

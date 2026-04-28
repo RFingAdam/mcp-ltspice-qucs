@@ -126,7 +126,11 @@ def _elliptic_g_via_lc_extraction(
     # Cauer expansion on the driving-point impedance reconstructed from
     # poles/zeros. To keep this self-contained and robust, we implement a
     # numerical LC extraction by least-squares fit to the prototype |S21|.
-    g = _fit_lc_to_prototype(order, z, p, k)
+    # Pass the prototype zero frequencies into the fitter so each trap's
+    # (L, C) pair is *constrained* to resonate at its target TZ. Without
+    # this constraint, the LSQ fit drifts the L/C product so the achieved
+    # trap resonance no longer matches the reported transmission_zeros_hz.
+    g = _fit_lc_to_prototype(order, z, p, k, zeros_hz_norm)
     return g, zeros_hz_norm
 
 
@@ -135,6 +139,7 @@ def _fit_lc_to_prototype(
     zeros: np.ndarray,
     poles: np.ndarray,
     gain: float,
+    omega_zk_targets: list[float],
 ) -> list[float]:
     """Fit LC ladder values so the resulting |S21| matches the prototype.
 
@@ -172,48 +177,45 @@ def _fit_lc_to_prototype(
         [np.full(omega_pb.size, 8.0), np.full(omega_tb.size, 2.0), np.full(omega_sb.size, 0.5)]
     )
 
-    # Initial guess: Butterworth-ish g's, traps placed at finite zeros
     n_traps = order // 2
     n_series = (order + 1) // 2
 
-    # Shunt LC trap requires (L, C) pair; resonates at omega_zk
-    # so L*C = 1/omega_zk^2. We pick L=1 for each trap initially.
-    omega_zk = sorted({float(abs(z.imag)) for z in zeros if abs(z.imag) > 1e-9})
+    # Each trap's resonance is enforced exactly: C_trap = 1/(ω_zk² · L_trap).
+    # The optimisation variable for each trap is just L_trap (one DOF), and
+    # C_trap is computed from L_trap inside the response evaluator. This
+    # guarantees `1/(2π√(L·C)) = ω_zk` for every trap, matching the
+    # `transmission_zeros_hz` returned by the synthesis.
+    omega_zk = sorted(omega_zk_targets)
     if len(omega_zk) < n_traps:
-        # Pad with high frequencies (zero approximated by inductor only)
+        # Pad with very high frequencies (trap effectively a short)
         omega_zk = omega_zk + [10.0] * (n_traps - len(omega_zk))
 
-    # Initial L_series values (Butterworth-like)
+    # Initial L values: Butterworth-ish series Ls; trap Ls start at 1 (normalised).
     butter_g = _butterworth_g(order)
     series_init = [butter_g[2 * i + 1] for i in range(n_series)]
 
-    # Initial trap values: L = 1, C = 1/omega_zk^2
     x0_list = [1.0]  # R_S
     for i in range(n_series):
         x0_list.append(series_init[i])
         if i < n_traps:
-            l_t = 1.0
-            c_t = 1.0 / (omega_zk[i] ** 2 * l_t)
-            x0_list.extend([l_t, c_t])
+            x0_list.append(1.0)  # L_trap initial guess (C_trap is derived)
     x0_list.append(1.0)  # R_L
     x0 = np.asarray(x0_list)
 
     def _response_db(x: np.ndarray) -> np.ndarray:
-        return _ladder_response_db(x, omega, n_series, n_traps, "series_first")
+        return _ladder_response_db(
+            x, omega, n_series, n_traps, "series_first", omega_zk
+        )
 
     def _residuals(x: np.ndarray) -> np.ndarray:
         if np.any(x[1:-1] <= 0):
             return np.full_like(target_db, 1e6)
         return weights * (_response_db(x) - target_db)
 
-    # Fit only the L/C values (keep R_S = R_L = 1)
     from scipy.optimize import least_squares
 
     bounds_lo = np.full_like(x0, 1e-3)
     bounds_hi = np.full_like(x0, 1e3)
-    bounds_lo[0] = bounds_hi[0] = 1.0  # R_S fixed
-    bounds_lo[-1] = bounds_hi[-1] = 1.0  # R_L fixed
-    # Allow small slack on terminations
     bounds_lo[0], bounds_hi[0] = 0.999, 1.001
     bounds_lo[-1], bounds_hi[-1] = 0.999, 1.001
 
@@ -225,7 +227,23 @@ def _fit_lc_to_prototype(
         ftol=1e-10,
         xtol=1e-10,
     )
-    return [float(v) for v in res.x]
+
+    # Reconstruct the historical [R_S, L1, L_trap, C_trap, L3, ...] flat
+    # vector layout that downstream code (lc_ladder) expects, with C_trap
+    # derived from L_trap and the trap's ω_zk.
+    fitted = [float(v) for v in res.x]
+    out: list[float] = [fitted[0]]  # R_S
+    src_idx = 1
+    for i in range(n_series):
+        out.append(fitted[src_idx])  # L_series
+        src_idx += 1
+        if i < n_traps:
+            l_t = fitted[src_idx]
+            src_idx += 1
+            c_t = 1.0 / (omega_zk[i] ** 2 * l_t)
+            out.extend([l_t, c_t])
+    out.append(fitted[-1])  # R_L
+    return out
 
 
 def _ladder_response_db(
@@ -234,11 +252,14 @@ def _ladder_response_db(
     n_series: int,
     n_traps: int,
     topology: str,
+    omega_zk: list[float],
 ) -> np.ndarray:
     """Compute |S21|(ω) in dB for an elliptic-style LC ladder.
 
-    Element order in ``x``: [R_S, L1, (L2, C2), L3, (L4, C4), ..., R_L]
-    where (L, C) pairs are shunt LC traps to ground.
+    Element order in ``x``: [R_S, L1, L2_trap, L3, L4_trap, ..., R_L].
+    Trap C values are NOT in ``x`` — they are derived as
+    ``C_trap_i = 1/(ω_zk[i]² · L_trap_i)`` so each trap's resonance is
+    pinned exactly to its target transmission-zero frequency.
     """
     s = 1j * omega
     # ABCD chain product
@@ -251,34 +272,29 @@ def _ladder_response_db(
     rl = x[-1]
     idx = 1
 
-    # Walk the ladder. For series_first T-topology: alternating series L
-    # then shunt LC trap, ending with series L.
     for i in range(n_series):
         l_series = x[idx]
         idx += 1
-        # Series inductor: ABCD = [[1, sL], [0, 1]]
-        new_a = a * 1 + b * 0
-        new_b = a * (s * l_series) + b * 1
-        new_c = c * 1 + d * 0
-        new_d = c * (s * l_series) + d * 1
+        new_a = a
+        new_b = a * (s * l_series) + b
+        new_c = c
+        new_d = c * (s * l_series) + d
         a, b, c, d = new_a, new_b, new_c, new_d
 
         if i < n_traps:
             l_t = x[idx]
-            c_t = x[idx + 1]
-            idx += 2
-            # Shunt LC trap (L in series with C, then to ground):
-            # Y_trap = 1 / (sL + 1/sC) = sC / (s²LC + 1)
+            idx += 1
+            c_t = 1.0 / (omega_zk[i] ** 2 * l_t)
+            # Shunt LC trap: Y = sC / (s²LC + 1). With L*C pinned to
+            # 1/ω_zk², the denominator is (1 - ω²/ω_zk²) — i.e. the trap
+            # resonates exactly at ω_zk.
             y_trap = (s * c_t) / (s**2 * l_t * c_t + 1)
-            # ABCD of shunt admittance: [[1, 0], [Y, 1]]
-            new_a = a * 1 + b * y_trap
-            new_b = a * 0 + b * 1
-            new_c = c * 1 + d * y_trap
-            new_d = c * 0 + d * 1
+            new_a = a + b * y_trap
+            new_b = b
+            new_c = c + d * y_trap
+            new_d = d
             a, b, c, d = new_a, new_b, new_c, new_d
 
-    # S21 of two-port with source/load Z0:
-    # S21 = 2 / (A + B/Z0 + C*Z0 + D)  (with Z0 = R_S = R_L = 1 in normalized units)
     s21 = 2.0 / (a + b / rl + c * rs + d * (rs / rl))
     return 20.0 * np.log10(np.maximum(np.abs(s21), 1e-12))
 

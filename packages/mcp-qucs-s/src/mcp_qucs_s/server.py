@@ -243,19 +243,15 @@ def run_harmonic_balance(
                 "this tool needs the 'xyce' executable on $PATH.",
                 tool_version=__version__,
             )
-        # NB: full HB integration is deferred — return a structured placeholder
-        # so calling agents see the expected response shape.
-        return ok(
-            {
-                "sch_path": sch_path,
-                "fundamentals_hz": fundamentals_hz,
-                "harmonics": harmonics,
-                "input_power_dbm": input_power_dbm,
-                "note": "Xyce harmonic-balance integration is scaffolded; "
-                "full output parsing pending.",
-            },
-            warnings=["This tool is partially implemented."],
-            runtime_sec=timer.elapsed(),
+        # Xyce HB netlist generation, execution, and harmonic-content
+        # extraction (IM3 / IIP3 / 1 dB compression) are not yet
+        # implemented. This is a Tier-6 roadmap item; see CHANGELOG.
+        return error(
+            "run_harmonic_balance is not yet implemented. The Xyce backend "
+            "is detectable but netlist generation and harmonic-content "
+            "parsing are pending. Tracked as a Tier-6 roadmap item; see "
+            "CHANGELOG. Use ngspice .TRAN + FFT as an interim workaround "
+            "for two-tone intermod analysis.",
             tool_version=__version__,
         )
     except Exception as e:
@@ -302,16 +298,14 @@ def extract_noise_parameters(
     try:
         if not is_qucs_available():
             return error("Qucs-S not installed.", tool_version=__version__)
-        return ok(
-            {
-                "sch_path": sch_path,
-                "f_start_hz": f_start_hz,
-                "f_stop_hz": f_stop_hz,
-                "note": "Noise-parameter extraction scaffolded; full Qucs-S "
-                "noise output parsing pending.",
-            },
-            warnings=["This tool is partially implemented."],
-            runtime_sec=timer.elapsed(),
+        # Qucs-S noise-analysis output parsing (Fmin / Γopt / Rn / NF50)
+        # is not yet implemented. Tracked as a Tier-6 roadmap item; see CHANGELOG.
+        return error(
+            "extract_noise_parameters is not yet implemented. Qucs-S is "
+            "installed but the noise-analysis dataset parser (Fmin, "
+            "Gamma_opt, Rn, NF50) is pending. Tracked as a Tier-6 roadmap "
+            "item; see CHANGELOG. Use SPICE .NOISE in mcp-ltspice as an "
+            "interim workaround for input-referred noise spectral density.",
             tool_version=__version__,
         )
     except Exception as e:
