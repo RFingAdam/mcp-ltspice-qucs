@@ -476,18 +476,32 @@ def find_transmission_zeros(
         "Replace ideal L/C values with vendor parts. Returns parasitic data "
         "(Cp/Ls, ESR, SRF) so downstream sims include realistic loss behavior. "
         "Vendors: 'coilcraft_0402hp', 'coilcraft_0603cs', 'murata_gjm_c0g', "
-        "'johanson_l', 'tdk_mlg'."
+        "'johanson_l' (L-07W), 'tdk_mlg' (MLK1005S). Set srf_margin > 0 (e.g. 1.2) "
+        "to auto-reject parts whose SRF < srf_margin × max_spec_freq_hz; "
+        "provide either max_spec_freq_hz directly or a spec dict from which it's derived."
     ),
 )
 def substitute_real_components(
     components: dict[str, float],
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
+    srf_margin: Annotated[float, Field(ge=0)] = 0.0,
+    max_spec_freq_hz: Annotated[float | None, Field(gt=0)] = None,
+    spec: dict | None = None,
+    max_value_drift_pct: Annotated[float | None, Field(gt=0)] = 25.0,
 ) -> Envelope[dict[str, dict[str, Any]]]:
     timer = Timer()
     try:
         return ok(
-            _substitute_real(components, inductor_vendor, capacitor_vendor),
+            _substitute_real(
+                components,
+                inductor_vendor,
+                capacitor_vendor,
+                srf_margin=srf_margin,
+                max_spec_freq_hz=max_spec_freq_hz,
+                spec=spec,
+                max_value_drift_pct=max_value_drift_pct,
+            ),
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
         )
@@ -1456,6 +1470,8 @@ def compare_filter_orders(
     mc_n_runs: Annotated[int, Field(gt=0, le=10000)] = 1000,
     mc_tolerance_pct: Annotated[float, Field(gt=0, le=20)] = 2.0,
     s2p_dir: str | None = None,
+    srf_margin: Annotated[float, Field(ge=0)] = 0.0,
+    max_value_drift_pct: Annotated[float | None, Field(gt=0)] = None,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1474,6 +1490,8 @@ def compare_filter_orders(
             mc_n_runs=mc_n_runs,
             mc_tolerance_pct=mc_tolerance_pct,
             s2p_dir=s2p_dir,
+            srf_margin=srf_margin,
+            max_value_drift_pct=max_value_drift_pct,
         )
         return ok(
             {
@@ -1601,6 +1619,97 @@ def build_design_report_pdf(
             f"build_design_report_pdf failed: {e}",
             tool_version=__version__,
         )
+
+
+# ---------------------------------------------------------------------------
+# Tool namespacing — register namespaced aliases alongside the flat names
+# ---------------------------------------------------------------------------
+#
+# Categories help LLM agents discover tools by domain. Both the flat name
+# (back-compat) and the namespaced alias work; over time the namespaced
+# form is preferred. A future major release will deprecate the flat names.
+
+NAMESPACE_ALIASES: dict[str, str] = {
+    # filter.* — RF / lumped-LC filter design + analysis
+    "synthesize_lc_filter": "filter.synthesize_lc",
+    "place_transmission_zero": "filter.place_transmission_zero",
+    "find_transmission_zeros": "filter.find_transmission_zeros",
+    "evaluate_filter_spec_tool": "filter.evaluate_spec",
+    "render_response": "filter.render_response",
+    "substitute_real_components": "filter.substitute_real_components",
+    "list_vendor_parts": "filter.list_vendor_parts",
+    "optimize_filter": "filter.optimize",
+    "monte_carlo_analysis": "filter.monte_carlo",
+    "stability_check": "filter.stability_check",
+    "parameter_sweep": "filter.parameter_sweep",
+    "corner_analysis": "filter.corner_analysis",
+    "sensitivity_analysis": "filter.sensitivity",
+    "srf_audit": "filter.srf_audit",
+    "compare_filter_orders": "filter.compare_orders",
+    "render_lc_ladder_schematic": "filter.render_lc_schematic",
+    "render_asc_as_schematic": "filter.render_schematic",
+    "build_design_report_pdf": "filter.build_report_pdf",
+    # analog.* — active-filter / op-amp synthesis
+    "sallen_key_low_pass": "analog.sallen_key_lpf",
+    "sallen_key_high_pass": "analog.sallen_key_hpf",
+    "sallen_key_band_pass": "analog.sallen_key_bpf",
+    "mfb_low_pass": "analog.mfb_lpf",
+    "mfb_band_pass": "analog.mfb_bpf",
+    "cascaded_lpf_design": "analog.cascaded_lpf",
+    # power.* — SMPS, LDO, control-loop analysis
+    "analyze_ldo": "power.analyze_ldo",
+    "required_psrr_for_ripple": "power.required_psrr",
+    "design_buck": "power.design_buck",
+    "design_boost": "power.design_boost",
+    "type2_compensator": "power.type2_compensator",
+    "compute_phase_margin": "power.compute_phase_margin",
+    # digital.* — timing, crosstalk, supply-noise injection
+    "check_setup_hold": "digital.check_setup_hold",
+    "propagation_delay": "digital.propagation_delay",
+    "estimate_digital_to_analog_crosstalk": "digital.digital_to_analog_xtalk",
+    "estimate_supply_noise_injection": "digital.supply_noise_injection",
+    # vendor.* — opamp / mosfet / bjt / diode / vref catalogues
+    "list_opamps": "vendor.list_opamps",
+    "lookup_opamp": "vendor.lookup_opamp",
+    "find_opamp_for_application": "vendor.find_opamp",
+    "list_mosfets": "vendor.list_mosfets",
+    "lookup_mosfet": "vendor.lookup_mosfet",
+    "find_mosfet_for_application": "vendor.find_mosfet",
+    "list_bjts": "vendor.list_bjts",
+    "lookup_bjt": "vendor.lookup_bjt",
+    "list_diodes": "vendor.list_diodes",
+    "lookup_diode": "vendor.lookup_diode",
+    "list_references": "vendor.list_references",
+    "lookup_reference": "vendor.lookup_reference",
+    # sim.* — simulator runner / S-parameter extraction
+    "run_simulation": "sim.run",
+    "extract_sparameters": "sim.extract_sparameters",
+}
+
+
+def _register_namespaced_aliases() -> None:
+    """Iterate the alias map and register each namespaced name as a second
+    entry pointing to the same Python function as the flat name.
+
+    Skips silently if a flat name isn't actually defined in this module
+    (e.g. partial test-time imports), so the bookkeeping is robust to
+    minor module surface changes.
+    """
+    for flat_name, namespaced_name in NAMESPACE_ALIASES.items():
+        func = globals().get(flat_name)
+        if func is None or not callable(func):
+            continue
+        mcp.tool(
+            name=namespaced_name,
+            description=(
+                f"Namespaced alias of `{flat_name}`. Prefer the namespaced "
+                "name; the flat alias will be deprecated in a future major "
+                "release. See CHANGELOG."
+            ),
+        )(func)
+
+
+_register_namespaced_aliases()
 
 
 # ---------------------------------------------------------------------------
