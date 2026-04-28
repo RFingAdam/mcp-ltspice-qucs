@@ -156,6 +156,7 @@ def components_dict_to_elements(
     *,
     topology: str = "series_first",
     transmission_zeros: bool | None = None,
+    kind: str = "lowpass",
 ) -> list[tuple[ElementType, dict[str, float]]]:
     """Convert the synthesis-style component dict into an ordered element
     list suitable for :func:`ladder_sparams_from_components`.
@@ -209,6 +210,34 @@ def components_dict_to_elements(
 
     sorted_names = sorted(components.keys(), key=_idx)
     elements: list[tuple[ElementType, dict[str, float]]] = []
+
+    # Highpass: odd-k = series-C, even-k = shunt-L (series_first); reversed for shunt_first.
+    if kind == "highpass":
+        for name in sorted_names:
+            idx = _idx(name)
+            value = components[name]
+            kind_letter = name[0]
+            is_odd_k = idx % 2 == 1
+            if topology == "series_first":
+                if is_odd_k:
+                    # series position — must be a C in HPF
+                    if kind_letter != "C":
+                        raise ValueError(f"HPF series_first expects C at odd index, got {name}")
+                    elements.append(("series_c", {"C": value}))
+                else:
+                    if kind_letter != "L":
+                        raise ValueError(f"HPF series_first expects L at even index, got {name}")
+                    elements.append(("shunt_l", {"L": value}))
+            else:  # shunt_first
+                if is_odd_k:
+                    if kind_letter != "L":
+                        raise ValueError(f"HPF shunt_first expects L at odd index, got {name}")
+                    elements.append(("shunt_l", {"L": value}))
+                else:
+                    if kind_letter != "C":
+                        raise ValueError(f"HPF shunt_first expects C at even index, got {name}")
+                    elements.append(("series_c", {"C": value}))
+        return elements
 
     if not transmission_zeros:
         # Walk and emit series_l / shunt_c per topology

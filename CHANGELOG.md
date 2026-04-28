@@ -9,6 +9,33 @@ grouped by package.
 
 ## [Unreleased]
 
+### Filter synthesis — HPF / BPF / BSF (`mcp-ltspice`)
+
+Closes the biggest user-visible gap in filter coverage. Three new top-level synthesis functions backed by classical Pozar §8.5 frequency transformations from the LPF prototype:
+
+- **`synthesize_lc_hpf`** (`filter.synthesize_lc_hpf`) — high-pass via series-L → series-C and shunt-C → shunt-L. Component count equals the LPF prototype's. -3 dB at the specified cutoff (Butterworth) or equiripple edge (Chebyshev).
+- **`synthesize_lc_bpf`** (`filter.synthesize_lc_bpf`) — band-pass via series-L → series-LC tank, shunt-C → shunt-LC tank. Component count doubles. f₀ = √(f_low · f_high), Δ = (f_high − f_low) / f₀; each LC pair resonates at f₀ exactly.
+- **`synthesize_lc_bsf`** (`filter.synthesize_lc_bsf`) — band-stop via series-L → series parallel-LC (anti-resonant), shunt-C → shunt series-LC (resonant). Used to notch a specific band (LO leakage, image rejection).
+
+Currently supports Butterworth and Chebyshev I across all three. Elliptic HPF/BPF/BSF needs a separate transformation for finite transmission zeros and is on the roadmap. `components_dict_to_elements` extended with a `kind: str = "lowpass"` parameter so HPF responses can be analysed via the existing analytical-S-parameter path; BPF/BSF S-parameter analysis requires new ABCD element types and is deferred.
+
+### Substrate preset library + microstrip loss (`mcp-qucs-s`)
+
+- New `mcp_qucs_s.substrates` module with **16 curated presets** covering FR-4 (4 thicknesses), Rogers RO4350B (3), Rogers RO4003C (2), RT/Duroid 5880 (2) + 6002, PTFE, Isola FR408HR (2), Taconic TLY5. Each carries documented εr / h_mm / t_um / tan_d from the manufacturer datasheet.
+- New `list_substrate_presets_tool` MCP tool returns the full catalogue with descriptions.
+- `synthesize_microstrip_line` and `analyze_microstrip_tool` now accept a **preset name string** (e.g. `"Rogers4350B_0508"`) as the `substrate` argument in addition to the parameter dict. Saves engineers from re-typing `{er, h_mm, t_um, tan_d}` every call.
+- `analyze_microstrip` now uses the substrate's `tan_d` (previously accepted but ignored) to compute **conductor + dielectric attenuation in dB/mm**, surfaced as `alpha_d_db_per_mm`, `alpha_c_db_per_mm`, `alpha_total_db_per_mm`. Pozar §3.8.1 dielectric formula plus skin-effect conductor loss (default σ = 5.8 × 10⁷ S/m for copper; override for gold / aluminium / measured plating). Verified against published values for FR-4 / Rogers / Duroid at 5 GHz.
+
+### Monte Carlo trace mode (`mcp-ltspice`)
+
+`monte_carlo_analysis` gains a `trace=True` flag that emits a JSONL file (one record per trial: seed, sampled components, metrics, pass/fail status, failures list). Lets engineers do offline sensitivity / root-cause analysis of yield loss without re-running MC. Default path is `mc_trace_<base_seed>.jsonl` in cwd; override via `trace_path`.
+
+`monte_carlo_analysis(transmission_zeros=...)` default changed from `True` to `None` — now auto-infers topology from the components dict (matches the `components_dict_to_elements` behaviour added earlier in this Unreleased stream). Old code passing `True`/`False` continues to work unchanged.
+
+### Tests
+
+30 new tests across `test_hpf_bpf_bsf_synthesis.py`, `test_substrate_presets.py`, `test_mc_trace.py`. Total pass count 421 (+30 vs. prior 391 baseline), 0 regressions.
+
 ### `mcp-ltspice` — power-supply EMC pre-compliance toolkit
 
 Five new tools fill the gap between SMPS sizing (existing buck / boost / LDO) and a real product passing conducted-emissions:
