@@ -75,9 +75,21 @@ site/
 # Private design experiments — these stay local for review and don't
 # get pushed. Add a gitkeep'd subfolder under examples/ to share an
 # example you want public.
-examples/halow_lpf/
 examples/private/
 examples/_local/
+examples/_archive/
+
+# Generated example artifacts — re-buildable from each design.py
+examples/halow_lpf/halow_lpf*
+examples/halow_lpf/order*_final.s2p
+examples/halow_lpf/response.png
+examples/halow_lpf/compare_orders_report.md
+examples/halow_lpf/coex_report.md
+examples/halow_lpf/spice_validation.md
+examples/halow_lpf/report.md
+
+# Vendor S-parameter cache — populated by fetch_coilcraft_s2p / fetch_murata_spice
+.cache/vendor_models/
 # Generated bundle PDFs — re-buildable from each example's design.py
 examples/**/report.pdf
 

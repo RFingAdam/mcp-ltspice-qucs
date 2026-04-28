@@ -1,0 +1,107 @@
+{
+  "_doc": {
+    "title": "Worldwide HaLow Elliptic LPF — Murata Type 2HK target",
+    "rationale": "Single SKU covering EU 863-870, US/AU/NZ 902-928, JP 916.5-927.5, KR 917.5-923.5, SG/IN 866-869. Suppresses 2H (LTE B3/B9 DL victim) and 3H (LTE B7/B38/B41 DL victim). Protects co-located GNSS RX (sensitivity -130 dBm) by maintaining ≥30 dB rejection across GPS L1 / GLONASS L1 / Galileo E1 / BeiDou B1 (1175-1610 MHz).",
+    "tx_power_dbm_at_filter_input": 23,
+    "module": "Murata LBAA0Z02HK (Type 2HK)",
+    "antenna_isolation_db_assumed": 25.0
+  },
+  "passband": {
+    "f_start": 863000000.0,
+    "f_stop": 928000000.0,
+    "il_max_db": 1.0,
+    "rl_min_db": 14.0
+  },
+  "stopband_targets": [
+    {
+      "freq": 1575420000.0,
+      "rejection_min_db": 18.0,
+      "label": "GPS L1 / BeiDou B1 protection"
+    },
+    {
+      "freq": 1602000000.0,
+      "rejection_min_db": 18.0,
+      "label": "GLONASS L1OF protection"
+    },
+    {
+      "freq": 1830000000.0,
+      "rejection_min_db": 35.0,
+      "label": "2H center / LTE B3 DL"
+    },
+    {
+      "freq": 1856000000.0,
+      "rejection_min_db": 35.0,
+      "label": "2H high / LTE B3 DL upper"
+    },
+    {
+      "freq": 2640000000.0,
+      "rejection_min_db": 35.0,
+      "label": "3H center / LTE B7 DL"
+    },
+    {
+      "freq": 2784000000.0,
+      "rejection_min_db": 30.0,
+      "label": "3H high / LTE B7 DL upper"
+    }
+  ],
+  "harmonics": [2, 3],
+  "coex_radios": [
+    {
+      "name": "GPS L1",
+      "f_center_hz": 1575420000.0,
+      "bandwidth_hz": 2046000.0,
+      "sensitivity_dbm": -130.0,
+      "category": "gnss"
+    },
+    {
+      "name": "GLONASS L1OF",
+      "f_center_hz": 1602000000.0,
+      "bandwidth_hz": 8125000.0,
+      "sensitivity_dbm": -130.0,
+      "category": "gnss"
+    },
+    {
+      "name": "Galileo E1",
+      "f_center_hz": 1575420000.0,
+      "bandwidth_hz": 24552000.0,
+      "sensitivity_dbm": -130.0,
+      "category": "gnss"
+    },
+    {
+      "name": "LTE B1 DL",
+      "f_range_hz": [2110000000.0, 2170000000.0],
+      "sensitivity_dbm": -97.0,
+      "category": "lte_dl"
+    },
+    {
+      "name": "LTE B3 DL",
+      "f_range_hz": [1805000000.0, 1880000000.0],
+      "sensitivity_dbm": -97.0,
+      "category": "lte_dl"
+    },
+    {
+      "name": "LTE B7 DL",
+      "f_range_hz": [2620000000.0, 2690000000.0],
+      "sensitivity_dbm": -97.0,
+      "category": "lte_dl"
+    },
+    {
+      "name": "LTE B8 DL",
+      "f_range_hz": [925000000.0, 960000000.0],
+      "sensitivity_dbm": -97.0,
+      "category": "lte_dl"
+    },
+    {
+      "name": "LTE B20 DL",
+      "f_range_hz": [791000000.0, 821000000.0],
+      "sensitivity_dbm": -97.0,
+      "category": "lte_dl"
+    },
+    {
+      "name": "LTE B41",
+      "f_range_hz": [2496000000.0, 2690000000.0],
+      "sensitivity_dbm": -97.0,
+      "category": "lte_dl"
+    }
+  ]
+}

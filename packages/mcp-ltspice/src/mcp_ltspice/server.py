@@ -105,6 +105,23 @@ from mcp_ltspice.synthesis import (
 from mcp_ltspice.synthesis import (
     place_transmission_zero as _place_transmission_zero,
 )
+from mcp_ltspice.coex_zeros import place_zeros_for_coex as _place_zeros_for_coex
+from mcp_ltspice.validate_spice import validate_against_spice as _validate_against_spice
+from mcp_ltspice.vendor_fetch import (
+    cache_manifest as _cache_manifest,
+)
+from mcp_ltspice.vendor_fetch import (
+    fetch_coilcraft_s2p as _fetch_coilcraft_s2p,
+)
+from mcp_ltspice.vendor_fetch import (
+    fetch_murata_spice as _fetch_murata_spice,
+)
+from mcp_ltspice.vendor_fetch import (
+    list_user_vendor_parts as _list_user_vendor_parts,
+)
+from mcp_ltspice.vendor_fetch import (
+    register_user_vendor_dir as _register_user_vendor_dir,
+)
 from mcp_ltspice.vendor_models import (
     list_vendor_parts as _list_vendor_parts,
 )
@@ -476,18 +493,32 @@ def find_transmission_zeros(
         "Replace ideal L/C values with vendor parts. Returns parasitic data "
         "(Cp/Ls, ESR, SRF) so downstream sims include realistic loss behavior. "
         "Vendors: 'coilcraft_0402hp', 'coilcraft_0603cs', 'murata_gjm_c0g', "
-        "'johanson_l', 'tdk_mlg'."
+        "'johanson_l', 'tdk_mlg'. Set srf_margin>0 (e.g. 1.2) to auto-reject "
+        "parts whose SRF < srf_margin × max_spec_freq_hz; provide either "
+        "max_spec_freq_hz directly or a spec dict from which it is derived."
     ),
 )
 def substitute_real_components(
     components: dict[str, float],
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
+    srf_margin: Annotated[float, Field(ge=0)] = 0.0,
+    max_spec_freq_hz: Annotated[float | None, Field(gt=0)] = None,
+    spec: dict | None = None,
+    max_value_drift_pct: Annotated[float | None, Field(gt=0)] = 25.0,
 ) -> Envelope[dict[str, dict[str, Any]]]:
     timer = Timer()
     try:
         return ok(
-            _substitute_real(components, inductor_vendor, capacitor_vendor),
+            _substitute_real(
+                components,
+                inductor_vendor,
+                capacitor_vendor,
+                srf_margin=srf_margin,
+                max_spec_freq_hz=max_spec_freq_hz,
+                spec=spec,
+                max_value_drift_pct=max_value_drift_pct,
+            ),
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
         )
@@ -1601,6 +1632,179 @@ def build_design_report_pdf(
             f"build_design_report_pdf failed: {e}",
             tool_version=__version__,
         )
+
+
+# ---------------------------------------------------------------------------
+# Vendor model fetchers (Coilcraft / Murata / user-drop directory)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Fetch and cache an S-parameter Touchstone (.s2p) file from Coilcraft. "
+        "Pass either a known part number or an explicit source_url. Cached at "
+        "~/.cache/mcp-ltspice/coilcraft/<part>.s2p; subsequent calls are offline."
+    ),
+)
+def fetch_coilcraft_s2p(
+    part_number: str,
+    source_url: str | None = None,
+    cache_dir: str | None = None,
+    refresh: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _fetch_coilcraft_s2p(
+            part_number,
+            source_url=source_url,
+            cache_dir=cache_dir,
+            refresh=refresh,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"fetch_coilcraft_s2p failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Fetch and cache a Murata SPICE library (.lib) or S-parameter (.s2p) "
+        "for a given part number. Provide source_url for parts without a "
+        "registered URL pattern. Cached at ~/.cache/mcp-ltspice/murata/."
+    ),
+)
+def fetch_murata_spice(
+    part_number: str,
+    source_url: str | None = None,
+    cache_dir: str | None = None,
+    refresh: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _fetch_murata_spice(
+            part_number,
+            source_url=source_url,
+            cache_dir=cache_dir,
+            refresh=refresh,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"fetch_murata_spice failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Index a directory of user-supplied vendor model files (.s2p / .s1p / "
+        ".lib / .inc) under a namespace so they appear as substitution "
+        "candidates. Re-call to refresh the index."
+    ),
+)
+def register_user_vendor_dir(
+    directory: str,
+    namespace: str = "user",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _register_user_vendor_dir(directory, namespace=namespace)
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"register_user_vendor_dir failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(description="List user-vendor parts indexed under a namespace (default 'user').")
+def list_user_vendor_parts(
+    namespace: str = "user",
+    kind: str | None = None,
+) -> Envelope[list[dict[str, Any]]]:
+    return _wrap(_list_user_vendor_parts, namespace, kind=kind)
+
+
+@mcp.tool(description="Walk the vendor-fetch cache tree and return a manifest of cached files.")
+def vendor_cache_manifest(cache_dir: str | None = None) -> Envelope[dict[str, Any]]:
+    return _wrap(_cache_manifest, cache_dir)
+
+
+# ---------------------------------------------------------------------------
+# Coexistence-aware transmission-zero placement
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Compute optimal transmission-zero frequencies for an elliptic LPF "
+        "given the fundamental passband, harmonic orders, and victim bands. "
+        "Returns zeros (with trap-index hints), a markdown rationale, and a "
+        "list of unprotected victims."
+    ),
+)
+def place_zeros_for_coex(
+    passband_hz: list[float],
+    harmonics: list[int],
+    victim_bands: list[dict[str, Any]] | None = None,
+    n_zeros: int | None = None,
+    include_gnss: bool = False,
+    include_fcc_restricted: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if len(passband_hz) != 2:
+            raise ValueError("passband_hz must be a 2-element list [f_low, f_high]")
+        result = _place_zeros_for_coex(
+            (float(passband_hz[0]), float(passband_hz[1])),
+            harmonics,
+            victim_bands,
+            n_zeros=n_zeros,
+            include_gnss=include_gnss,
+            include_fcc_restricted=include_fcc_restricted,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"place_zeros_for_coex failed: {e}", tool_version=__version__)
+
+
+# ---------------------------------------------------------------------------
+# SPICE validation of analytical S2P
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Run SPICE on a substituted-real-vendor schematic and reconcile against "
+        "the analytical S2P preview. Returns per-frequency Δ|S21| / Δphase, "
+        "max-deltas, flagged regions, and a verdict ('agree' | "
+        "'minor_disagreement' | 'disagree' | 'spice_unavailable')."
+    ),
+)
+def validate_against_spice(
+    asc_path: str,
+    components: dict[str, float],
+    spec: dict | None = None,
+    output_spice_s2p: str | None = None,
+    output_analytical_s2p: str | None = None,
+    passband_threshold_db: Annotated[float, Field(gt=0)] = 0.5,
+    stopband_threshold_db: Annotated[float, Field(gt=0)] = 3.0,
+    prefer: str | None = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 180.0,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    topology: str = "series_first",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _validate_against_spice(
+            asc_path,
+            components,
+            spec=spec,
+            output_spice_s2p=output_spice_s2p,
+            output_analytical_s2p=output_analytical_s2p,
+            passband_threshold_db=passband_threshold_db,
+            stopband_threshold_db=stopband_threshold_db,
+            prefer=prefer,
+            timeout_sec=timeout_sec,
+            z0=z0,
+            topology=topology,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"validate_against_spice failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
