@@ -17,7 +17,15 @@ Closes the biggest user-visible gap in filter coverage. Three new top-level synt
 - **`synthesize_lc_bpf`** (`filter.synthesize_lc_bpf`) — band-pass via series-L → series-LC tank, shunt-C → shunt-LC tank. Component count doubles. f₀ = √(f_low · f_high), Δ = (f_high − f_low) / f₀; each LC pair resonates at f₀ exactly.
 - **`synthesize_lc_bsf`** (`filter.synthesize_lc_bsf`) — band-stop via series-L → series parallel-LC (anti-resonant), shunt-C → shunt series-LC (resonant). Used to notch a specific band (LO leakage, image rejection).
 
-Currently supports Butterworth and Chebyshev I across all three. Elliptic HPF/BPF/BSF needs a separate transformation for finite transmission zeros and is on the roadmap. `components_dict_to_elements` extended with a `kind: str = "lowpass"` parameter so HPF responses can be analysed via the existing analytical-S-parameter path; BPF/BSF S-parameter analysis requires new ABCD element types and is deferred.
+Currently supports Butterworth and Chebyshev I across all three. Elliptic HPF/BPF/BSF needs a separate transformation for finite transmission zeros and is on the roadmap.
+
+**Analytical S-parameter analysis is wired up for all four kinds** (LPF, HPF, BPF, BSF). `components_dict_to_elements` extended with a `kind` parameter (`"lowpass"`, `"highpass"`, `"bandpass"`, `"bandstop"`). Three new ABCD element types added to support BPF/BSF resonator topologies:
+
+- `series_lc_series` — series-LC in main path (BPF series section). `Z = sL + 1/(sC)` — dips at f₀.
+- `shunt_lc_parallel` — parallel-LC to ground (BPF shunt section). `Y = sC + 1/(sL)` — dips at f₀.
+- `series_lc_parallel` — parallel-LC in main path (BSF series section). `Z = sL/(s²LC+1)` — peaks at f₀.
+
+The existing `shunt_lc_trap` kind (series-LC to ground; elliptic LPF trap) doubles as the BSF shunt section. Verified BPF response: -3 dB at band edges, deep stopband > 50 dB one decade out. Verified BSF response: > 60 dB notch at f₀, lossless passband one decade out.
 
 ### Substrate preset library + microstrip loss (`mcp-qucs-s`)
 
