@@ -16,7 +16,6 @@ NAVY = RGBColor(0x1F, 0x2A, 0x44)
 TEAL = RGBColor(0x1A, 0x8A, 0x8A)
 ORANGE = RGBColor(0xE7, 0x75, 0x4A)
 GRAY = RGBColor(0x6B, 0x72, 0x80)
-LIGHT = RGBColor(0xF4, 0xF4, 0xF6)
 
 
 def _set_text(tf, text, size=18, bold=False, color=NAVY, align=PP_ALIGN.LEFT):
@@ -61,21 +60,28 @@ def slide_cover(prs):
     bg.line.fill.background()
 
     tb = s.shapes.add_textbox(Inches(0.7), Inches(2.5), Inches(12), Inches(1.5))
-    _set_text(tb.text_frame, "mcp-ltspice-qucs", size=60, bold=True,
-              color=RGBColor(0xFF, 0xFF, 0xFF))
+    _set_text(
+        tb.text_frame, "mcp-ltspice-qucs", size=60, bold=True, color=RGBColor(0xFF, 0xFF, 0xFF)
+    )
 
     sb = s.shapes.add_textbox(Inches(0.7), Inches(3.8), Inches(12), Inches(1.0))
-    _set_text(sb.text_frame,
-              "An agentic MCP suite for RF, analog, and SMPS-EMC design",
-              size=22, color=RGBColor(0xCB, 0xD5, 0xE1))
+    _set_text(
+        sb.text_frame,
+        "An agentic MCP suite for RF, analog, and SMPS-EMC design",
+        size=22,
+        color=RGBColor(0xCB, 0xD5, 0xE1),
+    )
 
     tag = s.shapes.add_textbox(Inches(0.7), Inches(4.6), Inches(12), Inches(0.6))
-    _set_text(tag.text_frame, "Spec → compliant deliverable in seconds.",
-              size=18, color=TEAL)
+    _set_text(tag.text_frame, "Spec → compliant deliverable in seconds.", size=18, color=TEAL)
 
     foot = s.shapes.add_textbox(Inches(0.7), Inches(6.5), Inches(12), Inches(0.4))
-    _set_text(foot.text_frame, "v0.2.0  •  427 tests passing  •  Investor briefing",
-              size=12, color=RGBColor(0xCB, 0xD5, 0xE1))
+    _set_text(
+        foot.text_frame,
+        "v0.2.0  •  427 tests passing  •  Investor briefing",
+        size=12,
+        color=RGBColor(0xCB, 0xD5, 0xE1),
+    )
 
 
 def slide_problem(prs):
@@ -103,35 +109,42 @@ def slide_problem(prs):
         tb2.text_frame,
         "Today's flow: engineer → math → simulator → respin.\n"
         "We collapse the loop so an LLM agent does engineer-quality work end-to-end.",
-        size=16, bold=True, color=ORANGE,
+        size=16,
+        bold=True,
+        color=ORANGE,
     )
 
 
 def slide_what_we_built(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_title(s, "What we built",
-               "112 MCP tools across four packages, callable by any agent stack")
+    _add_title(
+        s, "What we built", "112 MCP tools across four packages, callable by any agent stack"
+    )
 
-    pic = s.shapes.add_picture(str(ASSETS / "hero.png"),
-                               Inches(0.5), Inches(1.4),
-                               width=Inches(12.33))
-    # picture height auto-scales
+    s.shapes.add_picture(str(ASSETS / "hero.png"), Inches(0.5), Inches(1.4), width=Inches(12.33))
 
     cap = s.shapes.add_textbox(Inches(0.5), Inches(6.6), Inches(12.33), Inches(0.4))
-    _set_text(cap.text_frame,
-              "Three categories · 56 flat tools + 56 namespaced aliases · "
-              "all backed by peer-reviewed math (Pozar, Erickson, Sedra-Smith, Mancini)",
-              size=11, color=GRAY, align=PP_ALIGN.CENTER)
+    _set_text(
+        cap.text_frame,
+        "Three categories · 56 flat tools + 56 namespaced aliases · "
+        "all backed by peer-reviewed math (Pozar, Erickson, Sedra-Smith, Mancini)",
+        size=11,
+        color=GRAY,
+        align=PP_ALIGN.CENTER,
+    )
 
 
 def slide_demo1(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_title(s, "Demo 1 — RF Low-Pass Filter (1 GHz Butterworth)",
-               "Synthesise → analyse → Monte Carlo → LTspice/Touchstone deliverable in 9 seconds")
+    _add_title(
+        s,
+        "Demo 1 — RF Low-Pass Filter (1 GHz Butterworth)",
+        "Synthesise → analyse → Monte Carlo → LTspice/Touchstone deliverable in 9 seconds",
+    )
 
-    s.shapes.add_picture(str(ASSETS / "demo1_lpf.png"),
-                         Inches(1.67), Inches(1.5),
-                         width=Inches(10.0))
+    s.shapes.add_picture(
+        str(ASSETS / "demo1_lpf.png"), Inches(1.67), Inches(1.5), width=Inches(10.0)
+    )
 
     tb = s.shapes.add_textbox(Inches(0.5), Inches(5.4), Inches(12.33), Inches(2.0))
     _add_bullets(
@@ -148,12 +161,15 @@ def slide_demo1(prs):
 
 def slide_demo2(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_title(s, "Demo 2 — SMPS Conducted Emissions vs CISPR 32 Class B",
-               "From 'I have a switching converter' to 'here's how close to compliance you are'")
+    _add_title(
+        s,
+        "Demo 2 — SMPS Conducted Emissions vs CISPR 32 Class B",
+        "From 'I have a switching converter' to 'here's how close to compliance you are'",
+    )
 
-    s.shapes.add_picture(str(ASSETS / "demo2_emc.png"),
-                         Inches(1.67), Inches(1.4),
-                         width=Inches(10.0))
+    s.shapes.add_picture(
+        str(ASSETS / "demo2_emc.png"), Inches(1.67), Inches(1.4), width=Inches(10.0)
+    )
 
     tb = s.shapes.add_textbox(Inches(0.5), Inches(5.55), Inches(12.33), Inches(1.9))
     _add_bullets(
@@ -173,12 +189,15 @@ def slide_demo2(prs):
 
 def slide_demo3(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_title(s, "Demo 3 — Active Filter (Sallen-Key, 22 kHz, 4th order)",
-               "Anti-aliasing for a 96 kSPS audio ADC, complete with op-amp recommendation")
+    _add_title(
+        s,
+        "Demo 3 — Active Filter (Sallen-Key, 22 kHz, 4th order)",
+        "Anti-aliasing for a 96 kSPS audio ADC, complete with op-amp recommendation",
+    )
 
-    s.shapes.add_picture(str(ASSETS / "demo3_sallen_key.png"),
-                         Inches(1.67), Inches(1.4),
-                         width=Inches(10.0))
+    s.shapes.add_picture(
+        str(ASSETS / "demo3_sallen_key.png"), Inches(1.67), Inches(1.4), width=Inches(10.0)
+    )
 
     tb = s.shapes.add_textbox(Inches(0.5), Inches(5.55), Inches(12.33), Inches(1.9))
     _add_bullets(
@@ -197,8 +216,7 @@ def slide_demo3(prs):
 
 def slide_moat(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_title(s, "What's hard to replicate",
-               "Data, math, and agent-first design")
+    _add_title(s, "What's hard to replicate", "Data, math, and agent-first design")
 
     tb = s.shapes.add_textbox(Inches(0.5), Inches(1.6), Inches(12.33), Inches(5.5))
     _add_bullets(
@@ -245,7 +263,10 @@ def slide_why_now(prs):
     _set_text(
         box.text_frame,
         "The hardware team that ships first wins. We make every team's HW lead 5–10× faster.",
-        size=18, bold=True, color=TEAL, align=PP_ALIGN.CENTER,
+        size=18,
+        bold=True,
+        color=TEAL,
+        align=PP_ALIGN.CENTER,
     )
 
 
@@ -254,19 +275,27 @@ def slide_roadmap(prs):
     _add_title(s, "Roadmap")
 
     rows = [
-        ("Now (v0.2.0)",
-         "112 tools shipped · RF LPF/HPF/BPF/BSF · SMPS EMC · "
-         "active filters · vendor catalogues · LTspice/Touchstone deliverables"),
-        ("Phase 6",
-         "Xyce harmonic-balance · Qucs-S noise extraction · "
-         "distributed filter synthesis (hairpin, interdigital, combline) · "
-         ".sch ↔ .asc conversion bridge"),
-        ("Phase 7",
-         "Real-simulator integration tests · async runner with heartbeat · "
-         "Sobol-index sensitivity · correlated-tolerance Monte Carlo"),
-        ("Beyond",
-         "Persistent ngspice (10–50× MC speedup) · FilterDesign threading "
-         "through pipeline · live vendor-fetch agents (Coilcraft / Murata APIs)"),
+        (
+            "Now (v0.2.0)",
+            "112 tools shipped · RF LPF/HPF/BPF/BSF · SMPS EMC · "
+            "active filters · vendor catalogues · LTspice/Touchstone deliverables",
+        ),
+        (
+            "Phase 6",
+            "Xyce harmonic-balance · Qucs-S noise extraction · "
+            "distributed filter synthesis (hairpin, interdigital, combline) · "
+            ".sch ↔ .asc conversion bridge",
+        ),
+        (
+            "Phase 7",
+            "Real-simulator integration tests · async runner with heartbeat · "
+            "Sobol-index sensitivity · correlated-tolerance Monte Carlo",
+        ),
+        (
+            "Beyond",
+            "Persistent ngspice (10–50× MC speedup) · FilterDesign threading "
+            "through pipeline · live vendor-fetch agents (Coilcraft / Murata APIs)",
+        ),
     ]
     y = Inches(1.6)
     for label, body in rows:
@@ -285,19 +314,32 @@ def slide_close(prs):
     bg.line.fill.background()
 
     title = s.shapes.add_textbox(Inches(0.7), Inches(2.6), Inches(12), Inches(1.0))
-    _set_text(title.text_frame, "Validated. Shipped. Composable.",
-              size=44, bold=True, color=RGBColor(0xFF, 0xFF, 0xFF),
-              align=PP_ALIGN.CENTER)
+    _set_text(
+        title.text_frame,
+        "Validated. Shipped. Composable.",
+        size=44,
+        bold=True,
+        color=RGBColor(0xFF, 0xFF, 0xFF),
+        align=PP_ALIGN.CENTER,
+    )
 
     sub = s.shapes.add_textbox(Inches(0.7), Inches(3.8), Inches(12), Inches(0.7))
-    _set_text(sub.text_frame,
-              "github.com/RFingAdam/mcp-ltspice-qucs   ·   v0.2.0",
-              size=18, color=TEAL, align=PP_ALIGN.CENTER)
+    _set_text(
+        sub.text_frame,
+        "github.com/RFingAdam/mcp-ltspice-qucs   ·   v0.2.0",
+        size=18,
+        color=TEAL,
+        align=PP_ALIGN.CENTER,
+    )
 
     foot = s.shapes.add_textbox(Inches(0.7), Inches(5.5), Inches(12), Inches(0.5))
-    _set_text(foot.text_frame, "Ready to demo live.",
-              size=16, color=RGBColor(0xCB, 0xD5, 0xE1),
-              align=PP_ALIGN.CENTER)
+    _set_text(
+        foot.text_frame,
+        "Ready to demo live.",
+        size=16,
+        color=RGBColor(0xCB, 0xD5, 0xE1),
+        align=PP_ALIGN.CENTER,
+    )
 
 
 def main():

@@ -12,7 +12,6 @@ import numpy as np
 
 from mcp_ltspice.analog.cascade import cascaded_lpf_design, transfer_function_db
 from mcp_ltspice.eval import FilterSpec
-from mcp_ltspice.vendors.opamps import find_opamp_for_application
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     ladder_sparams_from_components,
@@ -20,6 +19,7 @@ from mcp_ltspice.extract import (
 from mcp_ltspice.montecarlo import monte_carlo_analysis
 from mcp_ltspice.power.emc import predict_conducted_emissions
 from mcp_ltspice.synthesis import synthesize_lc_lpf
+from mcp_ltspice.vendors.opamps import find_opamp_for_application
 
 ASSETS = Path(__file__).parent / "assets"
 ASSETS.mkdir(exist_ok=True, parents=True)
@@ -55,9 +55,7 @@ def chart_lpf() -> dict:
     """
     fc_hz = 1e9
     design = synthesize_lc_lpf("butterworth", 5, fc_hz)
-    els = components_dict_to_elements(
-        design.components, topology=design.topology, kind="lowpass"
-    )
+    els = components_dict_to_elements(design.components, topology=design.topology, kind="lowpass")
     f = np.geomspace(10e6, 20e9, 1001)
     s21 = _s21_db(els, f)
 
@@ -91,10 +89,16 @@ def chart_lpf() -> dict:
     ax_r.axvline(1.0, color=GRAY, ls=":", lw=1)
     ax_r.axvline(2.0, color=GRAY, ls=":", lw=1)
     ax_r.axvline(3.0, color=GRAY, ls=":", lw=1)
-    ax_r.scatter([2.0, 3.0, 5.0], [-30, -45, -60], color=ORANGE, marker="v", s=70,
-                 zorder=5, label="Stopband targets")
-    ax_r.text(0.04, -3, "Passband: IL ≤ 0.5 dB,\nRL ≥ 14 dB to 600 MHz",
-              color=TEAL, fontsize=9)
+    ax_r.scatter(
+        [2.0, 3.0, 5.0],
+        [-30, -45, -60],
+        color=ORANGE,
+        marker="v",
+        s=70,
+        zorder=5,
+        label="Stopband targets",
+    )
+    ax_r.text(0.04, -3, "Passband: IL ≤ 0.5 dB,\nRL ≥ 14 dB to 600 MHz", color=TEAL, fontsize=9)
     ax_r.text(2.1, -28, "30 dB @ 2·fc", color=ORANGE, fontsize=9)
     ax_r.text(3.1, -43, "45 dB @ 3·fc", color=ORANGE, fontsize=9)
     ax_r.text(5.1, -58, "60 dB @ 5·fc", color=ORANGE, fontsize=9)
@@ -163,11 +167,15 @@ def chart_smps_emc() -> dict:
 
     ax.semilogx(f_mhz, e_no, color=RED, lw=1.5, marker="o", ms=3, label="No filter")
     ax.semilogx(
-        f_mhz, e_yes, color=TEAL, lw=1.5, marker="o", ms=3,
+        f_mhz,
+        e_yes,
+        color=TEAL,
+        lw=1.5,
+        marker="o",
+        ms=3,
         label="With designed LC input filter (70 dB @ fsw)",
     )
-    ax.semilogx(f_mhz, lim, color=NAVY, lw=2, ls="--",
-                label="CISPR 32 Class B (QP) limit")
+    ax.semilogx(f_mhz, lim, color=NAVY, lw=2, ls="--", label="CISPR 32 Class B (QP) limit")
     ax.fill_between(f_mhz, lim, lim + 80, color=RED, alpha=0.05)
     ax.text(0.18, 130, "Violation zone", color=RED, fontsize=9, alpha=0.8)
     ax.set_xlabel("Frequency (MHz)")
