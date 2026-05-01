@@ -211,7 +211,7 @@ def list_spec_templates_tool() -> Envelope[list[str]]:
     description=(
         "List LTE bands. Optional ``region`` substring filter. NOTE: this is a "
         "filter-design helper backed by a curated subset; for the authoritative "
-        "regulatory band table prefer `lte_bands_list` from the **emc-regulations** MCP."
+        "regulatory band table prefer `lte_bands_list` from the **mcp-emc-regulations** MCP."
     )
 )
 def list_lte_bands_tool(
@@ -224,7 +224,7 @@ def list_lte_bands_tool(
     description=(
         "List 5G NR bands. ``family`` is 'fr1' or 'fr2'. NOTE: filter-design helper; "
         "for authoritative regulatory band data prefer `nr_bands_list` from the "
-        "**emc-regulations** MCP."
+        "**mcp-emc-regulations** MCP."
     )
 )
 def list_5gnr_bands_tool(family: str = "fr1") -> Envelope[list[dict[str, Any]]]:
@@ -236,7 +236,7 @@ def list_5gnr_bands_tool(family: str = "fr1") -> Envelope[list[dict[str, Any]]]:
         "List GNSS signals (GPS / GLONASS / Galileo / BeiDou). Filter-design helper "
         "with sensitivity / bandwidth metadata used by `lookup_harmonic_victims` and "
         "`check_coex_matrix`. For broader regulatory queries see the "
-        "**emc-regulations** MCP."
+        "**mcp-emc-regulations** MCP."
     )
 )
 def list_gnss_bands_tool(
@@ -249,7 +249,7 @@ def list_gnss_bands_tool(
     description=(
         "List ISM band allocations. ``region`` is the ITU region (1=EMEA, 2=Americas, 3=APAC). "
         "NOTE: filter-design helper; for authoritative regulatory band tables prefer "
-        "`ism_bands_list` from the **emc-regulations** MCP."
+        "`ism_bands_list` from the **mcp-emc-regulations** MCP."
     )
 )
 def list_ism_bands_tool(
@@ -286,7 +286,7 @@ def lookup_band_by_freq_tool(
     description=(
         "List FCC §15.205 restricted bands. NOTE: filter-design helper used by "
         "`lookup_harmonic_victims`; for authoritative regulatory queries prefer "
-        "`fcc_restricted_bands_list` from the **emc-regulations** MCP."
+        "`fcc_restricted_bands_list` from the **mcp-emc-regulations** MCP."
     )
 )
 def list_fcc_restricted_bands_tool() -> Envelope[list[dict[str, Any]]]:
