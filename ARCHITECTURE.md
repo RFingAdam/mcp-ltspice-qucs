@@ -12,7 +12,9 @@ mcp-ltspice-qucs/
 │   ├── mcp-ltspice/            # FastMCP server: filter synthesis, sim, eval
 │   ├── mcp-rf-analysis/        # FastMCP server: skrf + bands + coex
 │   └── mcp-qucs-s/             # FastMCP server: distributed-element sim
-└── examples/halow_lpf/         # End-to-end demo
+└── examples/                   # Worked end-to-end designs (basic_lpf,
+                                #   buck_smps, emc_compliance,
+                                #   filter_compare, opamp_filter)
 ```
 
 ## The three servers and their responsibilities
@@ -142,7 +144,14 @@ incantation is needed.
 
 ## Versioning
 
-Each package has its own `pyproject.toml` and version. All start at
-`0.1.0` and bump independently per [Semver](https://semver.org/).
-`rf-mcp-common` is the contract; breaking changes there cascade to
-every server and warrant a major bump for all four.
+Each package has its own `pyproject.toml` and version, bumping
+independently per [Semver](https://semver.org/). The current minor
+release is `0.2.0`. `rf-mcp-common` is the contract layer; breaking
+changes there cascade to every server and warrant a major bump for
+all four.
+
+Some tools in `mcp-qucs-s` ship as scaffolds — they detect the required
+simulator (Xyce for `run_harmonic_balance`, Qucs-S for
+`extract_noise_parameters`) but return an `error("not yet implemented")`
+envelope instead of placeholder data. This is deliberate: a scaffold
+that returns `ok()` with fake numbers is worse than no tool at all.
