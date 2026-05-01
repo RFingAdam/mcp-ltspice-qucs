@@ -13,10 +13,10 @@ uv sync --all-packages
 uv run pytest -q
 ```
 
-You should see ~180 tests pass. Two tests for the LTspice / ngspice
-runner skip by default; install one or both simulators (see the
+You should see 427 tests pass and 4 skip. The skips are simulator-gated
+(LTspice/ngspice/Qucs-S/Xyce); install any of them (see the
 [Installation guide](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/docs/installation.md))
-to enable them.
+to exercise the simulator-driven paths.
 
 ## Layout
 
@@ -110,9 +110,11 @@ We follow [Keep a Changelog](https://keepachangelog.com/) +
 - Move entries from `[Unreleased]` to a new dated section in `CHANGELOG.md`
 - Tag: `git tag <name>-v<version> && git push --tags`
 
-CI (when configured) builds and publishes to PyPI from the tag.
+CI runs the test matrix on every push and PR. PyPI publishing is
+not yet wired up; install from a git ref or build wheels locally
+with `uv build` until that lands.
 
 ## Code of conduct
 
-Be excellent. We follow the
-[Contributor Covenant](https://www.contributor-covenant.org/).
+We follow the [Contributor Covenant](https://www.contributor-covenant.org/).
+See [`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md).

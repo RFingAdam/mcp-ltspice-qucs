@@ -115,7 +115,7 @@ def status() -> Envelope[dict[str, Any]]:
         "impedance and electrical length. Hammerstad-Jensen closed form. "
         "NOTE: this is the **synthesis** direction (Z₀, length, freq → W, L). "
         "For impedance **analysis** of an existing trace from PCB geometry, "
-        "prefer `pcb_calc_microstrip_impedance` from the **pcb-emcopilot** MCP."
+        "prefer a PCB-layout-aware EMC MCP if one is available."
     ),
 )
 def synthesize_microstrip_line(
@@ -157,9 +157,9 @@ def synthesize_microstrip_line(
     description=(
         "Analyze an existing microstrip line: Z0, eps_eff, wavelength. "
         "Hammerstad-Jensen closed form. NOTE: for PCB impedance analysis from "
-        "stackup + trace data, prefer `pcb_calc_microstrip_impedance` "
-        "from the **pcb-emcopilot** MCP — that tool integrates with the wider "
-        "PCB analysis workflow (CPW, stripline, differential, eye-diagram)."
+        "stackup + trace data, prefer a PCB-layout-aware EMC MCP if one is "
+        "available — those tools integrate with the wider PCB analysis "
+        "workflow (CPW, stripline, differential, eye-diagram)."
     )
 )
 def analyze_microstrip_tool(
