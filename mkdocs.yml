@@ -115,6 +115,7 @@ nav:
       - Touchstone interop: reference/touchstone.md
       - Envelope contract: reference/envelope.md
       - E-series snap: reference/e-series.md
+  - Related MCP servers: related-mcp-servers.md
   - Contributing: contributing.md
   - Changelog: changelog.md
   - Security: security.md
