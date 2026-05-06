@@ -103,10 +103,24 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
         cmd = [str(ltspice_exe), "-b", "-Run", str(asc_path)]
 
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+    log_path.write_text(
+        f"# LTspice command: {' '.join(cmd)}\n"
+        f"# returncode: {proc.returncode}\n\n"
+        f"=== stdout ===\n{proc.stdout}\n\n"
+        f"=== stderr ===\n{proc.stderr}\n",
+        encoding="utf-8",
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"LTspice exited with returncode={proc.returncode}. "
+            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
+            f"Full log at {log_path}"
+        )
     if not raw_path.is_file():
         raise RuntimeError(
-            f"LTspice did not produce {raw_path}. stdout={proc.stdout[-500:]!r} "
-            f"stderr={proc.stderr[-500:]!r}"
+            f"LTspice did not produce {raw_path} despite rc=0. "
+            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
+            f"Full log at {log_path}"
         )
     return RunResult(
         raw_path=raw_path,
@@ -196,12 +210,29 @@ def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunRes
     netlist = _asc_to_ngspice_netlist(asc_path)
     raw_path = asc_path.with_suffix(".raw")
     log_path = asc_path.with_suffix(".log")
+    if raw_path.exists():
+        raw_path.unlink()  # parity with LTspice: don't let a stale .raw mask a failure
     cmd = [str(ngspice_exe), "-b", "-r", str(raw_path), "-o", str(log_path), str(netlist)]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+    # ngspice writes its own log via -o; append our captured stdout/stderr for completeness.
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(
+            f"\n# ngspice command: {' '.join(cmd)}\n"
+            f"# returncode: {proc.returncode}\n\n"
+            f"=== captured stdout ===\n{proc.stdout}\n\n"
+            f"=== captured stderr ===\n{proc.stderr}\n"
+        )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"ngspice exited with returncode={proc.returncode}. "
+            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
+            f"Full log at {log_path}"
+        )
     if not raw_path.is_file():
         raise RuntimeError(
-            f"ngspice did not produce {raw_path}. stdout={proc.stdout[-500:]!r} "
-            f"stderr={proc.stderr[-500:]!r}"
+            f"ngspice did not produce {raw_path} despite rc=0. "
+            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
+            f"Full log at {log_path}"
         )
     return RunResult(
         raw_path=raw_path,

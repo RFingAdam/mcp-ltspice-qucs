@@ -91,3 +91,6 @@ examples/**/report.pdf
 
 # pre-commit
 .pre-commit-cache/
+
+# Workflow scratch files (private to the maintainer)
+tasks/

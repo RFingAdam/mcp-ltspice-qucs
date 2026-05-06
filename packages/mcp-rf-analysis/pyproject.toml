@@ -1,6 +1,6 @@
 [project]
 name = "mcp-rf-analysis"
-version = "0.1.0"
+version = "0.3.0"
 description = "Simulator-agnostic MCP server for RF S-parameter analysis, regulatory band databases (LTE / 5G NR / GNSS / ISM / HaLow), and multi-radio coexistence engineering"
 readme = "README.md"
 requires-python = ">=3.11"
