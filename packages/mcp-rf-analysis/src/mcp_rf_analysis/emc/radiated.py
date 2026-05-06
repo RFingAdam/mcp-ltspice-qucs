@@ -55,18 +55,10 @@ def predict_radiated_emissions_loop(
     }
 
 
-# FCC Part 15.109 Class B radiated limits (US, residential), dBµV/m at 3m
-# Above 1 GHz the limit is on average power, not field strength — this
-# table covers up to 1 GHz only.
-_FCC_15_109_B_AT_3M: list[tuple[float, float]] = [
-    (30e6, 100.0),  # converted from 100 µV/m to dBµV/m: 20·log10(100) = 40 dBµV/m
-    (88e6, 100.0),
-    (216e6, 150.0),
-    (960e6, 200.0),
-]
-
-
-# Real values per §15.109(a):
+# FCC Part 15.109(a) Class B radiated limits, dBµV/m at 3m. Step
+# discontinuities are encoded with paired (f, f+1Hz) entries so the
+# log-linear interpolator never silently averages across them. Per
+# §15.109(a):
 #   30-88 MHz   : 100 µV/m at 3m → 40.0 dBµV/m
 #   88-216 MHz  : 150 µV/m at 3m → 43.5 dBµV/m
 #   216-960 MHz : 200 µV/m at 3m → 46.0 dBµV/m

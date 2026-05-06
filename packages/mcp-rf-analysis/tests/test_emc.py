@@ -43,6 +43,30 @@ def test_cispr22_class_b_at_30mhz() -> None:
     assert limit == pytest.approx(60.0, abs=0.5)
 
 
+def test_cispr22_class_b_step_at_5mhz() -> None:
+    """The CISPR 32:2015 Table A.1 limit is a *step* at 5 MHz: 56 dBµV
+    just below, 60 dBµV just above. A buggy log-linear interpolator
+    would silently average the two and report ~57 dBµV at 5.5 MHz.
+
+    This test pins the regression fixed in v0.3.0 — the step must
+    appear in the table data, not be smeared across the 5-30 MHz
+    range.
+    """
+    # At exactly 5 MHz the table corner is 56 dBµV (the lower bound)
+    limit_at_5 = cispr_limit_at(5e6)
+    assert limit_at_5 == pytest.approx(56.0, abs=0.5)
+    # Just above 5 MHz the limit jumps to 60 dBµV
+    limit_just_above = cispr_limit_at(5.1e6)
+    assert limit_just_above == pytest.approx(60.0, abs=0.5), (
+        f"At 5.1 MHz the CISPR Class B QP limit must be 60 dBµV "
+        f"(post-step value); got {limit_just_above:.2f} dBµV — the "
+        f"interpolator is silently smearing the 5 MHz step."
+    )
+    # Mid-band stays at 60 dBµV (no further interp drift)
+    limit_mid = cispr_limit_at(15e6)
+    assert limit_mid == pytest.approx(60.0, abs=0.5)
+
+
 def test_cispr22_class_a_is_10db_above_class_b() -> None:
     """Class A (industrial) is 10 dB more permissive."""
     a = cispr_limit_at(1e6, standard="cispr22_a")
