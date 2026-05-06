@@ -54,12 +54,22 @@ def srf_audit(
     per_component: dict[str, dict[str, Any]] = {}
     warnings: list[str] = []
 
+    unaudited: list[str] = []
     for refdes, value in components.items():
         kind = "L" if refdes.startswith("L") else "C"
         vendor = inductor_vendor if kind == "L" else capacitor_vendor
         try:
             part = lookup_part(vendor, value, kind=kind)  # type: ignore[arg-type]
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as exc:
+            # Surface as a warning rather than silently dropping the
+            # component from the audit — otherwise an out-of-catalog part
+            # masquerades as "no concerns".
+            unaudited.append(refdes)
+            warnings.append(
+                f"{refdes} = {value:.3e} not found in {vendor} catalog "
+                f"({exc.__class__.__name__}: {exc}); SRF unknown — "
+                f"audit incomplete for this component."
+            )
             continue
         srf = part.srf_hz
         ratio = f_max_target / srf
@@ -81,8 +91,10 @@ def srf_audit(
             )
 
     n_flagged = sum(1 for c in per_component.values() if c["flagged"])
-    if n_flagged == 0:
+    if n_flagged == 0 and not unaudited:
         severity = "ok"
+    elif n_flagged == 0 and unaudited:
+        severity = "caution"  # something we couldn't audit — caller should know
     elif n_flagged <= 2:
         severity = "caution"
     else:
@@ -91,6 +103,8 @@ def srf_audit(
     return {
         "n_components": len(per_component),
         "n_flagged": n_flagged,
+        "n_unaudited": len(unaudited),
+        "unaudited": unaudited,
         "severity": severity,
         "warnings": warnings,
         "per_component": per_component,

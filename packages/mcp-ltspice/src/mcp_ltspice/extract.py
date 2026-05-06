@@ -420,19 +420,33 @@ def extract_sparams_from_raw(
     *,
     port_map: dict[int, str],
     z0: float = 50.0,
+    assume_reciprocal_symmetric: bool = True,
 ) -> rf.Network:
     """Extract 2-port S-parameters from an LTspice/ngspice ``.raw`` file.
 
-    ``port_map`` maps port index (1, 2, ...) to the SPICE node name driven
-    by the corresponding source. Convention: each port is driven by an AC
-    voltage source with series Z0; we reconstruct S-parameters from the
-    voltage at each port node and the current into the network.
+    ``port_map`` maps port index (1, 2, ...) to the SPICE node name at
+    that port. Convention written by :mod:`mcp_ltspice.asc_io`:
 
-    The convention assumed for the schematic:
-    - Port k is driven by an AC source ``Vk`` with ``AC 1`` and series
-      resistor ``Rsk = z0`` between ``Vk`` and the port node.
-    - The waveform names in the .raw are ``V(<node>)`` for node voltages
-      and ``I(Rsk)`` for currents through the source resistor.
+    - Port 1 is driven by ``V1 AC 1 0`` through series resistor ``Rs1 = z0``,
+      landing on node ``port_map[1]``.
+    - Port 2 is the network output node ``port_map[2]``, terminated in
+      ``RL1 = z0`` to ground (no separate source).
+
+    From a single AC sweep we recover column 1 of the scattering matrix
+    exactly:
+
+    - ``a₁ = (V₁_src) / (2 √Z₀) = 1 / (2√Z₀)`` (since ``V₁_src = AC 1``)
+    - ``b₁ = (V_p1 − Z₀·I_Rs1) / (2 √Z₀)``  →  ``S11 = b₁ / a₁``
+    - ``b₂ = V_p2 / √Z₀``  (port 2 terminated in Z₀, so ``a₂ = 0``)
+      →  ``S21 = b₂ / a₁``
+
+    To populate column 2 we'd need a second AC sweep with the source
+    moved to port 2 (the runner does not orchestrate this today). When
+    ``assume_reciprocal_symmetric=True`` (the default) we fill column 2
+    by reciprocity (``S12 = S21``) and symmetry (``S22 = S11``). This is
+    exact for the lumped passive ladder filters this package synthesises;
+    for asymmetric or active networks, set ``assume_reciprocal_symmetric=False``
+    and run two sweeps.
     """
     from spicelib import RawRead
 
@@ -443,26 +457,52 @@ def extract_sparams_from_raw(
     freq_hz = np.asarray(freq_trace.get_wave(), dtype=np.complex128).real
 
     nports = len(port_map)
-    s = np.zeros((freq_hz.size, nports, nports), dtype=np.complex128)
+    if nports != 2:
+        raise NotImplementedError(
+            f"extract_sparams_from_raw currently supports 2-port networks; got nports={nports}"
+        )
 
-    for k, node_k in port_map.items():
-        v_trace = raw.get_trace(f"V({node_k})")
-        i_trace = raw.get_trace(f"I(Rs{k})")
-        if v_trace is None or i_trace is None:
-            raise ValueError(f"Missing trace for port {k}: need V({node_k}) and I(Rs{k})")
-        v_k = np.asarray(v_trace.get_wave(), dtype=np.complex128)
-        i_k = np.asarray(i_trace.get_wave(), dtype=np.complex128)
+    p1_node = port_map[1]
+    p2_node = port_map[2]
 
-        # Incident wave at port k: a_k = (V_k + Z0*I_k) / (2 sqrt(Z0))
-        # Reflected wave:          b_k = (V_k - Z0*I_k) / (2 sqrt(Z0))
-        a_k = (v_k + z0 * i_k) / (2.0 * np.sqrt(z0))
-        b_k = (v_k - z0 * i_k) / (2.0 * np.sqrt(z0))
-        s[:, k - 1, k - 1] = b_k / a_k  # NB: only valid when other ports are matched
+    v1_trace = raw.get_trace(f"V({p1_node})")
+    v2_trace = raw.get_trace(f"V({p2_node})")
+    i1_trace = raw.get_trace("I(Rs1)")
+    if v1_trace is None or v2_trace is None or i1_trace is None:
+        missing = [
+            name
+            for name, t in [
+                (f"V({p1_node})", v1_trace),
+                (f"V({p2_node})", v2_trace),
+                ("I(Rs1)", i1_trace),
+            ]
+            if t is None
+        ]
+        raise ValueError(f"Missing required traces in .raw file: {missing}")
 
-    # For full S-matrix we need a separate run per excitation. The AC
-    # method here yields the diagonal under the assumption that all
-    # other source AC magnitudes are zero. The runner orchestrates one
-    # AC sim per port and stitches them.
+    v_p1 = np.asarray(v1_trace.get_wave(), dtype=np.complex128)
+    v_p2 = np.asarray(v2_trace.get_wave(), dtype=np.complex128)
+    i_rs1 = np.asarray(i1_trace.get_wave(), dtype=np.complex128)
+
+    # Sign convention: spicelib reports I(Rs1) as current flowing from V1
+    # through Rs1 into the network — this is the current INTO port 1.
+    sqrt_z0 = np.sqrt(z0)
+    a1 = 1.0 / (2.0 * sqrt_z0)  # V1_src = AC 1, scalar (broadcast)
+    b1 = (v_p1 - z0 * i_rs1) / (2.0 * sqrt_z0)
+    b2 = v_p2 / sqrt_z0  # a2 = 0 (port 2 terminated in z0)
+
+    s11 = b1 / a1
+    s21 = b2 / a1
+
+    s = np.zeros((freq_hz.size, 2, 2), dtype=np.complex128)
+    s[:, 0, 0] = s11
+    s[:, 1, 0] = s21
+
+    if assume_reciprocal_symmetric:
+        s[:, 0, 1] = s21  # reciprocity
+        s[:, 1, 1] = s11  # symmetry
+    # else: leave column 2 zero; caller is expected to merge with a port-2 sweep
+
     return rf.Network(
         frequency=rf.Frequency.from_f(freq_hz, unit="Hz"),
         s=s,

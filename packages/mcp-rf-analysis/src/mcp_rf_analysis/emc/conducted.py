@@ -48,20 +48,27 @@ def lisn_impedance(freq_hz: float, lisn: LISNModel | None = None) -> complex:
 
 
 # CISPR 22 / 32 Class B limits (residential), conducted, dBµV (quasi-peak)
-# Frequency in Hz, limit in dBµV
+# Per CISPR 32:2015 Table A.1:
+#   0.15-0.50 MHz : 66 → 56 dBµV log-linear (decreasing)
+#   0.50-5.00 MHz : 56 dBµV (constant)
+#   5.00-30.0 MHz : 60 dBµV (constant — step up at 5 MHz)
+# The (5e6, 56) → (5.001e6, 60) pair encodes the step discontinuity
+# so log-linear interpolation does not silently average across it.
 _CISPR22_CLASS_B_QP = [
-    (150e3, 66.0),  # 66 → 56 dBµV log-linear from 150k to 500k
+    (150e3, 66.0),
     (500e3, 56.0),
     (5e6, 56.0),
+    (5.001e6, 60.0),
     (30e6, 60.0),
 ]
 
 
-# FCC Part 15B Class B (US), dBµV
+# FCC Part 15B Class B (US), dBµV — same shape as CISPR Class B
 _FCC_15B_CLASS_B = [
     (150e3, 66.0),
     (500e3, 56.0),
     (5e6, 56.0),
+    (5.001e6, 60.0),
     (30e6, 60.0),
 ]
 

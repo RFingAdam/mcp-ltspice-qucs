@@ -1,6 +1,6 @@
 [project]
 name = "mcp-qucs-s"
-version = "0.1.0"
+version = "0.3.0"
 description = "MCP server exposing Qucs-S (with Ngspice/Xyce backends) for native S-parameter sims, harmonic balance, microstrip / distributed-element synthesis, and lumped-to-distributed conversion"
 readme = "README.md"
 requires-python = ">=3.11"

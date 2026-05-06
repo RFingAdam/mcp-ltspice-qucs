@@ -9,7 +9,91 @@ grouped by package.
 
 ## [Unreleased]
 
-(no changes yet — next stream picks up from the v0.2.0 roadmap)
+(no changes yet — next stream picks up from the v0.3.0 roadmap)
+
+## [0.3.0] — 2026-05-06
+
+### Correctness — silent failures resolved (all packages)
+
+A five-agent code review identified six silent-failure paths the v0.2.0
+correctness-honesty pass missed. All are fixed; the user-visible impact:
+
+- **`mcp-ltspice.extract_sparams_from_raw`** previously filled only the
+  diagonal of the S-matrix, leaving `S21` and `S12` as zero. Every
+  Touchstone file produced via the LTspice → ngspice → `extract_sparameters`
+  flow claimed −∞ dB through the network, which silently failed any
+  `evaluate_filter_spec` check. The fix recovers the full S column from a
+  single AC sweep (`S11` from `(V₁ − Z₀·I_Rs1)/(2√Z₀·a₁)`, `S21` from
+  `V₂/(√Z₀·a₁)`) and fills column 2 by reciprocity + symmetry for the
+  passive ladder filters this package synthesises. New flag
+  `assume_reciprocal_symmetric` (default `True`) for the rare case where
+  a user wants to merge two separate sweeps.
+- **`mcp-rf-analysis.cispr_limit_at`** log-interpolated across the 5 MHz
+  step in the CISPR 22/32 Class B QP table (56 dBµV → 60 dBµV), reporting
+  ~58 dBµV at 12 MHz instead of the actual 60 dBµV. The same flaw was
+  present in the FCC 15B mirror table. Both tables now encode the step
+  with a paired `(5e6, 56.0), (5.001e6, 60.0)` entry, mirroring the
+  pattern already used in `radiated.py`. Dead `_FCC_15_109_B_AT_3M` table
+  removed.
+- **`mcp-ltspice.runner`** never asserted `proc.returncode` on either the
+  LTspice or ngspice path, so a non-zero exit (convergence failure,
+  missing model lib) that left a stale `.raw` from a previous run was
+  reported as success. The `RunResult.log_path` field was constructed
+  but the file was never written for the LTspice path. Both fixed:
+  returncode is now checked explicitly with stdout/stderr tail in the
+  exception, and the log file is persisted on every run.
+- **`mcp-ltspice.srf_check`** silently `continue`d past components whose
+  vendor lookup raised `ValueError`/`KeyError`, then returned
+  `severity='ok'` even though half the BoM was unaudited. Components
+  that can't be audited are now surfaced via a new `unaudited` field
+  and a warning per refdes; `severity` rises to at least `caution`.
+- **`mcp-ltspice.synthesis.lc_filter`** unpacked `scipy.optimize.least_squares`
+  results without checking `res.success`, so an unconverged elliptic fit
+  silently returned wrong L/C values. Now raises `RuntimeError` with the
+  optimiser status when convergence fails.
+
+### Test pinning (31 new regression tests)
+
+- New `tests/test_hardening_v030.py` (`mcp-ltspice`): contract tests for
+  every fix above, including a `monkeypatch`-based round-trip of
+  `extract_sparams_from_raw` that doesn't need a simulator install.
+- New `tests/test_microstrip_loss_pin.py` (`mcp-qucs-s`): scaling-law
+  tests for dielectric and conductor loss (linear in `tan_d`, linear in
+  `f` for α_d, √f for α_c, 1/√σ for α_c) plus order-of-magnitude
+  guardrails across FR-4 / Rogers / Duroid at 1–28 GHz. Catches missing-
+  factor and wrong-conversion bugs without depending on textbook example
+  values that vary across editions.
+- HPF / BPF / BSF response now verified at orders 3, 5, 7, 9 (was only 3
+  and 5 before). BPF additionally checked at narrow (Δ ≈ 0.01) and wide
+  (Δ ≈ 0.67) fractional bandwidth — the regimes where classical LPF→BPF
+  formulas break down.
+- Vendor parasitic substitution: `lookup_part("coilcraft_0402hp", 4.7e-9)`
+  now pinned to return an SRF in the documented 4–8 GHz neighbourhood,
+  not just "non-zero".
+- CISPR 22/32 Class B step at 5 MHz pinned with explicit `at 5.0 MHz` /
+  `at 5.1 MHz` / `at 15 MHz` regression tests.
+
+### Security
+
+- `SECURITY.md` now spells out the untrusted-`.asc` attack surface
+  explicitly. `runner.py` invokes external simulators on the supplied
+  path with no sandboxing; a malicious `.asc` can include `.SUBCKT`,
+  `.lib`, or `.include` directives the simulator will load. Document
+  guidance: run inside a container/chroot if accepting external
+  schematics.
+
+### Cleanup
+
+- Empty `packages/mcp-ltspice/src/mcp_ltspice/resources/` scaffolding
+  tree (specs/ templates/ models/{coilcraft,johanson,murata,tdk}/, all
+  empty) removed.
+- `tasks/` (private workflow scratch) untracked and gitignored.
+- All four packages bumped from 0.1.0 (stale since the suite tagged
+  v0.2.0 without bumping pyprojects) to 0.3.0 to align with the suite tag.
+
+### Test count
+
+458 passed, 4 simulator-gated skips, 0 failures (was 427 / 4 / 0 in 0.2.0).
 
 ## [0.2.0] — 2026-04-28
 
