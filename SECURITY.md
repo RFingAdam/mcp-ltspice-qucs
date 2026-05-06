@@ -24,10 +24,21 @@ mitigation within 30 days for high-severity issues.
 This is a developer-facing MCP toolkit, not a network-facing service.
 Realistic threat models include:
 
-- **Untrusted Touchstone / `.asc` input**: a malicious file could attempt
-  to exploit the SPICE simulator (via crafted netlist) or `spicelib`.
-  We rely on the upstream simulator's input handling; if you parse files
-  from untrusted sources, run the parser/runner in a sandbox.
+- **Untrusted `.asc` schematics**: `mcp_ltspice.runner` invokes LTspice
+  (or ngspice as fallback) on a user-supplied `.asc` path with no
+  sandboxing beyond `Path.expanduser().resolve()`. A malicious `.asc`
+  can reference external `.SUBCKT` definitions, `.lib` files, or
+  `.include` directives that the simulator will load and execute (in
+  the SPICE sense — some simulators support arbitrary expression
+  evaluation). **If the `.asc` came from an untrusted agent, user
+  upload, or downloaded artifact, run the runner inside a container or
+  chroot with no filesystem access outside a per-job working directory.**
+  The bundled examples and synthesised schematics are safe; treat
+  external `.asc` files the same way you'd treat a downloaded shell
+  script.
+- **Untrusted Touchstone files**: parsed via `skrf`. We rely on
+  `skrf`'s upstream input handling; vulnerabilities there are out of
+  scope but should be reported to scikit-rf maintainers.
 - **Untrusted MCP tool arguments**: the servers validate inputs via
   Pydantic models, but path arguments are not sandboxed by default. If
   you expose these MCP servers to an untrusted LLM agent or user, run

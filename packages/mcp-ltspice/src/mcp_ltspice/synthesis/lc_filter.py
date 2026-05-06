@@ -226,6 +226,22 @@ def _fit_lc_to_prototype(
         xtol=1e-10,
     )
 
+    # Validate convergence. scipy's `least_squares` sets `success=False`
+    # when it hits max iterations / NaN residuals / parameters at bounds
+    # without progress. Without this check, a bad fit silently returns
+    # whatever the optimiser stopped at — which may bear no resemblance
+    # to the requested filter response. Cost magnitude is intentionally
+    # not thresholded here: low-order elliptics with aggressive stopband
+    # targets converge to genuine "best-effort" solutions with high cost
+    # (the trap topology can't realise the response), and downstream
+    # `evaluate_filter_spec` is the right place to flag that.
+    if not res.success:
+        raise RuntimeError(
+            f"Elliptic ladder fit did not converge: status={res.status}, "
+            f"message={res.message!r}, cost={res.cost:.3e}. "
+            f"Try a lower order or relax the stopband target."
+        )
+
     # Reconstruct the historical [R_S, L1, L_trap, C_trap, L3, ...] flat
     # vector layout that downstream code (lc_ladder) expects, with C_trap
     # derived from L_trap and the trap's ω_zk.
