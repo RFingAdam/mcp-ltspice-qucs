@@ -117,4 +117,4 @@ with `uv build` until that lands.
 ## Code of conduct
 
 We follow the [Contributor Covenant](https://www.contributor-covenant.org/).
-See [`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md).
+See [`CODE_OF_CONDUCT.md`](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/.github/CODE_OF_CONDUCT.md).
