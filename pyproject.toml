@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "RF engineering MCP suite: LTspice, Qucs-S, and analysis servers (workspace root)"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }]
 
 [tool.uv.workspace]

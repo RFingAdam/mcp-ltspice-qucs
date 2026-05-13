@@ -1,10 +1,10 @@
 [project]
 name = "mcp-qucs-s"
-version = "0.3.0"
+version = "0.4.0"
 description = "MCP server exposing Qucs-S (with Ngspice/Xyce backends) for native S-parameter sims, harmonic balance, microstrip / distributed-element synthesis, and lumped-to-distributed conversion"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }]
 keywords = ["mcp", "qucs", "qucs-s", "harmonic-balance", "microstrip", "rf-engineering"]
 
