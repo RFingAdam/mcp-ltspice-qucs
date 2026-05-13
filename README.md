@@ -5,7 +5,7 @@
 <br/>
 
 [![CI](https://github.com/RFingAdam/mcp-ltspice-qucs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RFingAdam/mcp-ltspice-qucs/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache--2.0-1E40AF.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-1E40AF.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![MCP](https://img.shields.io/badge/MCP-server-A78BFA.svg)](https://modelcontextprotocol.io)
@@ -54,7 +54,7 @@ spec evaluation. Validated against the bundled example designs
   TDK SPICE models with E24/E96/E192 snap.
 - ✅ **CISPR-aware.** Conducted-emission prediction against CISPR 22 /
   CISPR 32 Class A / B before you build.
-- 🔒 **Apache-2.0.**
+- 🔒 **AGPL-3.0-or-later.**
 
 ---
 
@@ -213,8 +213,12 @@ Full contributor guide in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License & changelog
 
-[Apache-2.0](LICENSE); per-release changes in [`CHANGELOG.md`](CHANGELOG.md)
-([Keep a Changelog](https://keepachangelog.com/) format).
+[AGPL-3.0-or-later](LICENSE); per-release changes in [`CHANGELOG.md`](CHANGELOG.md)
+([Keep a Changelog](https://keepachangelog.com/) format). Relicensed
+from Apache-2.0 in v0.4.0 to align with the eng-mcp-suite toolkit-wide
+AGPL move. Underlying Qucs-S (GPL), LTspice (proprietary), and
+scikit-rf (BSD) are runtime-invoked dependencies, not redistributed
+by these wrappers.
 
 ## Acknowledgments
 

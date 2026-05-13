@@ -9,6 +9,20 @@ grouped by package.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-13
+
+### Changed
+- **License: Apache-2.0 → AGPL-3.0-or-later** (all four workspace
+  packages: mcp-ltspice, mcp-qucs-s, mcp-rf-analysis, rf-mcp-common).
+  Aligns with the eng-mcp-suite toolkit-wide AGPL move (the AGPL
+  closes the "wrap as a paid SaaS without contributing back" gap by
+  extending copyleft to network use). Underlying tools — Qucs-S (GPL),
+  LTspice (proprietary), scikit-rf (BSD) — are runtime-invoked, not
+  redistributed by these wrappers, so the wrapper's AGPL license is
+  independent of theirs. See the
+  [LICENSE_SUMMARY](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md)
+  for the toolkit-wide rationale.
+
 (no changes yet — next stream picks up from the v0.3.0 roadmap)
 
 ## [0.3.0] — 2026-05-06

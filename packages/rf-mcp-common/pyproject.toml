@@ -1,10 +1,10 @@
 [project]
 name = "rf-mcp-common"
-version = "0.3.0"
+version = "0.4.0"
 description = "Shared contracts for the RF MCP suite: response envelope, Touchstone helpers, E-series snap, structured logging"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }]
 keywords = ["mcp", "rf-engineering", "touchstone", "scikit-rf"]
 
