@@ -1,10 +1,10 @@
 [project]
 name = "mcp-rf-analysis"
-version = "0.3.0"
+version = "0.4.0"
 description = "Simulator-agnostic MCP server for RF S-parameter analysis, regulatory band databases (LTE / 5G NR / GNSS / ISM / HaLow), and multi-radio coexistence engineering"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }]
 keywords = ["mcp", "rf-engineering", "scikit-rf", "lte", "5g", "coexistence", "regulatory"]
 
