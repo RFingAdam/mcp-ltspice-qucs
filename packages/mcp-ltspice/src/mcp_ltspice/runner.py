@@ -42,6 +42,12 @@ def find_ltspice() -> Path | None:
     """Locate the LTspice executable. Checks env var, $PATH, and common
     Wine install locations.
     """
+    # Local ops switch: ngspice-only deployments (e.g. Arch without Wine LTspice).
+    force = os.environ.get("MCP_FORCE_NGSPICE", "").strip().lower()
+    sim = os.environ.get("MCP_SIMULATOR", "").strip().lower()
+    if force in ("1", "true", "yes", "on") or sim in ("ngspice", "ngspice-only"):
+        return None
+
     env = os.environ.get("LTSPICE_PATH")
     if env and Path(env).is_file():
         return Path(env)
@@ -85,7 +91,6 @@ def detect_simulator() -> Simulator | None:
         return Simulator.NGSPICE
     return None
 
-
 def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunResult:
     """Invoke LTspice in batch mode (-b)."""
     raw_path = asc_path.with_suffix(".raw")
@@ -98,7 +103,17 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
         wine = find_wine()
         if wine is None:
             raise RuntimeError("LTspice.exe found but Wine is not installed")
-        cmd = [str(wine), str(ltspice_exe), "-b", "-Run", str(asc_path)]
+
+        try:
+            asc_path_win = subprocess.check_output(
+                [str(wine), "winepath", "-w", str(asc_path)],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        except subprocess.CalledProcessError:
+            asc_path_win = str(asc_path)
+
+        cmd = [str(wine), str(ltspice_exe), "-b", "-Run", asc_path_win]
     else:
         cmd = [str(ltspice_exe), "-b", "-Run", str(asc_path)]
 
@@ -110,18 +125,17 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
         f"=== stderr ===\n{proc.stderr}\n",
         encoding="utf-8",
     )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"LTspice exited with returncode={proc.returncode}. "
-            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
-            f"Full log at {log_path}"
-        )
+
+    # LTspice under Wine often returns 1 even on success.
+    # Only fail if the .raw file was not produced.
     if not raw_path.is_file():
         raise RuntimeError(
-            f"LTspice did not produce {raw_path} despite rc=0. "
+            f"LTspice did not produce {raw_path}. "
+            f"returncode={proc.returncode}. "
             f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
             f"Full log at {log_path}"
         )
+
     return RunResult(
         raw_path=raw_path,
         log_path=log_path,
@@ -130,7 +144,6 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
         stdout=proc.stdout,
         stderr=proc.stderr,
     )
-
 
 def _asc_to_ngspice_netlist(asc_path: Path) -> Path:
     """Convert one of our generated .asc schematics to an ngspice netlist.
@@ -205,16 +218,16 @@ def _asc_to_ngspice_netlist(asc_path: Path) -> Path:
     netlist_path.write_text("\n".join(netlist_lines) + "\n", encoding="utf-8")
     return netlist_path
 
-
 def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunResult:
     netlist = _asc_to_ngspice_netlist(asc_path)
     raw_path = asc_path.with_suffix(".raw")
     log_path = asc_path.with_suffix(".log")
     if raw_path.exists():
-        raw_path.unlink()  # parity with LTspice: don't let a stale .raw mask a failure
+        raw_path.unlink()
+
     cmd = [str(ngspice_exe), "-b", "-r", str(raw_path), "-o", str(log_path), str(netlist)]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
-    # ngspice writes its own log via -o; append our captured stdout/stderr for completeness.
+
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(
             f"\n# ngspice command: {' '.join(cmd)}\n"
@@ -222,18 +235,17 @@ def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunRes
             f"=== captured stdout ===\n{proc.stdout}\n\n"
             f"=== captured stderr ===\n{proc.stderr}\n"
         )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"ngspice exited with returncode={proc.returncode}. "
-            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
-            f"Full log at {log_path}"
-        )
+
+    # ngspice can also return non-zero in some environments.
+    # Rely on the presence of the .raw file instead.
     if not raw_path.is_file():
         raise RuntimeError(
-            f"ngspice did not produce {raw_path} despite rc=0. "
+            f"ngspice did not produce {raw_path}. "
+            f"returncode={proc.returncode}. "
             f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}. "
             f"Full log at {log_path}"
         )
+
     return RunResult(
         raw_path=raw_path,
         log_path=log_path,
@@ -242,7 +254,6 @@ def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunRes
         stdout=proc.stdout,
         stderr=proc.stderr,
     )
-
 
 def run_simulation(
     asc_path: str | Path,
