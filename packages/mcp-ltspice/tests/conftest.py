@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 
 import pytest
@@ -12,7 +13,20 @@ def _have(cmd: str) -> bool:
 
 
 HAS_NGSPICE = _have("ngspice")
-HAS_LTSPICE = _have("LTspice") or _have("ltspice") or _have("XVIIx64.exe")
+
+HAS_WINE = _have("wine") or _have("wine64")
+
+ltspice_path = os.getenv("LTSPICE_PATH")
+HAS_LTSPICE = (
+    _have("LTspice")
+    or _have("ltspice")
+    or _have("XVIIx64.exe")
+    or (
+        bool(ltspice_path)
+        and os.path.isfile(ltspice_path)
+        and HAS_WINE
+    )
+)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
