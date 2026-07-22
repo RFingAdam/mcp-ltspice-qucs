@@ -20,7 +20,7 @@ def compute_path_loss(
     model: str = "friis",
     n: float = 2.0,
     extra_loss_db: float = 0.0,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Compute free-space (Friis) or log-distance path loss.
 
     - ``friis``: PL_dB = 20 log10(4π d f / c)
@@ -50,7 +50,7 @@ def compute_antenna_isolation_estimate(
     freq_hz: float,
     *,
     ground_plane_size_m: float | None = None,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Estimate antenna-to-antenna isolation in free space + ground plane.
 
     Uses far-field Friis as a baseline. If ``ground_plane_size_m`` is

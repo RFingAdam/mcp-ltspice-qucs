@@ -16,13 +16,18 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import skrf as rf
 from numpy.typing import NDArray
 
 from rf_mcp_common.touchstone import network_to_touchstone
+
+# Impedance / admittance vectors arrive from numpy arithmetic as
+# `complexfloating[Any, Any]`, not the narrower `complex128`. Accept the
+# wide form on input; the ABCD builders always emit complex128.
+ComplexArray = NDArray[np.complexfloating[Any, Any]]
 
 ElementType = Literal[
     "series_l",
@@ -36,7 +41,7 @@ ElementType = Literal[
 ]
 
 
-def _abcd_series_z(z: NDArray[np.complex128]) -> NDArray[np.complex128]:
+def _abcd_series_z(z: ComplexArray) -> NDArray[np.complex128]:
     """ABCD matrix for a series impedance Z. Returns shape (N, 2, 2)."""
     out = np.zeros((z.size, 2, 2), dtype=np.complex128)
     out[:, 0, 0] = 1.0
@@ -46,7 +51,7 @@ def _abcd_series_z(z: NDArray[np.complex128]) -> NDArray[np.complex128]:
     return out
 
 
-def _abcd_shunt_y(y: NDArray[np.complex128]) -> NDArray[np.complex128]:
+def _abcd_shunt_y(y: ComplexArray) -> NDArray[np.complex128]:
     """ABCD matrix for a shunt admittance Y. Returns shape (N, 2, 2)."""
     out = np.zeros((y.size, 2, 2), dtype=np.complex128)
     out[:, 0, 0] = 1.0
@@ -105,7 +110,7 @@ def ladder_sparams_from_components(
             # At resonance Z → 0 and Y → ∞; clamp |Z| to a small floor so
             # the limit (perfect short to ground) evaluates as finite-precision
             # huge admittance instead of NaN.
-            z_trap = s_axis * l_t + 1.0 / (s_axis * c_t)
+            z_trap: ComplexArray = s_axis * l_t + 1.0 / (s_axis * c_t)
             z_floor = 1e-30
             with np.errstate(divide="ignore", invalid="ignore"):
                 z_trap = np.where(np.abs(z_trap) < z_floor, z_floor + 0j, z_trap)
@@ -132,10 +137,17 @@ def ladder_sparams_from_components(
             # and ~1/(sC) at high frequency.
             l_t = params["L"]
             c_t = params["C"]
-            z_par = s_axis * l_t / (s_axis**2 * l_t * c_t + 1.0)
-            # Clamp at resonance to avoid Inf
-            z_ceiling = 1e30
-            z_par = np.where(np.abs(z_par) > z_ceiling, z_ceiling + 0j, z_par)
+            # Floor the denominator *before* dividing, mirroring the
+            # shunt_lc_trap branch above. Clamping the quotient afterwards
+            # (|z| > ceiling) cannot catch the anti-resonant bin: there
+            # s²LC+1 → 0 with numerator → 0 too, so the quotient is NaN,
+            # and `abs(NaN) > ceiling` is False — the clamp silently misses
+            # and the NaN propagates into the S-matrix.
+            den = s_axis**2 * l_t * c_t + 1.0
+            den_floor = 1e-30
+            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+                den = np.where(np.abs(den) < den_floor, den_floor + 0j, den)
+                z_par = s_axis * l_t / den
             mat = _abcd_series_z(z_par)
         else:
             raise ValueError(f"Unknown element type: {kind}")
@@ -146,11 +158,17 @@ def ladder_sparams_from_components(
     c = abcd[:, 1, 0]
     d = abcd[:, 1, 1]
 
-    with np.errstate(divide="ignore", invalid="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         denom = a + b / z0 + c * z0 + d
         s11 = (a + b / z0 - c * z0 - d) / denom
         s21 = 2.0 / denom
-        s12 = 2.0 * (a * d - b * c) / denom
+        # S12 = 2·det(ABCD)/denom, and det ≡ 1 here: every element is built
+        # by _abcd_series_z or _abcd_shunt_y, both of which have det 1, and
+        # det is multiplicative over the cascade. Evaluating `a*d - b*c`
+        # numerically instead overflows once the ladder gets long (a 9th-order
+        # BSF does it), yielding inf → the isfinite guard below rewrote S12 to
+        # 0 while S21 stayed finite — a silent reciprocity violation.
+        s12 = s21
         s22 = (-a + b / z0 - c * z0 + d) / denom
 
     s = np.zeros((freq_hz.size, 2, 2), dtype=np.complex128)
@@ -367,7 +385,7 @@ def components_dict_to_elements(
         return elements
 
     # Elliptic case: pair up traps
-    seen: set[str] = set()
+    seen = set()
     for name in sorted_names:
         if name in seen:
             continue

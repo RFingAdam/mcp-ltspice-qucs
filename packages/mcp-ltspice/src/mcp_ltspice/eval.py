@@ -147,7 +147,9 @@ def evaluate_filter_spec(
             )
         )
 
-    overall = "pass" if all(c.status == "pass" for c in criteria) else "fail"
+    overall: Literal["pass", "fail"] = (
+        "pass" if all(c.status == "pass" for c in criteria) else "fail"
+    )
     return SpecEvalResult(
         overall=overall,
         criteria=criteria,

@@ -36,7 +36,15 @@ def list_lte_bands(region: str | None = None) -> list[dict[str, Any]]:
     if region is None:
         return data
     needle = region.lower()
-    return [b for b in data if needle in b.get("region", "").lower()]
+    matches = [b for b in data if needle in b.get("region", "").lower()]
+    if not matches:
+        # Don't hand back an empty list: "no LTE bands in EMEA" and
+        # "you misspelled EMEA" are indistinguishable to the caller, and
+        # only one of them is true. list_5gnr_bands / list_halow_channels
+        # already raise on an unknown filter; match them.
+        available = sorted({b.get("region", "") for b in data if b.get("region")})
+        raise ValueError(f"No LTE bands match region {region!r}; available: {available}")
+    return matches
 
 
 def list_5gnr_bands(family: str = "fr1") -> list[dict[str, Any]]:
@@ -55,7 +63,11 @@ def list_gnss_bands(system: str | None = None) -> list[dict[str, Any]]:
     if system is None:
         return data
     needle = system.lower()
-    return [b for b in data if b.get("system", "").lower() == needle]
+    matches = [b for b in data if b.get("system", "").lower() == needle]
+    if not matches:
+        available = sorted({b.get("system", "") for b in data if b.get("system")})
+        raise ValueError(f"Unknown GNSS system {system!r}; available: {available}")
+    return matches
 
 
 def list_ism_bands(region: int | None = None) -> list[dict[str, Any]]:
@@ -63,7 +75,11 @@ def list_ism_bands(region: int | None = None) -> list[dict[str, Any]]:
     data = _load_band_json("ism")["bands"]
     if region is None:
         return data
-    return [b for b in data if region in b.get("regions", [])]
+    matches = [b for b in data if region in b.get("regions", [])]
+    if not matches:
+        available = sorted({r for b in data for r in b.get("regions", [])})
+        raise ValueError(f"Unknown ITU region {region!r}; available: {available}")
+    return matches
 
 
 def list_halow_channels(region: str = "US") -> dict[str, Any]:

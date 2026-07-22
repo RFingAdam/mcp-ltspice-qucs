@@ -68,6 +68,11 @@ class ParasiticCapacitor:
     srf_hz: float
 
 
+# Either kind of catalogue part. Both carry ``srf_hz``, which is what the
+# substitution search compares against.
+ParasiticPart = ParasiticInductor | ParasiticCapacitor
+
+
 def _srf_from_lc(l_h: float, c_f: float) -> float:
     return 1.0 / (2.0 * math.pi * math.sqrt(l_h * c_f))
 
@@ -220,7 +225,7 @@ VendorName = Literal[
 ]
 
 
-_VENDOR_TABLES: dict[str, dict[float, object]] = {
+_VENDOR_TABLES: dict[str, dict[float, ParasiticPart]] = {
     "coilcraft_0402hp": COILCRAFT_0402HP,  # type: ignore[dict-item]
     "coilcraft_0603cs": COILCRAFT_0603CS,  # type: ignore[dict-item]
     "murata_gjm_c0g": MURATA_GJM_C0G,  # type: ignore[dict-item]
@@ -255,7 +260,7 @@ def lookup_part(
 
     keys = sorted(table.keys())
     nearest = min(keys, key=lambda k: abs(k - value))
-    return table[nearest]  # type: ignore[return-value]
+    return table[nearest]
 
 
 def lookup_part_with_srf_margin(
@@ -321,7 +326,7 @@ def lookup_part_with_srf_margin(
             )
             continue
         if candidate.srf_hz >= min_srf_hz:
-            return candidate, rejected  # type: ignore[return-value]
+            return candidate, rejected
         rejected.append(
             {
                 "candidate_value": cand_value,

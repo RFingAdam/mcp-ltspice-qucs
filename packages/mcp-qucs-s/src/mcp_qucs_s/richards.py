@@ -13,10 +13,24 @@ References:
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from mcp_qucs_s.microstrip import Substrate, synthesize_microstrip_line
+
+
+def _refdes_index(name: str) -> int:
+    """Numeric index from a refdes like ``L3`` / ``C12``.
+
+    Raises rather than returning a sentinel: a refdes we can't order is a
+    caller error, and silently sorting it to position 0 would netlist the
+    ladder in the wrong sequence.
+    """
+    m = re.search(r"\d+", name)
+    if m is None:
+        raise ValueError(f"Component name has no numeric index: {name!r}")
+    return int(m.group())
 
 
 @dataclass
@@ -58,9 +72,7 @@ def lumped_to_distributed(
     notes: list[str] = []
 
     # Walk components in numeric order
-    import re
-
-    sorted_names = sorted(components.keys(), key=lambda n: int(re.search(r"\d+", n).group()))
+    sorted_names = sorted(components.keys(), key=_refdes_index)
 
     for name in sorted_names:
         value = components[name]

@@ -36,8 +36,11 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check .
 
+      # No `|| true`. Until v0.4.1 this step was both failing and ignored:
+      # mypy aborted on a duplicate-conftest error before checking anything,
+      # and the suppression hid it. Both are fixed; keep it enforcing.
       - name: Mypy
-        run: uv run mypy packages/ || true
+        run: uv run mypy packages/
 
   test:
     name: Test (Python ${{ matrix.python-version }})
