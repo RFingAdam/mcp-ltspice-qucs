@@ -9,6 +9,45 @@ grouped by package.
 
 ## [Unreleased]
 
+### Fixed — Qucs-S could not be driven at all (mcp-qucs-s)
+
+Running qucsator-RF 1.0.7 for the first time showed the Qucs-S backend was
+unreachable end to end, for three independent reasons.
+
+- **Nothing could produce simulator input.** `run_sp_analysis`,
+  `export_touchstone` and `extract_noise_parameters` all take a path to a
+  file no code in the package could generate, so using them meant
+  hand-authoring a schematic in the Qucs GUI first. New
+  `mcp_qucs_s.netlist` generates qucsator netlists, and a new
+  `simulate_lc_ladder` MCP tool goes design → netlist → simulation →
+  Touchstone in one call.
+- **`find_qucs_s()` returned the GUI.** Discovery tried `qucs-s` *first*,
+  which is the Qt application, not the engine. Passing it
+  `-i netlist -o dat` opens a window and blocks forever on a headless box.
+  Discovery now looks for `qucsator_rf` / `qucsator` and never falls back
+  to the GUI; when only the GUI is present the error says so and points at
+  the missing `--recurse-submodules` submodule build.
+- **`parse_qucs_dat` could not read Qucs output.** It called `float()` on
+  every line, but Qucs writes complex values as `+1.23e-10+j6.18e-08`, so
+  every real `.dat` raised `ValueError`. It also expected each
+  S-parameter split into `.r`/`.i` sections, a format qucsator-RF does not
+  emit. Both layouts now parse.
+
+Elements are specified by explicit position (`series_l` vs `shunt_l`)
+rather than inferred from the refdes letter, so highpass and bandstop
+ladders netlist correctly — the failure mode behind #32 in the ngspice
+netlister, deliberately not repeated here.
+
+Verified against real qucsator output: lowpass **and** highpass ladders
+track the closed-form Butterworth response to within 0.001 dB, and a shunt
+LC trap notches at its resonance. Regression cover includes a real
+qucsator-RF `.dat` committed as a fixture, so the parser cannot drift from
+the format the simulator actually writes.
+
+`sch_path` is renamed to `netlist_path` throughout: qucsator consumes a
+netlist, not the GUI's `.sch`, and the old name sent users looking for the
+wrong file.
+
 ### Fixed — generated schematics were electrically disconnected (mcp-ltspice)
 
 Found by running the pipeline against real LTspice 26.0.2 (Wine) and
