@@ -288,3 +288,61 @@ def test_refdes_index_parses_and_rejects() -> None:
     assert _refdes_index("L12") == 12
     with pytest.raises(ValueError, match="no numeric index"):
         _refdes_index("Lout")
+
+
+# ---------------------------------------------------------------------------
+# First-run consent dialog under Wine.
+#
+# Recent LTspice releases open a modal "Anonymously Share LTspice Usage Data"
+# dialog on first launch in a Wine prefix. It blocks -b batch mode forever,
+# and the raw symptom is a bare subprocess.TimeoutExpired with an empty log —
+# giving the operator nothing to go on. These pin the detection and that the
+# timeout is translated into an actionable error.
+# ---------------------------------------------------------------------------
+
+
+def test_first_run_pending_when_no_ini_present(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("WINEPREFIX", str(tmp_path))
+    (tmp_path / "drive_c/users/someone/AppData/Roaming").mkdir(parents=True)
+    from mcp_ltspice.runner import ltspice_first_run_pending
+
+    assert ltspice_first_run_pending(Path("/wine/LTspice.exe")) is True
+
+
+def test_first_run_not_pending_once_ini_exists(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("WINEPREFIX", str(tmp_path))
+    roaming = tmp_path / "drive_c/users/someone/AppData/Roaming"
+    roaming.mkdir(parents=True)
+    (roaming / "LTspice.ini").write_text("[Options]\nCaptureAnalytics=false\n", encoding="utf-8")
+    from mcp_ltspice.runner import ltspice_first_run_pending
+
+    assert ltspice_first_run_pending(Path("/wine/LTspice.exe")) is False
+
+
+def test_native_windows_exe_is_never_first_run_gated(tmp_path, monkeypatch) -> None:
+    """The dialog is a Wine-only concern; a native .exe must not be flagged."""
+    monkeypatch.setattr("mcp_ltspice.runner._needs_wine", lambda exe, os_name=None: False)
+    from mcp_ltspice.runner import ltspice_first_run_pending
+
+    assert ltspice_first_run_pending(Path("C:/LTspice.exe")) is False
+
+
+def test_timeout_is_reported_with_first_run_guidance(tmp_path, monkeypatch) -> None:
+    """A hang must surface as an actionable RuntimeError, not TimeoutExpired."""
+    monkeypatch.setenv("WINEPREFIX", str(tmp_path))
+    (tmp_path / "drive_c/users/someone/AppData/Roaming").mkdir(parents=True)
+
+    from mcp_ltspice import runner as runner_mod
+
+    monkeypatch.setattr(runner_mod, "find_wine", lambda: Path("/usr/bin/wine"))
+    monkeypatch.setattr(runner_mod, "_to_wine_path", lambda wine, p: str(p))
+
+    def _hang(*a, **kw):
+        raise subprocess.TimeoutExpired(cmd="wine LTspice.exe", timeout=120.0)
+
+    monkeypatch.setattr(runner_mod.subprocess, "run", _hang)
+
+    asc = tmp_path / "x.asc"
+    asc.write_text("Version 4\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="Anonymously Share LTspice Usage Data"):
+        runner_mod._run_ltspice(asc, Path("/wine/LTspice.exe"), timeout=120.0)

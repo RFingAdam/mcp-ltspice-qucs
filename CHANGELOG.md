@@ -9,6 +9,67 @@ grouped by package.
 
 ## [Unreleased]
 
+### Fixed — generated schematics were electrically disconnected (mcp-ltspice)
+
+Found by running the pipeline against real LTspice 26.0.2 (Wine) and
+ngspice 44.2 for the first time. Both simulator paths were broken
+end-to-end: `run_simulation` reported success and `extract_sparameters`
+then failed, so no user could get S-parameters out of either.
+
+- **`generate_lpf_asc` never emitted a single `WIRE`.** The `_wire`
+  helper was dead code, and LTspice determines connectivity purely from
+  coordinates, so it netlisted every component onto its own `NC_*` nodes
+  — no filter at all. The AC analysis returned `No. Points: 0` and a
+  692-byte `.raw`, which the artifact-presence success policy accepted.
+  Extraction then died with "No plots found in the RAW file". Symbols
+  are now placed by solving for the anchor that puts their pins on the
+  intended nodes, using pin offsets from the stock symbol library and
+  the R90 convention `(dx, dy) → (-dy, dx)` verified against LTspice.
+- **S-parameter extraction required an `I(Rs1)` trace that ngspice never
+  writes**, so every ngspice run raised `IndexError` from `spicelib`.
+  The port-1 current is now derived from `V(p1)` by Ohm's law, which is
+  exact under the port convention the function already assumed. This
+  also removes a sign-convention trap: SPICE orients a device's current
+  by netlist node order, and LTspice emits `Rs1 p1 N001` for our
+  schematic, so its `I(Rs1)` runs *out* of port 1 — pinning S11 at 0 dB
+  for a perfectly matched filter. When the trace is present it is now
+  used only as a consistency check, warning if magnitudes disagree.
+- **`get_trace` raises instead of returning `None`**, so the "Missing
+  required traces" `ValueError` was unreachable. It now reports the
+  missing *and* available trace names.
+
+Verified against both simulators: |S21| tracks the closed-form
+doubly-terminated Butterworth response within 0.15 dB from 0.1–4 GHz,
+with passband |S11| below −94 dB.
+
+Regression cover for the class of bug, not just the instance:
+`test_asc_connectivity.py` reimplements LTspice's coordinate-based
+connectivity rule in pure Python, so **CI catches a floating pin with no
+simulator installed**; the end-to-end tests now compare against theory
+instead of asserting `raw_path.is_file()`, which a zero-point stub
+satisfied.
+
+### Fixed — LTspice first run blocks batch mode under Wine (mcp-ltspice)
+
+Recent LTspice releases open a modal "Anonymously Share LTspice Usage
+Data" dialog the first time they run in a Wine prefix. It appears even
+under `-b`, so batch runs hang until the caller's timeout with an empty
+log and no `.raw` — the symptom points nowhere near a consent prompt.
+`run_simulation` now warns up front when `LTspice.ini` is absent from
+the prefix, and converts the resulting `TimeoutExpired` into a
+`RuntimeError` naming the dialog and giving both remedies.
+
+### Fixed — documentation (docs/installation.md)
+
+- The Qucs-S build recipe cloned without `--recurse-submodules`, so
+  qucsator-RF — the actual simulation engine — was never built; the
+  result surfaces much later as "Qucs-S not installed". Also adds the
+  missing `flex`, `bison`, `gperf` and `dos2unix` build deps (`gperf`
+  fails at cmake time, `dos2unix` only at ~78% of the build) and
+  corrects `libqt6charts6-dev` → `qt6-charts-dev`.
+- Documents the LTspice first-run dialog and the `wineboot -u` /
+  `msiexec /qn` silent-install path.
+
 ### Fixed — simulator portability (mcp-ltspice)
 
 Reported by [@cr4i50n](https://github.com/cr4i50n) in
