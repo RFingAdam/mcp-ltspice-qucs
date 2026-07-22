@@ -179,6 +179,52 @@ def _needs_wine(exe: Path, os_name: str | None = None) -> bool:
     return exe.suffix.lower() == ".exe" and (os_name or os.name) != "nt"
 
 
+#: Written by LTspice once the first-run consent dialog has been answered.
+LTSPICE_SETTINGS_BASENAME = "LTspice.ini"
+
+
+def _ltspice_settings_files(exe: Path) -> list[Path]:
+    """Candidate ``LTspice.ini`` paths inside the active Wine prefix.
+
+    Empty when not running under Wine, where there is no such gate.
+    """
+    if not _needs_wine(exe):
+        return []
+    prefix = Path(os.environ.get("WINEPREFIX") or Path.home() / ".wine")
+    return list((prefix / "drive_c/users").glob(f"*/AppData/Roaming/{LTSPICE_SETTINGS_BASENAME}"))
+
+
+def ltspice_first_run_pending(exe: Path) -> bool:
+    """True when LTspice under Wine has never had its first-run dialog answered.
+
+    Recent LTspice releases open a modal *"Anonymously Share LTspice Usage
+    Data"* dialog the first time they run in a given Wine prefix. It appears
+    even under ``-b``, and because batch mode has no one to click it, the
+    process blocks until the caller's timeout expires — with an empty log and
+    no ``.raw``, which looks nothing like a consent prompt. Answering it once
+    writes ``LTspice.ini``, so the file's absence is a reliable preflight
+    signal.
+    """
+    if not _needs_wine(exe):
+        return False
+    return not any(p.is_file() for p in _ltspice_settings_files(exe))
+
+
+def _first_run_hint(exe: Path) -> str:
+    prefix = Path(os.environ.get("WINEPREFIX") or Path.home() / ".wine")
+    ini = prefix / "drive_c/users/<you>/AppData/Roaming" / LTSPICE_SETTINGS_BASENAME
+    return (
+        "\n\nLikely cause: LTspice has not been run before in this Wine prefix "
+        f"({prefix}). Recent releases open a modal 'Anonymously Share LTspice "
+        "Usage Data' dialog on first launch, which blocks -b batch mode "
+        "indefinitely because nothing can dismiss it.\n"
+        "Fix it once, either way:\n"
+        f"  1. Launch interactively and answer the prompt:  wine {exe}\n"
+        f"  2. Or pre-seed the setting (also opts out of telemetry):\n"
+        f"     printf '[Options]\\nCaptureAnalytics=false\\n' > {ini}"
+    )
+
+
 def _to_wine_path(wine: Path, path: Path) -> str:
     """Translate a POSIX path to its Windows form via ``winepath -w``.
 
@@ -249,7 +295,21 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
     else:
         cmd = [str(ltspice_exe), "-b", "-Run", str(asc_path)]
 
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+    if ltspice_first_run_pending(ltspice_exe):
+        log.warning(
+            "No %s in this Wine prefix, so LTspice has likely never been run here. "
+            "If this call hangs until the timeout, it is waiting on the first-run "
+            "consent dialog, not simulating.",
+            LTSPICE_SETTINGS_BASENAME,
+        )
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired as e:
+        hint = _first_run_hint(ltspice_exe) if ltspice_first_run_pending(ltspice_exe) else ""
+        raise RuntimeError(
+            f"LTspice produced no result within {timeout:.0f}s. command={' '.join(cmd)!r}{hint}"
+        ) from e
     log_path.write_text(
         f"# LTspice command: {' '.join(cmd)}\n"
         f"# returncode: {proc.returncode}\n\n"

@@ -22,7 +22,10 @@ import numpy as np
 import skrf as rf
 from numpy.typing import NDArray
 
+from rf_mcp_common.logging import get_logger
 from rf_mcp_common.touchstone import network_to_touchstone
+
+log = get_logger("mcp_ltspice.extract")
 
 # Impedance / admittance vectors arrive from numpy arithmetic as
 # `complexfloating[Any, Any]`, not the narrower `complex128`. Accept the
@@ -483,27 +486,66 @@ def extract_sparams_from_raw(
     p1_node = port_map[1]
     p2_node = port_map[2]
 
-    v1_trace = raw.get_trace(f"V({p1_node})")
-    v2_trace = raw.get_trace(f"V({p2_node})")
-    i1_trace = raw.get_trace("I(Rs1)")
-    if v1_trace is None or v2_trace is None or i1_trace is None:
+    def _trace(name: str):
+        """``get_trace`` raises rather than returning ``None`` for an unknown
+        trace, so the old ``is None`` guards below were unreachable."""
+        try:
+            return raw.get_trace(name)
+        except (IndexError, KeyError):
+            return None
+
+    v1_trace = _trace(f"V({p1_node})")
+    v2_trace = _trace(f"V({p2_node})")
+    i1_trace = _trace("I(Rs1)")
+    if v1_trace is None or v2_trace is None:
         missing = [
             name
-            for name, t in [
-                (f"V({p1_node})", v1_trace),
-                (f"V({p2_node})", v2_trace),
-                ("I(Rs1)", i1_trace),
-            ]
+            for name, t in [(f"V({p1_node})", v1_trace), (f"V({p2_node})", v2_trace)]
             if t is None
         ]
-        raise ValueError(f"Missing required traces in .raw file: {missing}")
+        available = [t.name for t in getattr(raw, "_trace_info", [])]
+        raise ValueError(f"Missing required traces in .raw file: {missing}. Available: {available}")
 
     v_p1 = np.asarray(v1_trace.get_wave(), dtype=np.complex128)
     v_p2 = np.asarray(v2_trace.get_wave(), dtype=np.complex128)
-    i_rs1 = np.asarray(i1_trace.get_wave(), dtype=np.complex128)
 
-    # Sign convention: spicelib reports I(Rs1) as current flowing from V1
-    # through Rs1 into the network — this is the current INTO port 1.
+    # Port-1 current, by Ohm's law rather than from the I(Rs1) trace.
+    #
+    # This is exact under the port convention already assumed a few lines
+    # below (V1 = AC 1 driving through Rs1 = z0 into p1): the current into
+    # port 1 is (V_src - V_p1)/z0 with V_src = 1. Deriving it buys two
+    # things over reading the trace:
+    #
+    # - ngspice does not record resistor currents at all, so the trace is
+    #   simply absent there and extraction used to die with an IndexError.
+    # - SPICE defines a two-terminal device's current as flowing from its
+    #   first node to its second, and which pin LTspice emits first depends
+    #   on the symbol's orientation in the schematic. LTspice netlists our
+    #   generated schematic as `Rs1 p1 N001`, so its I(Rs1) runs *out* of
+    #   port 1 — the opposite sign to the one this code assumed, which put
+    #   S11 at 0 dB (fully reflective) for a well-matched filter.
+    i_rs1 = (1.0 - v_p1) / z0
+
+    if i1_trace is not None:
+        # The trace is still useful as a consistency check: magnitudes must
+        # agree even though the sign is orientation-dependent. A mismatch
+        # means the schematic does not follow the documented port-1
+        # convention, so every S-parameter below is suspect.
+        measured = np.asarray(i1_trace.get_wave(), dtype=np.complex128)
+        scale = float(np.max(np.abs(i_rs1))) or 1.0
+        deviation = float(np.max(np.abs(np.abs(measured) - np.abs(i_rs1)))) / scale
+        if deviation > 1e-3:
+            log.warning(
+                "I(Rs1) in %s disagrees with the current implied by V(%s) "
+                "(max relative deviation %.3g). The schematic may not follow the "
+                "expected port-1 convention (V1 = AC 1 through Rs1 = z0 into %s); "
+                "S-parameters may be wrong.",
+                raw_path,
+                p1_node,
+                deviation,
+                p1_node,
+            )
+
     sqrt_z0 = np.sqrt(z0)
     a1 = 1.0 / (2.0 * sqrt_z0)  # V1_src = AC 1, scalar (broadcast)
     b1 = (v_p1 - z0 * i_rs1) / (2.0 * sqrt_z0)
