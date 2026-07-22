@@ -53,14 +53,41 @@ ngspice approximates loosely. On Linux/macOS, install through Wine.
 ### Linux
 
 ```bash
-sudo apt install wine64 winetricks
-winecfg                                        # initialize default prefix
+sudo apt install wine winetricks
+wineboot -u                                    # initialize default prefix
 # Download LTspice installer from analog.com:
 wget https://ltspice.analog.com/software/LTspice64.msi -O /tmp/LTspice64.msi
-wine msiexec /i /tmp/LTspice64.msi
+wine msiexec /i /tmp/LTspice64.msi /qn         # /qn = silent
 # After install, LTspice will live at:
 #   ~/.wine/drive_c/Program Files/ADI/LTspice/LTspice.exe
 ```
+
+#### First run blocks batch mode
+
+**Answer LTspice's first-run prompt before using it headlessly.** Recent
+releases open a modal *"Anonymously Share LTspice Usage Data"* dialog the
+first time they run in a Wine prefix. It appears even under `-b`, and since
+batch mode has nobody to click it, the process blocks until the caller's
+timeout expires, leaving an empty log and no `.raw`. Nothing in the symptom
+points at a consent prompt.
+
+Either launch it once interactively and answer the dialog:
+
+```bash
+wine ~/.wine/drive_c/Program\ Files/ADI/LTspice/LTspice.exe
+```
+
+…or pre-seed the setting, which also opts out of telemetry — the better
+option for CI and headless boxes:
+
+```bash
+printf '[Options]\nCaptureAnalytics=false\n' \
+    > ~/.wine/drive_c/users/$USER/AppData/Roaming/LTspice.ini
+```
+
+`mcp-ltspice` checks for that file before every LTspice run: it warns up
+front when the file is missing, and if the run then times out it says so
+explicitly instead of surfacing a bare `TimeoutExpired`.
 
 ### macOS
 
@@ -120,14 +147,29 @@ Qucs-S is not in apt; build from source:
 ```bash
 sudo apt install build-essential cmake git pkg-config \
     qt6-base-dev qt6-svg-dev qt6-tools-dev \
-    libqt6svgwidgets6 libqt6charts6-dev
-git clone https://github.com/ra3xdh/qucs_s /tmp/qucs_s
+    libqt6svgwidgets6 qt6-charts-dev \
+    flex bison gperf dos2unix
+# --recurse-submodules is required: the simulation engine (qucsator-RF)
+# is a submodule. Without it cmake still configures and you get the GUI
+# but no simulator, which surfaces much later as "Qucs-S not installed".
+git clone --recurse-submodules https://github.com/ra3xdh/qucs_s /tmp/qucs_s
 cd /tmp/qucs_s && mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=$HOME/.local ..
 make -j$(nproc)
 make install
-# binary: ~/.local/bin/qucs-s
+# binaries: ~/.local/bin/qucs-s and ~/.local/bin/qucsator_rf
+```
+
+`flex`, `bison`, `gperf` and `dos2unix` are all build-time requirements of
+qucsator-RF. Missing ones fail late and unhelpfully — `gperf` aborts at
+cmake time, `dos2unix` only at ~78% of the build with
+`/bin/sh: 1: dos2unix: not found`.
+
+Already cloned without submodules? No need to start over:
+
+```bash
+cd /tmp/qucs_s && git submodule update --init --recursive
 ```
 
 For harmonic-balance support you also need Xyce:

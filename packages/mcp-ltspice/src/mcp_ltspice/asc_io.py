@@ -103,6 +103,46 @@ def _wire(x1: int, y1: int, x2: int, y2: int) -> str:
     return f"WIRE {x1} {y1} {x2} {y2}"
 
 
+# Schematic geometry.
+#
+# LTspice has no netlist section in a .asc: connectivity is purely
+# positional. Two pins are the same node when they share a coordinate, and a
+# wire joins its two endpoints. Emitting symbols without wires — as this
+# module did until the pins below were worked out — produces a schematic that
+# looks right and netlists as a pile of disconnected ``NC_*`` nodes.
+#
+# Pin offsets are from the stock symbol library (``lib/sym/*.asy``); the R90
+# mapping ``(dx, dy) -> (-dy, dx)`` was verified against LTspice 26.0.2 by
+# netlisting a probe schematic and checking which net labels attached.
+#
+# Placing a two-terminal symbol therefore means solving for the SYMBOL
+# anchor that puts its pins where we want them, which is what the three
+# ``_place_*`` helpers below do.
+_GAP = 64  #: horizontal wire run between adjacent elements
+_SERIES_SPAN = 80  #: pin-to-pin length of a res/ind rotated to horizontal
+_CAP_SPAN = 64  #: pin-to-pin length of a vertical cap
+_VERT_SPAN = 80  #: pin-to-pin length of a vertical res/ind/source
+
+
+def _place_series(kind: str, x_left_pin: int, y: int) -> list[str]:
+    """Horizontal res/ind whose pins land on ``(x_left_pin, y)`` and
+    ``(x_left_pin + _SERIES_SPAN, y)``."""
+    return _symbol(kind, x_left_pin + 96, y - 16, "R90")
+
+
+def _place_vertical(kind: str, x: int, y_top_pin: int) -> list[str]:
+    """Vertical res/ind/voltage with its top pin on ``(x, y_top_pin)``."""
+    # Top pin sits 16 below the anchor for all three symbols; res/ind are
+    # also inset 16 in x, while the voltage source's pins are on its axis.
+    anchor_dx = 0 if kind == "voltage" else 16
+    return _symbol(kind, x - anchor_dx, y_top_pin - 16, "R0")
+
+
+def _place_cap(x: int, y_top_pin: int) -> list[str]:
+    """Vertical cap with its top pin on ``(x, y_top_pin)``."""
+    return _symbol("cap", x - 16, y_top_pin, "R0")
+
+
 def _flag(x: int, y: int, name: str) -> str:
     return f"FLAG {x} {y} {name}"
 
@@ -136,22 +176,10 @@ def generate_lpf_asc(
 
     lines: list[str] = _asc_header()
 
-    # Place source on the left and load on the right. LTspice uses 16-pixel
-    # grid; positions are arbitrary but must be consistent so wires connect.
-    # We hand-place the symbols on a uniform x-axis stride.
+    # Everything hangs off a single horizontal signal rail at y_axis; shunt
+    # elements drop below it to ground flags.
     x_left = 96
     y_axis = 144
-    x_load = x_left + 192 * (len(components) + 1)
-
-    # Source: voltage source with AC 1
-    lines.extend(_symbol("voltage", x_left - 64, y_axis, "R0"))
-    lines.append(_attr("InstName", "V1"))
-    lines.append(_attr("Value", "AC 1 0"))
-
-    # Source resistor Rs1 between V1 and node "n1"
-    lines.extend(_symbol("res", x_left - 16, y_axis - 96, "R90"))
-    lines.append(_attr("InstName", "Rs1"))
-    lines.append(_attr("Value", to_ltspice_value(z0)))
 
     # Now walk the components in numeric order
     def _idx(name: str) -> int:
@@ -162,8 +190,6 @@ def generate_lpf_asc(
 
     sorted_names = sorted(components.keys(), key=_idx)
     seen: set[str] = set()
-    pos_x = x_left
-    node_idx = 1
     elements: list[tuple[str, dict[str, float]]] = []
 
     if topology == "lpf_t_elliptic":
@@ -191,42 +217,68 @@ def generate_lpf_asc(
             else:
                 elements.append(("shunt_c", {"C": components[name], "k": _idx(name)}))
 
-    # Walk through elements left-to-right
+    # Walk left to right along the rail, wiring each element to the last.
+    # `x` always holds the coordinate of the live node on the rail.
+    x = x_left
+    flags: list[str] = []
+
+    # Source: V1 (AC 1) with its negative terminal on ground.
+    lines.extend(_place_vertical("voltage", x, y_axis))
+    lines.append(_attr("InstName", "V1"))
+    lines.append(_attr("Value", "AC 1 0"))
+    flags.append(_flag(x, y_axis + _VERT_SPAN, "0"))
+
+    # Source resistor Rs1 from the source node to port 1.
+    lines.append(_wire(x, y_axis, x + _GAP, y_axis))
+    x += _GAP
+    lines.extend(_place_series("res", x, y_axis))
+    lines.append(_attr("InstName", "Rs1"))
+    lines.append(_attr("Value", to_ltspice_value(z0)))
+    x += _SERIES_SPAN
+    flags.append(_flag(x, y_axis, "p1"))
+
     for elt_kind, params in elements:
         k = int(params["k"])
-        if elt_kind == "series_l":
-            lines.extend(_symbol("ind", pos_x, y_axis - 96, "R90"))
-            lines.append(_attr("InstName", f"L{k}"))
-            lines.append(_attr("Value", to_ltspice_value(params["L"])))
-            pos_x += 192
-        elif elt_kind == "shunt_c":
-            lines.extend(_symbol("cap", pos_x - 64, y_axis - 64, "R0"))
-            lines.append(_attr("InstName", f"C{k}"))
-            lines.append(_attr("Value", to_ltspice_value(params["C"])))
-        elif elt_kind == "trap":
-            # Inductor on top, cap on bottom, both shunt to ground
-            lines.extend(_symbol("ind", pos_x - 64, y_axis - 64, "R0"))
-            lines.append(_attr("InstName", f"L{k}"))
-            lines.append(_attr("Value", to_ltspice_value(params["L"])))
-            lines.extend(_symbol("cap", pos_x - 64, y_axis + 16, "R0"))
-            lines.append(_attr("InstName", f"C{k}"))
-            lines.append(_attr("Value", to_ltspice_value(params["C"])))
-        node_idx += 1
+        # Wire the previous node across to where this element starts.
+        lines.append(_wire(x, y_axis, x + _GAP, y_axis))
+        x += _GAP
 
-    # Load: RL1 to ground at the rightmost node
-    lines.extend(_symbol("res", x_load, y_axis - 96, "R0"))
+        if elt_kind == "series_l":
+            lines.extend(_place_series("ind", x, y_axis))
+            lines.append(_attr("InstName", f"L{k}"))
+            lines.append(_attr("Value", to_ltspice_value(params["L"])))
+            x += _SERIES_SPAN
+        elif elt_kind == "shunt_c":
+            # Shunt cap hangs off the rail; the node does not advance.
+            lines.extend(_place_cap(x, y_axis))
+            lines.append(_attr("InstName", f"C{k}"))
+            lines.append(_attr("Value", to_ltspice_value(params["C"])))
+            flags.append(_flag(x, y_axis + _CAP_SPAN, "0"))
+        elif elt_kind == "trap":
+            # Series LC to ground: inductor from the rail, cap beneath it.
+            lines.extend(_place_vertical("ind", x, y_axis))
+            lines.append(_attr("InstName", f"L{k}"))
+            lines.append(_attr("Value", to_ltspice_value(params["L"])))
+            lines.extend(_place_cap(x, y_axis + _VERT_SPAN))
+            lines.append(_attr("InstName", f"C{k}"))
+            lines.append(_attr("Value", to_ltspice_value(params["C"])))
+            flags.append(_flag(x, y_axis + _VERT_SPAN + _CAP_SPAN, "0"))
+
+    # Load: RL1 from port 2 to ground.
+    lines.append(_wire(x, y_axis, x + _GAP, y_axis))
+    x += _GAP
+    lines.extend(_place_vertical("res", x, y_axis))
     lines.append(_attr("InstName", "RL1"))
     lines.append(_attr("Value", to_ltspice_value(z0)))
+    flags.append(_flag(x, y_axis, "p2"))
+    flags.append(_flag(x, y_axis + _VERT_SPAN, "0"))
 
     # AC analysis directive
     lines.append(
-        f"TEXT {x_left} {y_axis + 192} Left 2 !.ac dec {npoints_per_decade} "
+        f"TEXT {x_left} {y_axis + 320} Left 2 !.ac dec {npoints_per_decade} "
         f"{f_start_hz} {f_stop_hz}"
     )
-    # Net labels for the runner's S-parameter extraction
-    lines.append(_flag(x_left, y_axis, "p1"))
-    lines.append(_flag(x_load + 80, y_axis, "p2"))
-    lines.append(_flag(x_load + 80, y_axis + 96, "0"))  # ground
+    lines.extend(flags)
 
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out
