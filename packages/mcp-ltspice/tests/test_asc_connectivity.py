@@ -150,6 +150,27 @@ def test_generated_lpf_asc_labels_ports_and_ground(tmp_path) -> None:
     assert {"p1", "p2", "0"} <= names, f"missing net labels; got {names}"
 
 
+def test_elliptic_trap_topology_has_no_floating_pins(tmp_path) -> None:
+    """Traps stack an inductor and a cap in series down to ground.
+
+    A different placement path from the plain ladder, so it needs its own
+    cover. Verified against LTspice, which netlists this as
+    ``L2 N002 P001`` / ``C2 P001 0`` — a series-LC shunt to ground.
+    """
+    comps = {"L1": 7.9e-9, "L2": 5.0e-9, "C2": 6.3e-12, "L3": 7.9e-9}
+    asc = generate_lpf_asc(comps, tmp_path / "ell.asc", topology="lpf_t_elliptic")
+    assert_fully_connected(asc)
+
+    parsed = parse_asc(asc)
+    pins = pin_positions(parsed["symbols"])
+    # The trap's inductor and capacitor must share a node with each other,
+    # and only the capacitor may touch ground.
+    ground = {(x, y) for x, y, name in parsed["flags"] if name == "0"}
+    assert set(pins["L2"]) & set(pins["C2"]), "trap L2/C2 do not share a node"
+    assert set(pins["C2"]) & ground, "trap capacitor does not reach ground"
+    assert not (set(pins["L2"]) & ground), "trap inductor shorts to ground"
+
+
 def test_every_shunt_element_reaches_ground(tmp_path) -> None:
     """A shunt cap wired only to the signal rail is a silent open circuit."""
     design = synthesize_lc_lpf("butterworth", order=5, cutoff_hz=1e9)
