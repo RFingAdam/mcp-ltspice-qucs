@@ -21,37 +21,40 @@ def _call(tool_name: str, /, **kwargs):
     return fn(**kwargs)
 
 
+# run_harmonic_balance is no longer scaffolded — it is implemented against
+# Xyce and validated in test_harmonic_balance.py, including IIP3 against a
+# closed-form cubic. Only its missing-Xyce path belongs in this file now.
+HB_DUT = ["Rin in 0 50", "Bnl out 0 V={1.0*V(in) + 10.0*V(in)*V(in)*V(in)}"]
+
+
 class TestRunHarmonicBalance:
-    def test_returns_error_envelope_when_xyce_missing(self):
-        """Without Xyce, the tool's pre-existing 'Xyce not installed' error path applies."""
-        if is_xyce_available():
-            pytest.skip("Xyce is installed; the missing-Xyce path can't be exercised here")
+    def test_returns_error_envelope_when_xyce_missing(self, monkeypatch):
+        """Missing Xyce must be an error envelope with an actionable hint."""
+        monkeypatch.setattr("mcp_qucs_s.server.is_xyce_available", lambda: False)
         env = _call(
             "run_harmonic_balance",
-            netlist_path="dummy.net",
+            dut_netlist=HB_DUT,
             fundamentals_hz=[1e9],
             harmonics=5,
-            input_power_dbm=0.0,
+            input_power_dbm=-20.0,
         )
         assert env.status == "error"
         assert "Xyce" in env.error
+        assert "installation.md" in env.error
 
-    def test_returns_error_envelope_when_xyce_available(self):
-        """With Xyce installed, the tool should NOT return ok() with a placeholder.
-        Even when Xyce can be detected, the implementation is incomplete and the
-        envelope must signal that explicitly via status='error'.
-        """
+    def test_is_no_longer_a_placeholder_when_xyce_is_present(self):
+        """The stub used to return error('not yet implemented') regardless."""
         if not is_xyce_available():
             pytest.skip("Xyce not installed; this test verifies the with-Xyce path")
         env = _call(
             "run_harmonic_balance",
-            netlist_path="dummy.net",
+            dut_netlist=HB_DUT,
             fundamentals_hz=[1e9],
             harmonics=5,
-            input_power_dbm=0.0,
+            input_power_dbm=-20.0,
         )
-        assert env.status == "error"
-        assert "not yet implemented" in env.error.lower()
+        assert env.status == "ok", env.error
+        assert "fundamental_dbm" in env.data
 
 
 class TestExtractNoiseParameters:
@@ -86,21 +89,6 @@ class TestNoOkPlaceholders:
     This is a contract test: if someone re-introduces the 'note: scaffolded'
     pattern, this test catches it.
     """
-
-    def test_run_harmonic_balance_never_returns_ok_placeholder(self):
-        env = _call(
-            "run_harmonic_balance",
-            netlist_path="dummy.net",
-            fundamentals_hz=[1e9],
-            harmonics=5,
-            input_power_dbm=0.0,
-        )
-        # Whether Xyce is installed or not, this tool is currently not
-        # implemented end-to-end; it must surface that as an error envelope.
-        assert env.status == "error", (
-            f"run_harmonic_balance returned status={env.status}; "
-            "scaffolded tools must return status='error' until fully implemented."
-        )
 
     def test_extract_noise_parameters_never_returns_ok_placeholder(self):
         env = _call(

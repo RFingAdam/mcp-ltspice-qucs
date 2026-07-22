@@ -68,7 +68,7 @@ def test_run_sp_analysis_returns_error_when_qucs_missing(monkeypatch) -> None:
 def test_run_harmonic_balance_returns_error_when_xyce_missing(monkeypatch) -> None:
     monkeypatch.setattr("mcp_qucs_s.server.is_xyce_available", lambda: False)
     env = server.run_harmonic_balance(
-        netlist_path="/nope.net",
+        dut_netlist=["Rin in 0 50", "Rout in out 50"],
         fundamentals_hz=[1e9],
     )
     assert env.status == "error"
