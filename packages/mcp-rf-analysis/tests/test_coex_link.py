@@ -83,27 +83,49 @@ def test_lookup_harmonic_victims_for_915mhz() -> None:
     assert h2["victims"]
 
 
+HALOW_TX = [
+    {
+        "name": "HaLow",
+        "f_center_hz": 915e6,
+        "power_dbm": 23,
+        "filtered_harmonic_dbc": {"2H": -10, "3H": -20},
+        "filter_rejection_db": 0,
+    },
+]
+
+
 def test_check_coex_matrix_identifies_halow_2f0_collision() -> None:
-    tx = [
-        {
-            "name": "HaLow",
-            "f_center_hz": 915e6,
-            "power_dbm": 23,
-            "filtered_harmonic_dbc": {"2H": -10, "3H": -20},
-            "filter_rejection_db": 0,
-        },
-    ]
-    rx = [
-        {
-            "name": "LTE_B25_RX",
-            "f_range_hz": [1930e6, 1995e6],
-            "sensitivity_dbm": -97,
-        },
-    ]
-    res = check_coex_matrix(tx, rx, antenna_iso_db=20)
-    # HaLow 2H = 1830 MHz — does NOT fall in B25 DL (1930-1995). So this
-    # specific pair should yield no entries; the matrix may still report
-    # the fundamental. This test just verifies the function runs and
-    # returns a dict with the expected structure.
-    assert "matrix" in res
-    assert "n_aggressors" in res
+    """HaLow 2H = 1830 MHz lands inside LTE B3 DL (1805-1880).
+
+    The previous version of this test pointed at B25 DL (1930-1995),
+    which 2H misses entirely — its own comment conceded there would be
+    no collision — and then asserted only that the response was a dict
+    with the expected keys. A logic inversion that reported collisions
+    everywhere, or none at all, passed it.
+    """
+    rx = [{"name": "LTE_B3_DL", "f_range_hz": [1805e6, 1880e6], "sensitivity_dbm": -97}]
+    res = check_coex_matrix(HALOW_TX, rx, antenna_iso_db=20)
+
+    hits = [m for m in res["matrix"] if m["mechanism"] == "harmonic_2"]
+    assert len(hits) == 1, f"expected exactly one 2H collision, got {res['matrix']}"
+    hit = hits[0]
+    assert hit["aggressor"] == "HaLow"
+    assert hit["victim"] == "LTE_B3_DL"
+    assert hit["f_emit_hz"] == pytest.approx(1830e6)
+    # 23 dBm fundamental, 2H suppressed 10 dBc -> 13 dBm emitted at 2f0.
+    assert hit["emit_dbm"] == pytest.approx(13.0)
+    # ...then 20 dB of antenna isolation to the victim.
+    assert hit["predicted_at_rx_dbm"] == pytest.approx(13.0 - 20.0)
+
+
+def test_check_coex_matrix_reports_nothing_for_a_clean_pair() -> None:
+    """The negative case: no harmonic of 915 MHz falls in B25 DL.
+
+    2H = 1830 and 3H = 2745 both sit outside 1930-1995, so the matrix
+    must be empty. Note n_aggressors counts TX entries, not collisions,
+    so it stays 1 either way — which is why asserting on it proved
+    nothing.
+    """
+    rx = [{"name": "LTE_B25_DL", "f_range_hz": [1930e6, 1995e6], "sensitivity_dbm": -97}]
+    res = check_coex_matrix(HALOW_TX, rx, antenna_iso_db=20)
+    assert res["matrix"] == []

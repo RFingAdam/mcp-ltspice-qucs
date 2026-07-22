@@ -10,6 +10,8 @@ from mcp_rf_analysis.network_ops import (
     compute_stability,
     deembed_network,
     renormalize_impedance,
+    s21_db_array,
+    s21_db_at,
     smith_chart_data,
 )
 from rf_mcp_common.touchstone import read_touchstone
@@ -66,3 +68,20 @@ def test_smith_chart_data_returns_z_norm(lpf_s2p) -> None:
 def test_smith_chart_invalid_port_raises(lpf_s2p) -> None:
     with pytest.raises(ValueError):
         smith_chart_data(lpf_s2p, port=99)
+
+
+def test_s21_scalar_and_array_helpers_agree(lpf_s2p) -> None:
+    """The two |S21| accessors must not drift apart.
+
+    s21_db_at interpolates the complex phasor then takes the magnitude;
+    s21_db_array takes the magnitude first. Measured against a dense-grid
+    ground truth they track each other to <0.1 dB, but nothing pinned
+    that — and s21_db_at is what check_rejection_at uses to decide
+    stopband pass/fail, so a divergence would silently move compliance
+    verdicts.
+    """
+    net = read_touchstone(lpf_s2p)
+    probes = np.geomspace(net.f.min() * 1.01, net.f.max() * 0.99, 40)
+    scalar = np.array([s21_db_at(net, f) for f in probes])
+    vector = s21_db_array(net, probes)
+    np.testing.assert_allclose(scalar, vector, atol=0.1)

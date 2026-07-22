@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Annotated, Any, TypeVar
 
 from fastmcp import FastMCP
@@ -105,7 +106,15 @@ log = get_logger("mcp_rf_analysis.server")
 
 
 def _wrap(func: Any, *args: Any, **kwargs: Any) -> Envelope[T]:
-    """Run a callable inside the standard envelope contract."""
+    """Run a callable inside the standard envelope contract.
+
+    Failures are named after the *calling* tool rather than ``func``.
+    Many tools here pass a lambda, which would otherwise produce
+    ``"<lambda> failed: ..."``; the rest pass the underscore-prefixed
+    internal helper, which names something the caller never invoked.
+    ``_wrap`` is only ever called directly from a tool body, so frame 1
+    is reliably the tool the agent asked for.
+    """
     timer = Timer()
     try:
         return ok(
@@ -114,7 +123,9 @@ def _wrap(func: Any, *args: Any, **kwargs: Any) -> Envelope[T]:
             tool_version=__version__,
         )
     except Exception as e:
-        return error(f"{func.__name__} failed: {e}", tool_version=__version__)
+        frame = sys._getframe(1)
+        tool_name = frame.f_code.co_name
+        return error(f"{tool_name} failed: {e}", tool_version=__version__)
 
 
 # -------- Network operations --------

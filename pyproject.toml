@@ -127,6 +127,7 @@ markers = [
     "ltspice: requires LTspice via Wine",
     "ngspice: requires ngspice on PATH",
     "qucs: requires qucs-s on PATH",
+    "xyce: requires Xyce on PATH",
     "slow: tests that take >5s",
 ]
 
