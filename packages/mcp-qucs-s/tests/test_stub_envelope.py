@@ -57,47 +57,58 @@ class TestRunHarmonicBalance:
         assert "fundamental_dbm" in env.data
 
 
+# extract_noise_parameters is implemented too, and validated in test_noise.py
+# against the exact identity NF = insertion loss for a passive pad. Only the
+# missing-Qucs path belongs here now.
+NOISE_DUT = ['R:R1 _p1 _p2 R="20"', 'R:R2 _p2 gnd R="100"']
+
+
 class TestExtractNoiseParameters:
-    def test_returns_error_envelope_when_qucs_missing(self):
-        if is_qucs_available():
-            pytest.skip("Qucs-S is installed; missing-Qucs path not testable here")
+    def test_returns_error_envelope_when_qucs_missing(self, monkeypatch):
+        monkeypatch.setattr("mcp_qucs_s.server.is_qucs_available", lambda: False)
         env = _call(
             "extract_noise_parameters",
-            netlist_path="dummy.net",
+            dut_netlist=NOISE_DUT,
             f_start_hz=1e9,
             f_stop_hz=10e9,
         )
         assert env.status == "error"
         assert "Qucs-S" in env.error
+        assert "installation.md" in env.error
 
-    def test_returns_error_envelope_when_qucs_available(self):
+    def test_is_no_longer_a_placeholder_when_qucs_is_present(self):
         if not is_qucs_available():
             pytest.skip("Qucs-S not installed; this test verifies the with-Qucs path")
         env = _call(
             "extract_noise_parameters",
-            netlist_path="dummy.net",
+            dut_netlist=NOISE_DUT,
             f_start_hz=1e9,
             f_stop_hz=10e9,
+            points=3,
         )
-        assert env.status == "error"
-        assert "not yet implemented" in env.error.lower()
+        assert env.status == "ok", env.error
+        assert env.data["parameters"], "expected per-frequency noise parameters"
 
 
 class TestNoOkPlaceholders:
-    """Regression: the scaffolded tools must NEVER return ok() with placeholder data.
+    """Regression: a scaffolded tool must never return ok() with placeholder data.
 
-    This is a contract test: if someone re-introduces the 'note: scaffolded'
-    pattern, this test catches it.
+    Both tools this file originally guarded are now implemented, so what is
+    left is the contract itself: any *future* scaffold must return an error
+    envelope rather than ok() with a 'note: scaffolded' field, which a calling
+    agent would read as success.
     """
 
-    def test_extract_noise_parameters_never_returns_ok_placeholder(self):
-        env = _call(
-            "extract_noise_parameters",
-            netlist_path="dummy.net",
-            f_start_hz=1e9,
-            f_stop_hz=10e9,
-        )
-        assert env.status == "error", (
-            f"extract_noise_parameters returned status={env.status}; "
-            "scaffolded tools must return status='error' until fully implemented."
-        )
+    def test_no_tool_returns_a_scaffolded_placeholder(self):
+        import mcp_qucs_s.server as server_mod
+
+        for name in dir(server_mod):
+            tool = getattr(server_mod, name)
+            fn = getattr(tool, "fn", None)
+            if fn is None or not callable(fn):
+                continue
+            doc = (fn.__doc__ or "") + (getattr(tool, "description", "") or "")
+            assert "scaffolded" not in doc.lower(), (
+                f"{name} still advertises itself as scaffolded; implement it or "
+                "have it return an error envelope."
+            )

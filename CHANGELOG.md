@@ -9,6 +9,36 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — Qucs-S noise parameters (#25, mcp-qucs-s)
+
+`extract_noise_parameters` was the last scaffolded tool in the suite. It now
+runs a real noise analysis and returns the four classical noise parameters
+per frequency: NF50, Fmin, Γopt and Rn. It also evaluates the noise figure
+at any source reflection coefficient via
+
+    F(Γs) = Fmin + (4·Rn/Z0)·|Γs − Γopt|² / ((1−|Γs|²)·|1+Γopt|²)
+
+which is the number that actually matters once a real LNA input match
+replaces the ideal Γopt.
+
+Anchored on an identity with no fitting in it: **a passive network's noise
+figure equals its insertion loss**, exactly, at T₀ = 290 K. Matched pads of
+3, 6, 10 and 20 dB all report NF equal to their loss to within 1e-4 dB, with
+Fmin = NF and Γopt = 0.
+
+Two Qucs conventions were established empirically rather than assumed, since
+either would produce plausible-but-wrong numbers:
+
+- **`Rn` is in absolute ohms, not normalised to Z₀.** Recomputing F at
+  Γs = 0 from Fmin/Rn/Γopt reproduces the reported NF50 to 4e-16 in ohms,
+  and is off by 0.01 in noise factor if treated as normalised.
+- **Noise temperature is per-component, not an analysis setting.**
+  `.SP … Temp="16.85"` does not change device noise. Qucs defaults
+  components to 26.85 °C, where a 10 dB pad correctly reads 10.13 dB
+  — `1 + (L−1)·T/T₀`. `build_noise_netlist` therefore applies the IEEE
+  reference 16.85 °C to resistor lines by default, leaving any explicit
+  `Temp` alone and never rewriting non-resistor device cards.
+
 ### Added — harmonic balance via Xyce (#24, mcp-qucs-s)
 
 `run_harmonic_balance` was scaffolded: it detected Xyce and then returned
