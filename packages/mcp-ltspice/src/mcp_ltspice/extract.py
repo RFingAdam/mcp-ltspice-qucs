@@ -436,12 +436,53 @@ def write_sparams_touchstone(
 # --------------------------------------------------------------------------
 
 
+#: Dialects spicelib can parse, tried in turn when auto-detection fails.
+RAW_DIALECTS = ("ngspice", "ltspice", "xyce", "qspice")
+
+
+def _open_raw(raw_path: str | Path, dialect: str | None = None):
+    """Open a ``.raw`` file, falling back to explicit dialects.
+
+    spicelib infers the dialect from the header, which is not stable across
+    simulator versions: ngspice 44.2 writes ``Command: ngspice-44.2, Build
+    ...`` and is recognised, while other builds write headers that defeat
+    detection and raise "file dialect is not specified and could not be auto
+    detected". Since the file on disk is perfectly readable once the dialect
+    is stated, try each one rather than failing the extraction.
+    """
+    from spicelib import RawRead
+    from spicelib.raw.raw_classes import SpiceReadException
+
+    if dialect is not None:
+        return RawRead(str(raw_path), dialect=dialect)
+
+    try:
+        return RawRead(str(raw_path))
+    except SpiceReadException as auto_failed:
+        for candidate in RAW_DIALECTS:
+            try:
+                raw = RawRead(str(raw_path), dialect=candidate)
+            except SpiceReadException:
+                continue
+            log.info(
+                "Could not auto-detect the dialect of %s; parsed it as %r.",
+                raw_path,
+                candidate,
+            )
+            return raw
+        raise SpiceReadException(
+            f"Could not read {raw_path} with auto-detection or any known dialect "
+            f"({', '.join(RAW_DIALECTS)}). Original error: {auto_failed}"
+        ) from auto_failed
+
+
 def extract_sparams_from_raw(
     raw_path: str | Path,
     *,
     port_map: dict[int, str],
     z0: float = 50.0,
     assume_reciprocal_symmetric: bool = True,
+    dialect: str | None = None,
 ) -> rf.Network:
     """Extract 2-port S-parameters from an LTspice/ngspice ``.raw`` file.
 
@@ -468,10 +509,13 @@ def extract_sparams_from_raw(
     exact for the lumped passive ladder filters this package synthesises;
     for asymmetric or active networks, set ``assume_reciprocal_symmetric=False``
     and run two sweeps.
-    """
-    from spicelib import RawRead
 
-    raw = RawRead(str(raw_path))
+    ``dialect`` pins the ``.raw`` format (``ngspice``, ``ltspice``, ``xyce``,
+    ``qspice``) for the rare file whose header defeats spicelib's
+    auto-detection. Leave it ``None`` to auto-detect and fall back through
+    the known dialects.
+    """
+    raw = _open_raw(raw_path, dialect)
     freq_trace = raw.get_trace("frequency")
     if freq_trace is None:
         raise ValueError("No 'frequency' trace in raw file (expected AC analysis)")
