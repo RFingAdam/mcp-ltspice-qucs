@@ -28,7 +28,7 @@ class TestRunHarmonicBalance:
             pytest.skip("Xyce is installed; the missing-Xyce path can't be exercised here")
         env = _call(
             "run_harmonic_balance",
-            sch_path="dummy.sch",
+            netlist_path="dummy.net",
             fundamentals_hz=[1e9],
             harmonics=5,
             input_power_dbm=0.0,
@@ -45,7 +45,7 @@ class TestRunHarmonicBalance:
             pytest.skip("Xyce not installed; this test verifies the with-Xyce path")
         env = _call(
             "run_harmonic_balance",
-            sch_path="dummy.sch",
+            netlist_path="dummy.net",
             fundamentals_hz=[1e9],
             harmonics=5,
             input_power_dbm=0.0,
@@ -60,7 +60,7 @@ class TestExtractNoiseParameters:
             pytest.skip("Qucs-S is installed; missing-Qucs path not testable here")
         env = _call(
             "extract_noise_parameters",
-            sch_path="dummy.sch",
+            netlist_path="dummy.net",
             f_start_hz=1e9,
             f_stop_hz=10e9,
         )
@@ -72,7 +72,7 @@ class TestExtractNoiseParameters:
             pytest.skip("Qucs-S not installed; this test verifies the with-Qucs path")
         env = _call(
             "extract_noise_parameters",
-            sch_path="dummy.sch",
+            netlist_path="dummy.net",
             f_start_hz=1e9,
             f_stop_hz=10e9,
         )
@@ -90,7 +90,7 @@ class TestNoOkPlaceholders:
     def test_run_harmonic_balance_never_returns_ok_placeholder(self):
         env = _call(
             "run_harmonic_balance",
-            sch_path="dummy.sch",
+            netlist_path="dummy.net",
             fundamentals_hz=[1e9],
             harmonics=5,
             input_power_dbm=0.0,
@@ -105,7 +105,7 @@ class TestNoOkPlaceholders:
     def test_extract_noise_parameters_never_returns_ok_placeholder(self):
         env = _call(
             "extract_noise_parameters",
-            sch_path="dummy.sch",
+            netlist_path="dummy.net",
             f_start_hz=1e9,
             f_stop_hz=10e9,
         )
