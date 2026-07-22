@@ -329,76 +329,23 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
 
 
 def _asc_to_ngspice_netlist(asc_path: Path) -> Path:
-    """Convert one of our generated .asc schematics to an ngspice netlist.
+    """Convert a ``.asc`` schematic to an ngspice netlist.
 
-    spicelib's AscEditor needs LTspice's .asy symbol library on disk to
-    resolve component definitions, which isn't available in CI. We bypass
-    that by parsing the .asc ourselves — our generator emits a known
-    subset (V1 source, Rs1/RL1 source/load, L*/C* reactives flagged at
-    nodes p1 and p2) so we can build the netlist directly.
+    Netlisting is driven by the schematic's geometry (see
+    :mod:`mcp_ltspice.asc_netlist`), not by guessing each element's position
+    from its refdes letter. The old approach assumed a lowpass ladder — a
+    lone ``C`` was taken to be a shunt cap, a lone ``L`` a series inductor —
+    so a highpass ladder was silently netlisted as its dual and ngspice
+    returned S-parameters for a circuit that was never designed (issue #32).
+
+    spicelib's AscEditor is not used because it needs LTspice's ``.asy``
+    symbol library on disk, which CI does not have.
     """
-    from mcp_ltspice.asc_io import from_ltspice_value, read_components
+    from mcp_ltspice.asc_netlist import netlist_from_asc
 
-    components = read_components(asc_path)
-    text = asc_path.read_text(encoding="utf-8", errors="replace")
-    z0 = 50.0  # default; could be parsed if non-default ever needed
-
-    # Recover the AC sweep directive from the .asc TEXT line
-    f_start, f_stop, npts = 1e6, 5e9, 200
-    for line in text.splitlines():
-        if ".ac dec" in line:
-            tokens = line.split(".ac dec", 1)[1].split()
-            if len(tokens) >= 3:
-                npts = int(tokens[0])
-                f_start = from_ltspice_value(tokens[1])
-                f_stop = from_ltspice_value(tokens[2])
-            break
-
-    indices = sorted({_refdes_index(k) for k in components})
-
-    netlist_lines = ["* Auto-generated ngspice netlist (mcp-ltspice runner)"]
-    netlist_lines.append("V1 vsrc 0 AC 1")
-    netlist_lines.append(f"Rs1 vsrc p1 {z0:g}")
-
-    # Walk components in numeric order; build a chain of nodes p1 -> n2 -> n3 -> ... -> p2
-    node_in = "p1"
-    next_node_id = 100  # internal nodes
-    for idx in indices:
-        l_key = f"L{idx}"
-        c_key = f"C{idx}"
-        is_trap = l_key in components and c_key in components
-
-        if is_trap:
-            # Shunt LC trap to ground from current node
-            mid = f"n{next_node_id}"
-            next_node_id += 1
-            netlist_lines.append(f"L{idx} {node_in} {mid} {components[l_key]:.6g}")
-            netlist_lines.append(f"C{idx} {mid} 0 {components[c_key]:.6g}")
-        elif l_key in components:
-            # Series inductor between node_in and a new node
-            new_node = f"n{next_node_id}"
-            next_node_id += 1
-            netlist_lines.append(f"L{idx} {node_in} {new_node} {components[l_key]:.6g}")
-            node_in = new_node
-        elif c_key in components:
-            # Shunt capacitor to ground from current node
-            netlist_lines.append(f"C{idx} {node_in} 0 {components[c_key]:.6g}")
-
-    # Last node -> p2 -> RL1 to ground. If no series elements changed node_in,
-    # tie p1 directly to p2 through a 0-ohm resistor for a sane termination.
-    if node_in == "p1":
-        netlist_lines.append("Rwire p1 p2 1m")
-    else:
-        netlist_lines.append(f"Rwire {node_in} p2 1m")
-    netlist_lines.append(f"RL1 p2 0 {z0:g}")
-
-    netlist_lines.append(f".ac dec {npts} {f_start:g} {f_stop:g}")
-    netlist_lines.append("* Save voltages and currents needed for S-param extraction")
-    netlist_lines.append(".save V(p1) V(p2) I(Rs1) I(RL1)")
-    netlist_lines.append(".end")
-
+    netlist_text, _z0 = netlist_from_asc(asc_path)
     netlist_path = asc_path.with_suffix(".cir")
-    netlist_path.write_text("\n".join(netlist_lines) + "\n", encoding="utf-8")
+    netlist_path.write_text(netlist_text, encoding="utf-8")
     return netlist_path
 
 

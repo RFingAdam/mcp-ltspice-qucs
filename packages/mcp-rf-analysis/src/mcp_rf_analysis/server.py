@@ -131,9 +131,22 @@ def _wrap(func: Any, *args: Any, **kwargs: Any) -> Envelope[T]:
 # -------- Network operations --------
 
 
-@mcp.tool(description="Cascade two or more 2-port networks (left-to-right).")
+@mcp.tool(
+    description=(
+        "Cascade two or more 2-port networks (left-to-right). The result "
+        "covers only the frequency range common to every input; a warning "
+        "names the retained range when any input is trimmed."
+    )
+)
 def cascade_networks(s2p_paths: list[str], output_path: str) -> Envelope[dict[str, Any]]:
-    return _wrap(lambda: {"output_path": str(_cascade_networks(s2p_paths, output_path))})
+    notes: list[str] = []
+    env: Envelope[dict[str, Any]] = _wrap(
+        lambda: {
+            "output_path": str(_cascade_networks(s2p_paths, output_path, collect_warnings=notes))
+        }
+    )
+    env.warnings.extend(notes)
+    return env
 
 
 @mcp.tool(description="De-embed left/right fixtures from a measured 2-port network.")
@@ -143,13 +156,22 @@ def deembed_network(
     output_path: str,
     fixture_right_s2p: str | None = None,
 ) -> Envelope[dict[str, Any]]:
-    return _wrap(
+    notes: list[str] = []
+    env: Envelope[dict[str, Any]] = _wrap(
         lambda: {
             "output_path": str(
-                _deembed_network(measured_s2p, fixture_left_s2p, output_path, fixture_right_s2p)
+                _deembed_network(
+                    measured_s2p,
+                    fixture_left_s2p,
+                    output_path,
+                    fixture_right_s2p,
+                    collect_warnings=notes,
+                )
             )
         }
     )
+    env.warnings.extend(notes)
+    return env
 
 
 @mcp.tool(description="Renormalize an S-parameter file to a new reference impedance.")
