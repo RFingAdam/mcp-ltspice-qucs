@@ -192,11 +192,88 @@ cd /tmp/qucs_s && git submodule update --init --recursive
 
 For harmonic-balance support you also need Xyce:
 
+**There is no working binary route on Debian/Ubuntu.** Sandia's download
+page states that its Linux binaries are RHEL 8 RPMs which "will **not**
+work on systems such as Debian or Ubuntu", and that the team no longer
+provides open-source binaries at all. The GitHub releases carry only
+release-notes PDFs. Build from source:
+
 ```bash
-# Pre-built debs at:
-#   https://xyce.sandia.gov/downloads/index.html
-# Or build from source — see Sandia's Xyce build guide.
+# Build deps (all in the Ubuntu archive). GCC 13 is required — see below.
+sudo apt install cmake g++ gfortran make bison flex libfl-dev \
+    libfftw3-dev libsuitesparse-dev libblas-dev liblapack-dev libtool git \
+    gcc-13 g++-13 gfortran-13
+
+# Trilinos >= 14.4 (Xyce 7.10's CMake build requires it)
+curl -L -o trilinos.tar.gz \
+  https://github.com/trilinos/Trilinos/archive/refs/heads/trilinos-release-14-4-branch.tar.gz
+tar xzf trilinos.tar.gz
+git clone --depth 1 --branch Release-7.10.0 https://github.com/Xyce/Xyce.git Xyce-src
+
+mkdir tri-build && cd tri-build
+cmake -C ../Xyce-src/cmake/trilinos/trilinos-base.cmake \
+  -D CMAKE_INSTALL_PREFIX=/usr/local/trilinos_serial -D CMAKE_BUILD_TYPE=Release \
+  -D CMAKE_C_COMPILER=gcc-13 -D CMAKE_CXX_COMPILER=g++-13 \
+  -D CMAKE_Fortran_COMPILER=gfortran-13 \
+  -D CMAKE_CXX_FLAGS="-O3 -fPIC" -D CMAKE_C_FLAGS="-O3 -fPIC" \
+  -D CMAKE_Fortran_FLAGS="-O3 -fPIC -fallow-argument-mismatch" \
+  -D Trilinos_ENABLE_Stokhos=OFF -D Trilinos_ENABLE_ROL=OFF \
+  -D Trilinos_ENABLE_TESTS=OFF -D Trilinos_ENABLE_EXAMPLES=OFF \
+  -D BUILD_SHARED_LIBS=OFF -D TPL_ENABLE_MPI=OFF \
+  -D TPL_ENABLE_AMD=ON -D AMD_LIBRARY_DIRS=/usr/lib/x86_64-linux-gnu \
+  -D TPL_AMD_INCLUDE_DIRS=/usr/include/suitesparse \
+  -D TPL_ENABLE_BLAS=ON -D TPL_ENABLE_LAPACK=ON \
+  ../Trilinos-trilinos-release-14-4-branch
+make -j8 && sudo make install
+
+mkdir ../xyce-build && cd ../xyce-build
+cmake -D CMAKE_INSTALL_PREFIX=/usr/local/xyce_serial \
+      -D Trilinos_ROOT=/usr/local/trilinos_serial \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_C_COMPILER=gcc-13 -D CMAKE_CXX_COMPILER=g++-13 \
+      -D CMAKE_CXX_FLAGS="-O3" -D BUILD_SHARED_LIBS=OFF ../Xyce-src
+cmake --build . -j 8 && sudo cmake --install .
+
+sudo ln -sf /usr/local/xyce_serial/bin/Xyce /usr/local/bin/Xyce
+sudo ln -sf /usr/local/xyce_serial/bin/Xyce /usr/local/bin/xyce
 ```
+
+About 17 minutes of compiling on 8 cores; 7.2 GB of build tree, 470 MB
+installed. Trilinos links statically, so nothing beyond stock system
+libraries is needed at runtime.
+
+Gotchas worth knowing before you start:
+
+- **GCC 15 does not work.** Ubuntu 25.10's default g++ 15.2 fails Trilinos
+  14.4 in `kokkos-kernels`, where GCC 15's `-Wtemplate-body` diagnoses a
+  real bug in an uninstantiated template. Pass `gcc-13`/`g++-13` explicitly
+  to *both* builds.
+- **Distro Trilinos is unusable.** Ubuntu ships 13.2.0, and the Debian
+  packaging does not enable the `EpetraExt` / `Amesos KLU` /
+  `COMPLEX_DOUBLE` options Xyce needs.
+- **Don't build in `/tmp`** if it is a tmpfs — the build tree is 7.2 GB.
+- `-j8` rather than `-j16` on a 16 GB box; Kokkos template instantiation
+  peaks around 9 GB.
+- Xyce writes its result files **next to the netlist**, not into the working
+  directory. `mcp-qucs-s` gives every run its own directory for this reason.
+
+### Verify
+
+```bash
+Xyce -v      # Xyce Release 7.10.0-opensource
+uv run pytest -m xyce
+```
+
+### Harmonic-balance gotchas
+
+- `.HB` takes one `NUMFREQ` entry **per tone**. A single value with two
+  tones aborts with "The size of numFreq does not match the number of tones
+  in .hb!". `run_harmonic_balance` handles this for you.
+- Use explicit multiplication in behavioural `B`-source expressions —
+  `V(in)*V(in)*V(in)`, not `V(in)^3`. The `^` form makes Xyce's HB startup
+  transient diverge with "Time step too small".
+- `.PRINT HB_FD` output is a **two-sided** spectrum; single-sided amplitude
+  at a positive frequency is twice the magnitude in that row.
 
 The synthesis tools in `mcp-qucs-s` (microstrip, couplers, Richards
 transform) are pure-Python closed-form and work without Qucs-S
