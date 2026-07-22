@@ -15,6 +15,39 @@ import skrf as rf
 
 from rf_mcp_common.touchstone import network_to_touchstone
 
+# Qucs writes complex numbers as <real><sign>j<imag>, e.g.
+#   +9.7999913015270312e-01-j1.9899925544312335e-01
+# Note the sign belongs to the imaginary part and `j` precedes its
+# magnitude, so this is not a form Python's complex() accepts.
+_QUCS_COMPLEX_RE = re.compile(
+    r"^\s*(?P<re>[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)"
+    r"(?P<sign>[+-])j(?P<im>(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*$"
+)
+
+
+def _parse_qucs_number(token: str, var_name: str, dat_path: str | Path) -> complex | float:
+    """Parse one Qucs data value, real or complex.
+
+    Raises with the variable and file named rather than letting a bare
+    ``ValueError: could not convert string to float`` escape — which is
+    exactly what a real ``.dat`` used to produce, giving no clue that the
+    parser simply did not understand the format.
+    """
+    m = _QUCS_COMPLEX_RE.match(token)
+    if m is not None:
+        imag = float(m.group("im"))
+        if m.group("sign") == "-":
+            imag = -imag
+        return complex(float(m.group("re")), imag)
+    try:
+        return float(token)
+    except ValueError:
+        raise ValueError(
+            f"Could not parse value {token!r} for variable {var_name!r} in {dat_path}. "
+            "Expected a real number or Qucs complex notation like "
+            "'+1.0e-01-j2.0e-02'."
+        ) from None
+
 
 def parse_qucs_dat(dat_path: str | Path) -> dict[str, np.ndarray]:
     """Parse a Qucs-S .dat output file into a dict of variable arrays.
@@ -38,8 +71,14 @@ def parse_qucs_dat(dat_path: str | Path) -> dict[str, np.ndarray]:
     for match in re.finditer(r"<(indep|dep)\s+([^\s>]+)[^>]*>(.*?)</\1>", text, re.DOTALL):
         name = match.group(2)
         body = match.group(3).strip()
-        values = [float(line.strip()) for line in body.splitlines() if line.strip()]
-        out[name] = np.asarray(values)
+        lines = [line.strip() for line in body.splitlines() if line.strip()]
+        values = [_parse_qucs_number(v, name, dat_path) for v in lines]
+        arr = np.asarray(values)
+        # Keep purely real columns (the frequency axis) real, so callers can
+        # use them as an axis without tripping numpy's complex-cast warning.
+        if np.iscomplexobj(arr) and not np.any(arr.imag):
+            arr = arr.real
+        out[name] = arr
     return out
 
 
@@ -59,16 +98,33 @@ def _freq_and_s_matrix(
     s = np.zeros((freq_hz.size, nports, nports), dtype=np.complex128)
     for i in range(nports):
         for j in range(nports):
-            re_key = f"S[{i + 1},{j + 1}].r"
-            im_key = f"S[{i + 1},{j + 1}].i"
-            if re_key not in data or im_key not in data:
-                raise ValueError(f"Missing S[{i + 1},{j + 1}] components in {dat_path}")
-            if data[re_key].size != freq_hz.size or data[im_key].size != freq_hz.size:
+            name = f"S[{i + 1},{j + 1}]"
+            re_key, im_key = f"{name}.r", f"{name}.i"
+
+            # qucsator-RF writes one complex column per S-parameter; older
+            # builds split it into separate .r/.i real columns. Accept both.
+            if name in data:
+                values = np.asarray(data[name], dtype=np.complex128)
+            elif re_key in data and im_key in data:
+                # Validate each half against the sweep before combining, so a
+                # short column is reported as such instead of silently
+                # broadcasting or being blamed on its partner.
+                for key in (re_key, im_key):
+                    if data[key].size != freq_hz.size:
+                        raise ValueError(
+                            f"{key} in {dat_path} has {data[key].size} "
+                            f"points but frequency has {freq_hz.size}"
+                        )
+                values = data[re_key] + 1j * data[im_key]
+            else:
+                raise ValueError(f"Missing {name} in {dat_path}. Found variables: {sorted(data)}")
+
+            if values.size != freq_hz.size:
                 raise ValueError(
-                    f"S[{i + 1},{j + 1}] in {dat_path} has "
-                    f"{data[re_key].size} points but frequency has {freq_hz.size}"
+                    f"{name} in {dat_path} has {values.size} points "
+                    f"but frequency has {freq_hz.size}"
                 )
-            s[:, i, j] = data[re_key] + 1j * data[im_key]
+            s[:, i, j] = values
     return freq_hz, s
 
 
