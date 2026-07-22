@@ -9,6 +9,108 @@ grouped by package.
 
 ## [Unreleased]
 
+### Fixed — simulator portability (mcp-ltspice)
+
+Reported by [@cr4i50n](https://github.com/cr4i50n) in
+[#28](https://github.com/RFingAdam/mcp-ltspice-qucs/pull/28) and
+[#29](https://github.com/RFingAdam/mcp-ltspice-qucs/pull/29) after
+trying to run the LTspice server on their own machine.
+
+- **LTspice under Wine exits 1 on a successful run**, so the runner's
+  strict return-code check rejected every good simulation. Success is
+  now decided by whether the `.raw` artifact was produced; the return
+  code is retained in `RunResult` and logged as a warning. Any stale
+  `.raw` is deleted first, so the artifact cannot be a leftover. Same
+  policy now applies to ngspice, matching `mcp-qucs-s`.
+- **Wine does not translate POSIX paths in argv**, so `-Run /home/…`
+  reached LTspice as a malformed drive spec. The `.asc` path is now
+  converted with `winepath -w`.
+- **A `.exe` no longer forces Wine on native Windows**, and
+  `find_ltspice()` learned the Windows install locations and honours
+  `WINEPREFIX`. Windows users previously always got "LTspice.exe found
+  but Wine is not installed".
+- **A set-but-invalid `LTSPICE_PATH`** silently fell through to ngspice;
+  it now warns.
+- **New `MCP_LTSPICE_SIMULATOR`** (`ltspice` | `ngspice`) pins simulator
+  selection for ngspice-only deployments. Read by `detect_simulator()`
+  and `run_simulation()` — deliberately *not* by `find_ltspice()`, which
+  must keep reporting what is actually installed.
+
+### Fixed — correctness (all packages)
+
+Surfaced by enabling mypy, which had never actually run (see below).
+
+- **`ladder_sparams_from_components` violated reciprocity.** S12 was
+  computed as `2·(a·d − b·c)/denom`. That determinant is identically 1
+  for a cascade of series-Z / shunt-Y two-ports, but evaluating it
+  numerically overflows on long ladders: a 9th-order bandstop produced
+  `inf` at one bin, and the finite-value guard rewrote S12 to 0 while
+  S21 stayed finite.
+- **`series_lc_parallel` leaked divide-by-zero / invalid-value
+  RuntimeWarnings** and its clamp could not fire at the anti-resonant
+  bin: it tested the quotient (NaN there) instead of flooring the
+  denominator before dividing, as the neighbouring trap branch does.
+- **`RF_MCP_LOG_LEVEL=debug` crashed every server at import.** The raw
+  env string went straight to `Logger.setLevel`, which only accepts an
+  int or an exact uppercase name. Case is now normalized, numeric levels
+  are accepted, and an unusable value warns and falls back to INFO
+  instead of taking down the server.
+- **`mcp-rf-analysis` error envelopes were unattributable.** `_wrap`
+  reported `func.__name__`, but most tools pass a lambda, so failures
+  read `"<lambda> failed: …"`. They now name the tool that was called.
+- **Unrecognized band filters returned an empty list**, so a misspelled
+  region read as "there are no such bands". `list_lte_bands`,
+  `list_gnss_bands`, and `list_ism_bands` now raise with the available
+  values, matching `list_5gnr_bands` / `list_halow_channels`.
+- **`list_spec_templates` used `.suffix` on a `Traversable`**, which
+  only exists for filesystem-backed packages — `AttributeError` when
+  zip-installed.
+- **`richards.py` / `runner.py` called `.group()` on a possibly-`None`
+  regex match**, crashing on any refdes without a digit.
+- **`render_response` accepted an unvalidated list** as `freq_range_hz`,
+  building a wrong-arity tuple from a 1- or 3-element list.
+- **`network_from_dat` skipped the validation its sibling performed**,
+  turning a partial Qucs-S `.dat` into a bare `KeyError`. Both loaders
+  now share a checked path that also rejects ragged component arrays.
+
+### Fixed — CI and tooling
+
+- **CI had been red since 2026-05-13.** `tests/test_workspace_smoke.py`
+  failed both `ruff format --check` and `ruff check`, and never ran: the
+  top-level `tests/` directory was missing from `testpaths`.
+- **mypy had never checked a single line.** It aborted with "Duplicate
+  module named conftest" before reaching any source file, and CI hid
+  that with `|| true`. Both fixed; the suppression is gone and the
+  workspace is clean under the enforced rule set.
+- **The docs site never deployed** — GitHub Pages was not enabled, so
+  the `deploy` job failed on every push while `build` passed.
+- **Fork PRs never got CI.** Approval was required for all first-time
+  contributors, so neither #28 nor #29 was ever validated.
+- **Simulator test gating matched too broadly.** `"ngspice" in
+  item.keywords` also matches test names and parametrize ids, so a case
+  parametrized over the string `"ngspice"` was skipped as though it
+  needed the binary. Now uses `get_closest_marker`.
+- `uv.lock` was left stale by the v0.4.0 version bump.
+
+### Added — tests (458 → 533)
+
+- **`mcp-rf-analysis` had no server-layer tests at all**; all 33 tools
+  are now swept for the shared envelope contract, with the tool list
+  discovered by introspection so new tools are covered automatically.
+- **`mcp-qucs-s` had no `conftest.py`**, so its registered `qucs` marker
+  gated nothing. Added, plus `xyce`. `sparams.py` — the only module that
+  runs once Qucs-S is installed, and one that needs no binary to test —
+  went from zero tests to full parse / round-trip / malformed-input
+  coverage.
+- **`check_coex_matrix`'s only test asserted nothing.** It was named for
+  a 2H collision, conceded in its own comment that the chosen pair does
+  not collide, and checked only that two keys existed. Repointed at LTE
+  B3 DL, which HaLow 2H = 1830 MHz genuinely falls into, plus a
+  clean-pair negative case.
+- Portability coverage for the runner: `LTSPICE_PATH` precedence, Wine
+  path translation and its fallback, native-Windows invocation, the
+  simulator pin, and both halves of the artifact-vs-returncode policy.
+
 ## [0.4.0] — 2026-05-13
 
 ### Changed
