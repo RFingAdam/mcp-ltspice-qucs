@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import sys
 import time
 
 import pytest
@@ -73,3 +74,46 @@ def test_tool_timer_marks_error_on_exception() -> None:
     parsed = json.loads(buf.getvalue().strip())
     assert parsed["status"] == "error"
     assert parsed["tool"] == "bad_tool"
+
+
+# ---------------------------------------------------------------------------
+# RF_MCP_LOG_LEVEL
+#
+# get_logger() runs at module scope in all three servers, so anything that
+# raises here is an import-time crash for the whole MCP server.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("DEBUG", logging.DEBUG),
+        ("debug", logging.DEBUG),  # lowercase is the natural thing to type
+        ("  Warning ", logging.WARNING),
+        ("10", logging.DEBUG),  # numeric levels are valid for setLevel
+    ],
+)
+def test_log_level_env_var_accepted(monkeypatch, value, expected) -> None:
+    monkeypatch.setenv("RF_MCP_LOG_LEVEL", value)
+    logger = get_logger(f"test_level_{value.strip().lower()}")
+    assert logger.level == expected
+
+
+def test_invalid_log_level_falls_back_instead_of_crashing(monkeypatch, capsys) -> None:
+    """A bad level must not take the server down at import."""
+    monkeypatch.setenv("RF_MCP_LOG_LEVEL", "verbose")
+    logger = get_logger("test_level_invalid")
+    assert logger.level == logging.INFO
+    assert "not a valid log level" in capsys.readouterr().err
+
+
+def test_unset_log_level_defaults_to_info(monkeypatch) -> None:
+    monkeypatch.delenv("RF_MCP_LOG_LEVEL", raising=False)
+    assert get_logger("test_level_unset").level == logging.INFO
+
+
+def test_handler_writes_to_stderr_not_stdout() -> None:
+    """stdout carries the MCP protocol stream; a log line there corrupts it."""
+    logger = get_logger("test_stream_target")
+    handler = next(h for h in logger.handlers if isinstance(h, logging.StreamHandler))
+    assert handler.stream is sys.stderr

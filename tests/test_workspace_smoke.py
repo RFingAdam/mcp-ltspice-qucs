@@ -16,10 +16,12 @@ Run all tests across the workspace:
 
     uv run pytest packages/
 """
+
 from __future__ import annotations
 
 import importlib
-from importlib.metadata import PackageNotFoundError, version as pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 
 PACKAGES = [
     ("rf_mcp_common", "rf-mcp-common"),
@@ -29,14 +31,14 @@ PACKAGES = [
 ]
 
 
-def test_all_workspace_packages_importable():
+def test_all_workspace_packages_importable() -> None:
     """Every workspace package imports without error."""
     for module_name, _ in PACKAGES:
         mod = importlib.import_module(module_name)
         assert mod is not None, f"{module_name} imported as None"
 
 
-def test_all_workspace_packages_installed():
+def test_all_workspace_packages_installed() -> None:
     """Every workspace package is installed (metadata resolves)."""
     missing = []
     for _, dist_name in PACKAGES:

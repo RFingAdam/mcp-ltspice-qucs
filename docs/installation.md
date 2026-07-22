@@ -79,8 +79,39 @@ export LTSPICE_PATH=...    # set in your shell rc, or pass to MCP server
 uv run pytest -m ltspice
 ```
 
-The runner uses the `LTSPICE_PATH` env var first, then falls back to
-`$PATH` and standard Wine install locations.
+The runner uses the `LTSPICE_PATH` env var first, then `$PATH`, then the
+standard install locations for Windows, macOS, and Wine (honouring
+`WINEPREFIX` if you use a non-default prefix). If `LTSPICE_PATH` is set
+but doesn't point at a real file, the runner logs a warning and keeps
+looking — it will not silently fall back to ngspice without telling you.
+
+### A note on exit codes
+
+**LTspice under Wine exits with code 1 even on a successful run.** The
+runner therefore treats the presence of the `.raw` output as the success
+condition, not the return code; a nonzero code is logged as a warning
+and reported in the envelope's `returncode` field. Any stale `.raw` is
+deleted before each run, so a leftover file from a previous invocation
+can't be mistaken for a fresh result. The same policy applies to ngspice
+and matches `mcp-qucs-s`, which has always keyed on artifact presence.
+
+If you see `did not produce <file>.raw`, that is a genuine failure — the
+error carries the exact command, the return code, and the path to the
+full log.
+
+### Choosing a simulator
+
+`MCP_LTSPICE_SIMULATOR` pins the choice for deployments that want one
+specific engine — most usefully an ngspice-only box that shouldn't pay
+for Wine at all:
+
+```bash
+export MCP_LTSPICE_SIMULATOR=ngspice   # or: ltspice
+```
+
+An explicit `prefer=` argument on `run_simulation` still wins over the
+env var. When the pinned simulator isn't installed the call fails with a
+clear error rather than quietly using the other one.
 
 ## Qucs-S (for `mcp-qucs-s`)
 

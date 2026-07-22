@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from mcp_qucs_s.microstrip import (
     Substrate,
@@ -34,7 +34,9 @@ class CouplerDesign:
     freq_hz: float
     z0: float
     substrate: Substrate
-    sections: list[dict[str, float]]  # per-section dimensions
+    # Per-section dimensions. Not dict[str, float]: every section also
+    # carries a "role" string naming the arm it describes.
+    sections: list[dict[str, Any]]
     notes: list[str]
 
 

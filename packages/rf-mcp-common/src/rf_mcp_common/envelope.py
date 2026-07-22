@@ -61,9 +61,15 @@ def error(
     warnings: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
     tool_version: str = "0.1.0",
-) -> Envelope[None]:
-    """Build a failure envelope with a human-readable message."""
-    return Envelope[None](
+) -> Envelope[Any]:
+    """Build a failure envelope with a human-readable message.
+
+    Returns ``Envelope[Any]`` rather than ``Envelope[None]``: a failure
+    carries ``data=None`` regardless of what the tool would have returned
+    on success, so the envelope has to be assignable to every tool's
+    declared ``Envelope[X]`` return type.
+    """
+    return Envelope[Any](
         status="error",
         data=None,
         warnings=warnings or [],

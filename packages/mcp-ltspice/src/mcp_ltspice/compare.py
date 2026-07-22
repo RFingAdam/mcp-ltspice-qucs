@@ -115,7 +115,7 @@ def _design_one(
     stopband_atten_db: float,
     z0: float,
     zero_targets: list[float],
-    spec: FilterSpec,
+    spec: FilterSpec | dict[str, Any],
     inductor_vendor: str,
     capacitor_vendor: str,
     optimize_max_iter: int,
@@ -162,7 +162,7 @@ def _design_one(
         capacitor_vendor=capacitor_vendor,
         srf_margin=srf_margin,
         max_value_drift_pct=max_value_drift_pct,
-        spec=spec.model_dump() if hasattr(spec, "model_dump") else spec,
+        spec=spec if isinstance(spec, dict) else spec.model_dump(),
     )
     real_comps = {ref: info["snapped_value"] for ref, info in parts.items()}
 
