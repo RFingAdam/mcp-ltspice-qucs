@@ -166,6 +166,24 @@ qucsator-RF. Missing ones fail late and unhelpfully — `gperf` aborts at
 cmake time, `dos2unix` only at ~78% of the build with
 `/bin/sh: 1: dos2unix: not found`.
 
+### The engine, not the GUI
+
+`qucs-s` is the Qt GUI; `qucsator_rf` is the simulation engine, and it is
+the one `mcp-qucs-s` invokes. Handing a netlist to the GUI opens a window
+and blocks forever on a headless machine, so discovery deliberately looks
+for `qucsator_rf` / `qucsator` and never falls back to `qucs-s`.
+
+If you have the GUI but no engine — the usual result of cloning without
+`--recurse-submodules` — the server says so explicitly rather than hanging.
+Check with:
+
+```bash
+qucsator_rf --version        # engine; this is the one that matters
+```
+
+Set `QUCS_S_PATH` to point directly at the engine binary if it lives
+somewhere non-standard.
+
 Already cloned without submodules? No need to start over:
 
 ```bash

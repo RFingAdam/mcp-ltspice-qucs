@@ -60,7 +60,7 @@ def test_lumped_to_distributed_tool() -> None:
 
 def test_run_sp_analysis_returns_error_when_qucs_missing(monkeypatch) -> None:
     monkeypatch.setattr("mcp_qucs_s.server.is_qucs_available", lambda: False)
-    env = server.run_sp_analysis(sch_path="/nope.sch", output_s2p="/nope.s2p")
+    env = server.run_sp_analysis(netlist_path="/nope.net", output_s2p="/nope.s2p")
     assert env.status == "error"
     assert "Qucs-S" in env.error
 
@@ -68,7 +68,7 @@ def test_run_sp_analysis_returns_error_when_qucs_missing(monkeypatch) -> None:
 def test_run_harmonic_balance_returns_error_when_xyce_missing(monkeypatch) -> None:
     monkeypatch.setattr("mcp_qucs_s.server.is_xyce_available", lambda: False)
     env = server.run_harmonic_balance(
-        sch_path="/nope.sch",
+        netlist_path="/nope.net",
         fundamentals_hz=[1e9],
     )
     assert env.status == "error"

@@ -17,6 +17,7 @@ from mcp_qucs_s.microstrip import (
 from mcp_qucs_s.microstrip import (
     synthesize_microstrip_line as _synthesize_microstrip_line,
 )
+from mcp_qucs_s.netlist import generate_ladder_netlist as _generate_ladder_netlist
 from mcp_qucs_s.richards import lumped_to_distributed as _lumped_to_distributed
 from mcp_qucs_s.runner import (
     is_qucs_available,
@@ -246,13 +247,15 @@ def lumped_to_distributed(
 
 @mcp.tool(
     description=(
-        "Run native Qucs-S S-parameter analysis on a .sch schematic. "
+        "Run native Qucs-S S-parameter analysis on a qucsator netlist "
+        "(generate one with simulate_lc_ladder, or hand-write it; this is "
+        "the netlist format, not the GUI .sch file). "
         "Requires Qucs-S installed (see docs/installation.md). Output is "
         "a Touchstone .s2p."
     ),
 )
 def run_sp_analysis(
-    sch_path: str,
+    netlist_path: str,
     output_s2p: str,
     timeout_sec: Annotated[float, Field(gt=0, le=600)] = 300.0,
 ) -> Envelope[dict[str, Any]]:
@@ -264,7 +267,7 @@ def run_sp_analysis(
                 "from source: github.com/ra3xdh/qucs_s",
                 tool_version=__version__,
             )
-        result = run_qucs(sch_path, timeout_sec=timeout_sec)
+        result = run_qucs(netlist_path, timeout_sec=timeout_sec)
         s2p = dat_to_touchstone(result.output_path, output_s2p)
         return ok(
             {"s2p_path": str(s2p), "dat_path": str(result.output_path)},
@@ -277,12 +280,89 @@ def run_sp_analysis(
 
 @mcp.tool(
     description=(
+        "Design-to-Touchstone in one call: build a Qucs netlist for a lumped "
+        "LC ladder, simulate it with qucsator, and write S-parameters as a "
+        ".s2p file. Each element states its position explicitly, e.g. "
+        "{'kind': 'series_l', 'L': 7.96e-9} or {'kind': 'shunt_c', 'C': 6.37e-12}. "
+        "Kinds: series_l, series_c, shunt_l, shunt_c, shunt_lc_trap, "
+        "shunt_lc_parallel, series_lc_series, series_lc_parallel. LC kinds take "
+        "both L and C. Elements are ordered source to load."
+    ),
+)
+def simulate_lc_ladder(
+    elements: Annotated[
+        list[dict[str, Any]],
+        Field(description="Ordered source-to-load elements, each with 'kind' plus L and/or C."),
+    ],
+    output_s2p: Annotated[str, Field(description="Path for the output .s2p file.")],
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    f_start_hz: Annotated[float, Field(gt=0)] = 1e6,
+    f_stop_hz: Annotated[float, Field(gt=0)] = 5e9,
+    points: Annotated[int, Field(ge=2, le=100_000)] = 200,
+    netlist_path: Annotated[
+        str | None,
+        Field(description="Where to keep the generated netlist. Default: beside the .s2p."),
+    ] = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 300.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if not is_qucs_available():
+            return error(
+                "Qucs-S not installed. See docs/installation.md to build "
+                "from source: github.com/ra3xdh/qucs_s",
+                tool_version=__version__,
+            )
+
+        parsed: list[tuple[str, dict[str, float]]] = []
+        for i, raw in enumerate(elements, start=1):
+            if "kind" not in raw:
+                return error(
+                    f"Element {i} has no 'kind'. Each element needs a kind plus "
+                    "its L and/or C value, e.g. {'kind': 'shunt_c', 'C': 6.37e-12}.",
+                    tool_version=__version__,
+                )
+            params = {k: float(v) for k, v in raw.items() if k in ("L", "C")}
+            parsed.append((str(raw["kind"]), params))
+
+        s2p_path = Path(output_s2p).expanduser().resolve()
+        net_path = (
+            Path(netlist_path).expanduser().resolve()
+            if netlist_path
+            else s2p_path.with_suffix(".net")
+        )
+        net = _generate_ladder_netlist(
+            parsed,
+            net_path,
+            z0=z0,
+            f_start_hz=f_start_hz,
+            f_stop_hz=f_stop_hz,
+            points=points,
+        )
+        result = run_qucs(net, timeout_sec=timeout_sec)
+        s2p = dat_to_touchstone(result.output_path, s2p_path, z0=z0)
+        return ok(
+            {
+                "s2p_path": str(s2p),
+                "netlist_path": str(net),
+                "dat_path": str(result.output_path),
+                "n_elements": len(parsed),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"simulate_lc_ladder failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
         "Run harmonic-balance analysis via the Xyce backend. Returns the "
         "spectral content at all mixing products. Requires Xyce installed."
     ),
 )
 def run_harmonic_balance(
-    sch_path: str,
+    netlist_path: str,
     fundamentals_hz: list[float],
     harmonics: int = 5,
     input_power_dbm: float = 0.0,
@@ -313,7 +393,7 @@ def run_harmonic_balance(
     description="Run Qucs-S sim and export S-parameters to Touchstone in one call.",
 )
 def export_touchstone(
-    sch_path: str,
+    netlist_path: str,
     output_s2p: str,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
@@ -323,7 +403,7 @@ def export_touchstone(
                 "Qucs-S not installed. See docs/installation.md.",
                 tool_version=__version__,
             )
-        result = run_qucs(sch_path)
+        result = run_qucs(netlist_path)
         s2p = dat_to_touchstone(result.output_path, output_s2p)
         return ok(
             {"s2p_path": str(Path(s2p).resolve())},
@@ -341,7 +421,7 @@ def export_touchstone(
     ),
 )
 def extract_noise_parameters(
-    sch_path: str,
+    netlist_path: str,
     f_start_hz: Annotated[float, Field(gt=0)],
     f_stop_hz: Annotated[float, Field(gt=0)],
 ) -> Envelope[dict[str, Any]]:
