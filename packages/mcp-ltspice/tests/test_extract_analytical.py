@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pytest
 
 from mcp_ltspice.extract import (
     components_dict_to_elements,
@@ -131,3 +132,39 @@ def test_reciprocal_network_obeys_s21_equals_s12() -> None:
     ]
     s = ladder_sparams_from_components(elements, f)
     np.testing.assert_allclose(s[:, 1, 0], s[:, 0, 1], rtol=1e-9)
+
+
+@pytest.mark.parametrize("order", [3, 5, 7, 9])
+def test_reciprocity_holds_for_high_order_bandstop(order) -> None:
+    """S12 == S21 exactly, including on ladders long enough to overflow.
+
+    S12 was computed as 2*(a*d - b*c)/denom. That determinant is
+    identically 1 for a cascade of series-Z / shunt-Y two-ports, but
+    evaluating it numerically overflows once the chain gets long: at
+    order 9 one bin produced inf, and the isfinite guard rewrote S12 to
+    0 while S21 stayed finite.
+    """
+    from mcp_ltspice.synthesis import synthesize_lc_bsf
+
+    d = synthesize_lc_bsf("butterworth", order=order, f_low_hz=900e6, f_high_hz=1100e6)
+    els = components_dict_to_elements(d.components, topology=d.topology, kind=d.metadata["kind"])
+    f = np.geomspace(1e6, 5e9, 600)
+    s = ladder_sparams_from_components(els, f)
+    np.testing.assert_array_equal(s[:, 0, 1], s[:, 1, 0])
+    assert np.isfinite(s).all(), "non-finite S-parameter leaked into the matrix"
+
+
+def test_bandstop_sweep_emits_no_numeric_warnings(recwarn) -> None:
+    """No divide-by-zero / invalid-value escaping to the user's console.
+
+    The anti-resonant bin of series_lc_parallel used to leak RuntimeWarnings
+    because the clamp tested the quotient (which is NaN there) rather than
+    flooring the denominator first.
+    """
+    from mcp_ltspice.synthesis import synthesize_lc_bsf
+
+    d = synthesize_lc_bsf("butterworth", order=9, f_low_hz=900e6, f_high_hz=1100e6)
+    els = components_dict_to_elements(d.components, topology=d.topology, kind=d.metadata["kind"])
+    ladder_sparams_from_components(els, np.geomspace(1e6, 5e9, 600))
+    numeric = [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
+    assert not numeric, [str(w.message) for w in numeric]

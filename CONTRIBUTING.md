@@ -13,10 +13,21 @@ uv sync --all-packages
 uv run pytest -q
 ```
 
-You should see 427 tests pass and 4 skip. The skips are simulator-gated
-(LTspice/ngspice/Qucs-S/Xyce); install any of them (see the
+On a machine with no simulators installed you should see **533 tests
+pass and 11 skip**, and no failures. Every skip is gated on a missing
+binary (LTspice / ngspice / Qucs-S / Xyce) or is a tool with no required
+argument to make invalid; install a simulator (see the
 [Installation guide](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/docs/installation.md))
 to exercise the simulator-driven paths.
+
+Before opening a PR, run the same three commands CI runs — if these are
+clean, CI will be too:
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest -q
+```
 
 ## Layout
 
@@ -37,6 +48,31 @@ uv run pytest packages/mcp-ltspice/    # one package
 uv run pytest -k "synthesis"           # by keyword
 uv run pytest -m ngspice               # only simulator-integration
 uv run pytest --cov                    # with coverage
+```
+
+### Simulator-gated tests
+
+Tests that need a real simulator carry a marker and skip cleanly when
+the binary is absent: `ngspice`, `ltspice`, `qucs`, `xyce`. Availability
+is decided by the package's own discovery function (e.g.
+`mcp_ltspice.runner.find_ltspice`), so anything the runner can find —
+`$LTSPICE_PATH`, `$WINEPREFIX`, the standard Windows / macOS / Wine
+install paths — also un-skips the tests.
+
+If `-m ltspice` skips when you believe LTspice is installed, run:
+
+```bash
+uv run python -c "from mcp_ltspice.runner import find_ltspice; print(find_ltspice())"
+```
+
+A `None` there means the runner cannot see it either — that is the bug
+to report, not the skip. Setting `$LTSPICE_PATH` to a file that does not
+exist logs a warning rather than failing silently.
+
+To pin which simulator is used regardless of what is installed:
+
+```bash
+MCP_LTSPICE_SIMULATOR=ngspice uv run pytest -m ngspice
 ```
 
 ## Linting & typing

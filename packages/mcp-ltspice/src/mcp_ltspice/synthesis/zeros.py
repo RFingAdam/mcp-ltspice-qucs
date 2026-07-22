@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import warnings
-from typing import Literal
+from typing import Any, Literal
 
 from rf_mcp_common.ecomp import ESeries, snap_to_eseries
 
@@ -170,7 +170,7 @@ def place_transmission_zero(
     mode: TrapMode | None = None,
     preserve_ratio: bool | None = None,
     snap_series: ESeries | str | None = ESeries.E24,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """User-facing wrapper. Returns updated components plus diagnostic
     info (achieved resonance, snap errors, original values).
 

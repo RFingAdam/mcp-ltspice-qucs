@@ -74,7 +74,10 @@ def check_passband_compliance(
 def list_spec_templates() -> list[str]:
     """Return the names of bundled spec templates."""
     pkg = resources.files("mcp_rf_analysis").joinpath("resources/templates")
-    return sorted(p.name.removesuffix(".json") for p in pkg.iterdir() if p.suffix == ".json")
+    # Match on ``.name``, not ``.suffix``: ``iterdir()`` yields a plain
+    # Traversable (no ``.suffix``) when the package is loaded from a zip
+    # rather than the filesystem, which would raise AttributeError here.
+    return sorted(p.name.removesuffix(".json") for p in pkg.iterdir() if p.name.endswith(".json"))
 
 
 def evaluate_against_spec_template(s2p_path: str | Path, template_name: str) -> dict[str, Any]:

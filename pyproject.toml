@@ -87,6 +87,20 @@ warn_unused_ignores = true
 warn_return_any = true
 namespace_packages = true
 explicit_package_bases = true
+# Each package ships its own tests/conftest.py; without this mypy aborts with
+# "Duplicate module named conftest" before checking a single source file.
+exclude = ['packages/.*/tests/.*']
+# mypy was effectively disabled until v0.4.1 (it aborted on the conftest clash
+# above, and CI masked that with `|| true`). Turning it on surfaced ~190 errors.
+# We enforce type *correctness* now — anything that indicates a real defect —
+# and defer type *completeness* (annotating every numpy return and generic
+# parameter) to a ratchet. Do not add codes here to silence a new error.
+disable_error_code = [
+    "no-any-return",    # numpy/pandas returns widened to Any
+    "type-arg",         # bare `dict`/`list`/`ndarray` generics
+    "no-untyped-call",  # calls into untyped third-party (matplotlib, schemdraw)
+    "no-untyped-def",   # unannotated internal helpers
+]
 mypy_path = [
     "packages/rf-mcp-common/src",
     "packages/mcp-ltspice/src",
@@ -95,13 +109,14 @@ mypy_path = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["spicelib.*", "PyLTSpice.*", "skrf.*"]
+module = ["spicelib.*", "skrf.*", "scipy.*", "joblib.*", "schemdraw.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra --strict-markers --strict-config"
 testpaths = [
+    "tests",
     "packages/rf-mcp-common/tests",
     "packages/mcp-ltspice/tests",
     "packages/mcp-rf-analysis/tests",
@@ -112,6 +127,7 @@ markers = [
     "ltspice: requires LTspice via Wine",
     "ngspice: requires ngspice on PATH",
     "qucs: requires qucs-s on PATH",
+    "xyce: requires Xyce on PATH",
     "slow: tests that take >5s",
 ]
 
