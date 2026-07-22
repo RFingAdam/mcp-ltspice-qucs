@@ -10,6 +10,8 @@ from pydantic import Field
 
 from mcp_qucs_s import __version__
 from mcp_qucs_s.couplers import synthesize_coupler as _synthesize_coupler
+from mcp_qucs_s.harmonic_balance import analyze as _hb_analyze
+from mcp_qucs_s.harmonic_balance import sweep_compression as _hb_sweep_compression
 from mcp_qucs_s.microstrip import (
     Substrate,
     analyze_microstrip,
@@ -99,7 +101,7 @@ def status() -> Envelope[dict[str, Any]]:
                 "extract_noise_parameters",
                 "export_touchstone",
             ],
-            "sim_tools_requiring_xyce": ["run_harmonic_balance"],
+            "sim_tools_requiring_xyce": ["run_harmonic_balance", "sweep_compression_point"],
         },
         tool_version=__version__,
     )
@@ -362,31 +364,132 @@ def simulate_lc_ladder(
     ),
 )
 def run_harmonic_balance(
-    netlist_path: str,
-    fundamentals_hz: list[float],
-    harmonics: int = 5,
-    input_power_dbm: float = 0.0,
+    dut_netlist: Annotated[
+        list[str],
+        Field(
+            description=(
+                "Raw SPICE lines for the circuit under test — devices, .SUBCKT "
+                "and .MODEL cards — referring to the in_node and out_node names. "
+                "Do not include sources, termination or analysis directives; "
+                "those are added here. Use explicit multiplication in B-source "
+                "expressions (V(in)*V(in)*V(in)); the '^' operator makes Xyce's "
+                "HB startup transient diverge."
+            )
+        ),
+    ],
+    fundamentals_hz: Annotated[
+        list[float],
+        Field(description="One tone for harmonic distortion, two for intermod."),
+    ],
+    harmonics: Annotated[int, Field(ge=1, le=32)] = 5,
+    input_power_dbm: float = -20.0,
+    in_node: str = "in",
+    out_node: str = "out",
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 300.0,
 ) -> Envelope[dict[str, Any]]:
+    timer = Timer()
     try:
         if not is_xyce_available():
             return error(
-                "Xyce not installed. Download from xyce.sandia.gov; "
-                "this tool needs the 'xyce' executable on $PATH.",
+                "Xyce not installed. Build it from source — see "
+                "docs/installation.md. Sandia's Linux binaries are RHEL RPMs "
+                "that do not run on Debian/Ubuntu, and they no longer ship "
+                "open-source builds.",
                 tool_version=__version__,
             )
-        # Xyce HB netlist generation, execution, and harmonic-content
-        # extraction (IM3 / IIP3 / 1 dB compression) are not yet
-        # implemented. This is a Tier-6 roadmap item; see CHANGELOG.
-        return error(
-            "run_harmonic_balance is not yet implemented. The Xyce backend "
-            "is detectable but netlist generation and harmonic-content "
-            "parsing are pending. Tracked as a Tier-6 roadmap item; see "
-            "CHANGELOG. Use ngspice .TRAN + FFT as an interim workaround "
-            "for two-tone intermod analysis.",
-            tool_version=__version__,
+
+        result = _hb_analyze(
+            dut_netlist,
+            fundamentals_hz=fundamentals_hz,
+            harmonics=harmonics,
+            input_power_dbm=input_power_dbm,
+            in_node=in_node,
+            out_node=out_node,
+            z0=z0,
+            timeout_sec=timeout_sec,
         )
+
+        payload: dict[str, Any] = {
+            "fundamentals_hz": result.fundamentals_hz,
+            "fundamental_dbm": result.fundamental_dbm,
+            "input_power_dbm": result.input_power_dbm,
+            "gain_db": result.gain_db,
+            "spectrum": result.spectrum.top(20),
+            "netlist_path": str(result.netlist_path),
+            "output_path": str(result.output_path),
+        }
+        env_warnings: list[str] = []
+        if result.im3_dbm is not None:
+            payload |= {
+                "im3_dbm": result.im3_dbm,
+                "im3_freqs_hz": result.im3_freqs_hz,
+                "oip3_dbm": result.oip3_dbm,
+                "iip3_dbm": result.iip3_dbm,
+            }
+            # The single-point extrapolation assumes the products still sit on
+            # their 3:1 slope. Near compression they do not, and IIP3 reads low.
+            if result.gain_db is not None and result.fundamental_dbm:
+                env_warnings.append(
+                    "IIP3 is extrapolated from one drive level, which assumes the "
+                    "third-order products are still on their 3:1 slope. Confirm by "
+                    "re-running a few dB lower and checking IIP3 does not move."
+                )
+
+        env: Envelope[dict[str, Any]] = ok(
+            payload, runtime_sec=timer.elapsed(), tool_version=__version__
+        )
+        env.warnings.extend(env_warnings)
+        return env
     except Exception as e:
         return error(f"run_harmonic_balance failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Sweep drive level through harmonic balance and locate the 1 dB "
+        "gain-compression point (P1dB). Requires Xyce. The lowest power swept "
+        "sets the small-signal gain reference, so keep it well below compression."
+    ),
+)
+def sweep_compression_point(
+    dut_netlist: list[str],
+    fundamental_hz: float,
+    input_powers_dbm: list[float],
+    harmonics: Annotated[int, Field(ge=1, le=32)] = 5,
+    in_node: str = "in",
+    out_node: str = "out",
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 300.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if not is_xyce_available():
+            return error(
+                "Xyce not installed. See docs/installation.md for the source build.",
+                tool_version=__version__,
+            )
+        data = _hb_sweep_compression(
+            dut_netlist,
+            fundamental_hz=fundamental_hz,
+            input_powers_dbm=input_powers_dbm,
+            harmonics=harmonics,
+            in_node=in_node,
+            out_node=out_node,
+            z0=z0,
+            timeout_sec=timeout_sec,
+        )
+        env: Envelope[dict[str, Any]] = ok(
+            data, runtime_sec=timer.elapsed(), tool_version=__version__
+        )
+        if data.get("p1db_in_dbm") is None:
+            env.warnings.append(
+                "Gain never compressed by 1 dB across the swept range, so P1dB is "
+                "not bracketed. Extend the sweep to higher drive levels."
+            )
+        return env
+    except Exception as e:
+        return error(f"sweep_compression_point failed: {e}", tool_version=__version__)
 
 
 @mcp.tool(
