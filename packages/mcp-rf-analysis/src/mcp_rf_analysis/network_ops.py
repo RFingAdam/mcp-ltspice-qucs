@@ -3,6 +3,7 @@ stability, Smith chart data."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,7 @@ from numpy.typing import NDArray
 from rf_mcp_common.touchstone import read_touchstone, write_touchstone
 
 
-def cascade_networks(s2p_paths: list[str | Path], output_path: str | Path) -> Path:
+def cascade_networks(s2p_paths: Sequence[str | Path], output_path: str | Path) -> Path:
     """Cascade two or more 2-port networks (left-to-right order)."""
     if len(s2p_paths) < 2:
         raise ValueError("Need at least 2 networks to cascade")

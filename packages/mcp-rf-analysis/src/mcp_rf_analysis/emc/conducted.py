@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass
@@ -111,7 +111,7 @@ def predict_conducted_emissions(
     *,
     standard: Literal["cispr22_b", "cispr22_a", "fcc15b_b"] = "cispr22_b",
     margin_db: float = 6.0,
-) -> dict[str, list]:
+) -> dict[str, Any]:
     """Convert a (freq_hz, current_a_rms) spectrum to a LISN voltage
     spectrum and compare against the conducted-emissions limit.
 

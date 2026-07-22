@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -35,7 +36,7 @@ def estimate_digital_to_analog_crosstalk(
     aggressor: DigitalAggressor,
     coupling_capacitance_ff: float,  # mutual capacitance to victim (femtoFarads)
     victim_impedance_ohm: float,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Estimate the noise voltage induced on a high-Z analog node by a
     nearby switching digital signal.
 
@@ -74,7 +75,7 @@ def estimate_supply_noise_injection(
     supply_inductance_nh: float = 5.0,  # typical PCB power-net partial L
     supply_resistance_mohm: float = 10.0,  # PDN resistance at switching freq
     n_simultaneous_switches: int = 1,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Estimate the V_droop on the supply rail due to digital switching.
 
     Charge per switch: Q = C_load · ΔV

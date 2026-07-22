@@ -511,7 +511,7 @@ def place_transmission_zero(
             trap_index=trap_index,
             target_freq_hz=target_freq_hz,
             preserve_ratio=preserve_ratio,
-            snap_series=snap_series,  # type: ignore[arg-type]
+            snap_series=snap_series,
         )
         new_comps = result["components"]
         l_key = f"L{trap_index}"
@@ -592,7 +592,13 @@ def render_response(
     timer = Timer()
     try:
         marker_tuples = [(float(f), str(label)) for f, label in markers] if markers else None
-        fr = tuple(freq_range_hz) if freq_range_hz else None  # type: ignore[assignment]
+        fr: tuple[float, float] | None = None
+        if freq_range_hz:
+            if len(freq_range_hz) != 2:
+                raise ValueError(
+                    f"freq_range_hz must be [f_min, f_max]; got {len(freq_range_hz)} value(s)"
+                )
+            fr = (float(freq_range_hz[0]), float(freq_range_hz[1]))
         out = _render_response(
             s2p_path,
             output_png,
@@ -728,7 +734,7 @@ def optimize_filter(
             z0=z0,
             method=method,  # type: ignore[arg-type]
             max_iter=max_iter,
-            snap_series=snap_series,  # type: ignore[arg-type]
+            snap_series=snap_series,
         )
         return ok(
             {
@@ -1135,7 +1141,7 @@ def cascaded_lpf_design(
     response: str = "butterworth",
     c_pf: Annotated[float, Field(gt=0)] = 1000.0,
 ) -> Envelope[dict[str, Any]]:
-    return _wrap(_cascaded_lpf, fc_hz, order, response=response, c_pf=c_pf)  # type: ignore[arg-type]
+    return _wrap(_cascaded_lpf, fc_hz, order, response=response, c_pf=c_pf)
 
 
 # ----- Power supply tools --------------------------------------------------

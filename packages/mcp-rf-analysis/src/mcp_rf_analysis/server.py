@@ -519,7 +519,7 @@ def estimate_fext_db(
 def cispr_limit_at(
     freq_hz: Annotated[float, Field(gt=0)],
     standard: str = "cispr22_b",
-) -> Envelope[dict[str, float]]:
+) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
         limit = _cispr_limit_at(freq_hz, standard=standard)  # type: ignore[arg-type]
