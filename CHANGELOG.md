@@ -9,6 +9,38 @@ grouped by package.
 
 ## [Unreleased]
 
+### Fixed — three silent-correctness bugs (#31, #32, #35)
+
+- **`.asc` I/O assumed UTF-8/LF (#31).** LTspice XVII writes UTF-16LE with a
+  BOM, so `read_components` decoded mojibake, matched no `SYMBOL` line, and
+  returned `{}` as though the schematic held no parts. Worse,
+  `update_component` then rewrote the file as UTF-8/LF — silently
+  re-encoding a user-authored schematic it had never successfully read.
+  Encoding and line endings are now detected and preserved byte-for-byte
+  outside the edited line; an undecodable file raises `AscDecodeError`
+  instead of looking empty; and editing a refdes that is not present raises
+  rather than rewriting the file unchanged.
+- **The ngspice netlister mis-netlisted every non-lowpass ladder (#32).** It
+  read each element's position from its refdes letter, so a highpass
+  (series C, shunt L) was emitted as its dual and ngspice returned
+  S-parameters for a circuit nobody designed. `z0` was hardcoded to 50 Ω
+  besides. New `mcp_ltspice.asc_netlist` netlists from schematic *geometry*
+  using the same coordinate rules LTspice applies, which is correct for any
+  topology — including schematics this package did not generate — and reads
+  the port impedance off the terminating resistors. On a generated lowpass
+  it reproduces LTspice's own netlist node for node. Unknown symbol kinds
+  raise `NotImplementedError` naming the symbol instead of being skipped.
+- **`cascade_networks` extrapolated silently (#35).** It found the common
+  grid with `numpy.intersect1d`, which needs exact float equality; two
+  instruments never produce bit-identical grids, so real inputs hit the
+  fallback that resampled every other network onto network 1's grid —
+  extrapolating past the end of their measured data with no warning.
+  `deembed_network` raised in the same situation. Both now share one
+  documented policy in `common_frequency_grid`: restrict to the overlap of
+  the measured ranges so resampling is always interpolation, raise when the
+  ranges are disjoint, and report any trimming through the envelope's
+  `warnings`.
+
 ### Fixed — Qucs-S could not be driven at all (mcp-qucs-s)
 
 Running qucsator-RF 1.0.7 for the first time showed the Qucs-S backend was

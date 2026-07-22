@@ -17,8 +17,10 @@ Generated schematics follow the convention used by the runner:
 
 from __future__ import annotations
 
+import codecs
 import contextlib
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -119,15 +121,40 @@ def _wire(x1: int, y1: int, x2: int, y2: int) -> str:
 # anchor that puts its pins where we want them, which is what the three
 # ``_place_*`` helpers below do.
 _GAP = 64  #: horizontal wire run between adjacent elements
-_SERIES_SPAN = 80  #: pin-to-pin length of a res/ind rotated to horizontal
+_SERIES_SPAN = 80  #: legacy alias; prefer series_span(kind)
 _CAP_SPAN = 64  #: pin-to-pin length of a vertical cap
 _VERT_SPAN = 80  #: pin-to-pin length of a vertical res/ind/source
 
 
+#: Pin-to-pin length and first-pin y-offset per symbol kind, from the stock
+#: symbol library. A cap's pins are (16,0)/(16,64); res and ind are
+#: (16,16)/(16,96). Getting this wrong places a series capacitor 16 units off
+#: its wire, which reads as a plausible schematic and netlists as an open
+#: circuit.
+_SYMBOL_GEOMETRY = {
+    "res": (80, 16),
+    "ind": (80, 16),
+    "voltage": (80, 16),
+    "cap": (64, 0),
+}
+
+
+def series_span(kind: str) -> int:
+    """Pin-to-pin length of ``kind`` once rotated horizontal."""
+    try:
+        return _SYMBOL_GEOMETRY[kind][0]
+    except KeyError:
+        raise ValueError(f"No pin geometry known for symbol {kind!r}") from None
+
+
 def _place_series(kind: str, x_left_pin: int, y: int) -> list[str]:
-    """Horizontal res/ind whose pins land on ``(x_left_pin, y)`` and
-    ``(x_left_pin + _SERIES_SPAN, y)``."""
-    return _symbol(kind, x_left_pin + 96, y - 16, "R90")
+    """Horizontal two-terminal symbol with pins on ``(x_left_pin, y)`` and
+    ``(x_left_pin + series_span(kind), y)``.
+
+    Solves the R90 mapping ``(dx, dy) -> (-dy, dx)`` for the anchor.
+    """
+    span, first_dy = _SYMBOL_GEOMETRY[kind]
+    return _symbol(kind, x_left_pin + first_dy + span, y - 16, "R90")
 
 
 def _place_vertical(kind: str, x: int, y_top_pin: int) -> list[str]:
@@ -234,7 +261,7 @@ def generate_lpf_asc(
     lines.extend(_place_series("res", x, y_axis))
     lines.append(_attr("InstName", "Rs1"))
     lines.append(_attr("Value", to_ltspice_value(z0)))
-    x += _SERIES_SPAN
+    x += series_span("res")
     flags.append(_flag(x, y_axis, "p1"))
 
     for elt_kind, params in elements:
@@ -247,7 +274,7 @@ def generate_lpf_asc(
             lines.extend(_place_series("ind", x, y_axis))
             lines.append(_attr("InstName", f"L{k}"))
             lines.append(_attr("Value", to_ltspice_value(params["L"])))
-            x += _SERIES_SPAN
+            x += series_span("ind")
         elif elt_kind == "shunt_c":
             # Shunt cap hangs off the rail; the node does not advance.
             lines.extend(_place_cap(x, y_axis))
@@ -289,9 +316,97 @@ def generate_lpf_asc(
 # --------------------------------------------------------------------------
 
 
+class AscDecodeError(ValueError):
+    """An ``.asc`` could not be decoded as any encoding LTspice writes."""
+
+
+#: Byte-order marks LTspice files carry, longest first so UTF-16 wins over a
+#: prefix match. LTspice XVII writes UTF-16LE with BOM; LTspice 24+ writes
+#: UTF-8. Both use CRLF.
+_BOMS: tuple[tuple[bytes, str], ...] = (
+    (codecs.BOM_UTF8, "utf-8-sig"),
+    (codecs.BOM_UTF16_LE, "utf-16"),
+    (codecs.BOM_UTF16_BE, "utf-16"),
+)
+
+
+@dataclass(frozen=True)
+class AscText:
+    """Decoded ``.asc`` contents plus what it takes to write it back.
+
+    ``update_component`` edits schematics the user owns, so it must not
+    quietly re-encode them. Round-tripping an LTspice XVII file through
+    UTF-8/LF would rewrite every byte of a file whose contents were never
+    successfully read in the first place.
+    """
+
+    text: str
+    encoding: str
+    newline: str
+
+    def render(self, lines: list[str]) -> bytes:
+        body = self.newline.join(lines) + self.newline
+        return body.encode(self.encoding)
+
+
+def _decode_asc(asc_path: str | Path) -> AscText:
+    """Read an ``.asc``, detecting its encoding and line endings.
+
+    Raises :class:`AscDecodeError` rather than returning mojibake: the old
+    ``errors="replace"`` path turned an unreadable UTF-16 file into a
+    successful-looking parse of zero components.
+    """
+    raw = Path(asc_path).read_bytes()
+
+    encoding: str | None = None
+    for bom, enc in _BOMS:
+        if raw.startswith(bom):
+            encoding = enc
+            break
+
+    candidates = [encoding] if encoding else ["utf-8", "utf-16", "cp1252"]
+    text: str | None = None
+    for enc in candidates:
+        assert enc is not None
+        try:
+            text = raw.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            continue
+        encoding = enc
+        break
+
+    if text is None or encoding is None:
+        raise AscDecodeError(
+            f"Could not decode {asc_path} as any encoding LTspice writes "
+            f"(tried: {', '.join(c for c in candidates if c)}). "
+            "LTspice XVII writes UTF-16LE with a BOM; LTspice 24+ writes UTF-8."
+        )
+
+    # Detect line endings from the first break, defaulting to the platform
+    # convention LTspice itself uses.
+    if "\r\n" in text:
+        newline = "\r\n"
+    elif "\n" in text:
+        newline = "\n"
+    else:
+        newline = "\r\n"
+
+    return AscText(text=text, encoding=encoding, newline=newline)
+
+
+def read_asc_text(asc_path: str | Path) -> AscText:
+    """Public wrapper around encoding detection, for callers that re-write."""
+    return _decode_asc(asc_path)
+
+
 def read_components(asc_path: str | Path) -> dict[str, float]:
-    """Return a {refdes: value} dict for L* and C* components in the .asc."""
-    text = Path(asc_path).read_text(encoding="utf-8", errors="replace")
+    """Return a {refdes: value} dict for L* and C* components in the .asc.
+
+    Raises :class:`AscDecodeError` if the file cannot be decoded, so an
+    unreadable schematic is distinguishable from one that genuinely holds
+    no components.
+    """
+    text = _decode_asc(asc_path).text
     out: dict[str, float] = {}
     refdes: str | None = None
     for line in text.splitlines():
@@ -311,10 +426,11 @@ def update_component(asc_path: str | Path, refdes: str, new_value: float) -> Pat
     """Set the Value of a single L/C component, preserving the rest of the
     schematic. Writes in-place and returns the path."""
     p = Path(asc_path)
-    lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    doc = _decode_asc(p)
     out_lines: list[str] = []
     cur_refdes: str | None = None
-    for line in lines:
+    found = False
+    for line in doc.text.splitlines():
         if line.startswith("SYMBOL "):
             cur_refdes = None
             out_lines.append(line)
@@ -323,7 +439,17 @@ def update_component(asc_path: str | Path, refdes: str, new_value: float) -> Pat
             out_lines.append(line)
         elif line.startswith("SYMATTR Value ") and cur_refdes == refdes:
             out_lines.append(f"SYMATTR Value {to_ltspice_value(new_value)}")
+            found = True
         else:
             out_lines.append(line)
-    p.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+    if not found:
+        raise KeyError(
+            f"No component {refdes!r} in {p}. Writing the file back unchanged "
+            "would look like a successful edit; refusing instead."
+        )
+
+    # Write back in the encoding and line endings we found, so editing one
+    # value in a user's schematic does not rewrite the whole file.
+    p.write_bytes(doc.render(out_lines))
     return p
