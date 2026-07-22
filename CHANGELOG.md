@@ -9,6 +9,48 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — harmonic balance via Xyce (#24, mcp-qucs-s)
+
+`run_harmonic_balance` was scaffolded: it detected Xyce and then returned
+`error("not yet implemented")`. It now runs a real analysis.
+
+- **`mcp_qucs_s.harmonic_balance`** builds the `.HB` netlist, runs Xyce,
+  and parses the frequency-domain output into a single-sided spectrum.
+  One tone gives harmonic distortion; two give the intermodulation
+  products, IM3, OIP3 and IIP3.
+- **`sweep_compression_point`** is a new tool: sweep drive level and locate
+  P1dB by interpolating where gain falls 1 dB below its small-signal value.
+- Missing Xyce still returns an `error()` envelope, now pointing at the
+  source-build instructions rather than at binaries that do not exist for
+  Debian/Ubuntu.
+
+Validated against a closed form rather than a plausible-looking number: for
+a behavioural cubic `V(out) = a1·V(in) + a3·V(in)³` the third-order
+intercept is exactly `A = sqrt(4·a1/(3·a3))`, and the computed IIP3 matches
+it to **0.001 dB**. IM3 tracks the textbook 3:1 slope (30.00 dB per 10 dB
+of drive) and the intercept does not drift with drive level. A diode pair
+is the more realistic-looking test circuit but a poor validator — its I-V
+is exponential, not cubic, so its products never follow a 3:1 slope.
+
+Three Xyce behaviours found the hard way and now documented in
+`docs/installation.md`:
+
+- `.HB` needs one `NUMFREQ` entry **per tone**; a single value with two
+  tones aborts the run.
+- `^` in a behavioural `B`-source expression makes the HB startup transient
+  diverge; explicit multiplication works.
+- `.PRINT HB_FD` emits a **two-sided** spectrum, so a positive-frequency
+  bin folds to twice its printed magnitude (DC does not).
+
+### Fixed — documentation (docs/installation.md)
+
+The Xyce section pointed at "pre-built debs" from Sandia. Those do not
+exist: Sandia's Linux binaries are RHEL 8 RPMs that explicitly do not run
+on Debian/Ubuntu, and the team no longer ships open-source binaries at all.
+Replaced with the verified source build (Trilinos 14.4 + Xyce 7.10, ~17 min
+on 8 cores), including the GCC-15 incompatibility that otherwise fails the
+Trilinos build at ~30%.
+
 ### Fixed — three silent-correctness bugs (#31, #32, #35)
 
 - **`.asc` I/O assumed UTF-8/LF (#31).** LTspice XVII writes UTF-16LE with a
