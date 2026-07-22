@@ -166,13 +166,17 @@ def _refdes_index(name: str) -> int:
     return int(m.group())
 
 
-def _needs_wine(exe: Path) -> bool:
+def _needs_wine(exe: Path, os_name: str | None = None) -> bool:
     """True when ``exe`` is a Windows binary we must launch through Wine.
 
     On native Windows a ``.exe`` runs directly — requiring Wine there
     would make LTspice unusable on the platform it ships for.
+
+    ``os_name`` defaults to the real platform and exists so tests can
+    exercise both branches: monkeypatching ``os.name`` globally makes
+    ``pathlib`` try to build a ``WindowsPath`` on POSIX, which raises.
     """
-    return exe.suffix.lower() == ".exe" and os.name != "nt"
+    return exe.suffix.lower() == ".exe" and (os_name or os.name) != "nt"
 
 
 def _to_wine_path(wine: Path, path: Path) -> str:

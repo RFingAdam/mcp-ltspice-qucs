@@ -136,17 +136,20 @@ def test_failure_message_carries_returncode_and_command(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_needs_wine_only_off_windows(monkeypatch) -> None:
-    """A .exe runs directly on Windows; Wine is only needed elsewhere."""
-    monkeypatch.setattr("mcp_ltspice.runner.os.name", "posix")
-    assert _needs_wine(Path("/x/LTspice.exe")) is True
-    monkeypatch.setattr("mcp_ltspice.runner.os.name", "nt")
-    assert _needs_wine(Path("C:/x/LTspice.exe")) is False
+def test_needs_wine_only_off_windows() -> None:
+    """A .exe runs directly on Windows; Wine is only needed elsewhere.
+
+    Passes os_name explicitly rather than monkeypatching os.name: that
+    patch is global, and pathlib consults it to decide which Path
+    flavour to build, so "nt" makes Path() raise on a POSIX runner.
+    """
+    assert _needs_wine(Path("/x/LTspice.exe"), os_name="posix") is True
+    assert _needs_wine(Path("C:/x/LTspice.exe"), os_name="nt") is False
 
 
-def test_needs_wine_false_for_native_binary(monkeypatch) -> None:
-    monkeypatch.setattr("mcp_ltspice.runner.os.name", "posix")
-    assert _needs_wine(Path("/Applications/LTspice.app/Contents/MacOS/LTspice")) is False
+def test_needs_wine_false_for_native_binary() -> None:
+    exe = Path("/Applications/LTspice.app/Contents/MacOS/LTspice")
+    assert _needs_wine(exe, os_name="posix") is False
 
 
 def test_to_wine_path_translates_via_winepath(monkeypatch) -> None:
