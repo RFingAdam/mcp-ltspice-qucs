@@ -58,6 +58,29 @@ The agent calls `synthesize_lc_filter`:
 It returns the ideal L/C values plus a Touchstone `.s2p` of the ideal
 response.
 
+### Registering your own vendor models
+
+The curated catalogues cover a handful of representative RF series. For
+third-party or measured parts — Würth, AVX, TDK, distributor exports, or your
+own lab `.s2p` files — point the MCP at a directory:
+
+```text
+my_models/
+├── wurth_L_3n3.s2p     # inductor, 3.3 nH  (name shorthand + measured)
+├── wurth_L_4n7.s2p
+└── avx_C_2p2.s2p       # capacitor, 2.2 pF
+```
+
+> *"Register `~/my_models` as a vendor namespace called `user_wurth`."*
+
+The agent calls `register_user_vendor_dir`. Each file's kind (L/C), value and
+self-resonant frequency are recovered from the measured reactance
+(series-through fixture, `Z = 2·Z₀·(1−S21)/S21`) and cross-checked against the
+filename. Afterwards `substitute_real_components(inductor_vendor="user_wurth",
+...)` treats them like any curated series. Registering multiple labelled
+directories (`user_wurth`, `user_lab_2024`) keeps them from colliding, and
+re-registering refreshes the index.
+
 ## Step 2 — Substitute real parts
 
 > *"Snap the inductors to Coilcraft 0402HP and the caps to Murata GJM C0G."*
