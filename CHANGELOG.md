@@ -9,6 +9,26 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — validate_against_spice (#16, mcp-ltspice)
+
+The whole pipeline — synthesise, place zeros, substitute real vendor parts,
+optimise, Monte Carlo — can run end to end on the closed-form ladder without
+a single SPICE run. That is the right default for a fast inner loop, but it
+silently drops everything a real simulation captures (vendor `.lib`
+subcircuits, DC-bias/temperature behaviour, ground and supply
+non-idealities, measured vendor S-parameters via `.include`), so a reported
+yield could be an artefact of the lumped-element approximation.
+
+`validate_against_spice` closes the loop: it runs the schematic through a
+real simulator, extracts the S-parameters, computes the analytical response
+for the same components, and returns a per-region |S21| divergence plus a
+verdict — `agree`, `minor_disagreement`, `disagree`, or `spice_unavailable`.
+Passband and stopband are separated by the analytical response itself, each
+judged against its own threshold. A passband disagreement adds an explicit
+warning that the analytical margin should not be trusted. With no simulator
+installed it returns the analytical response and `spice_unavailable` rather
+than failing, so it is safe to call unconditionally.
+
 ### Added — elliptic high-pass synthesis (#26, partial: HPF)
 
 `synthesize_lc_hpf("elliptic", ...)` now works; it previously raised
