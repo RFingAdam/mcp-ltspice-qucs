@@ -58,6 +58,32 @@ def test_lumped_to_distributed_tool() -> None:
     assert env.data["n_elements"] >= 3
 
 
+def test_synthesize_stepped_impedance_lpf_tool() -> None:
+    env = server.synthesize_stepped_impedance_lpf(
+        components={"L1": 5e-9, "C2": 2e-12, "L3": 5e-9},
+        cutoff_hz=1e9,
+        substrate={"er": 4.4, "h_mm": 1.6},
+        z_high_ohm=120.0,
+        z_low_ohm=20.0,
+    )
+    assert env.status == "ok"
+    assert env.data["n_sections"] == 3
+    assert [s["role"] for s in env.data["sections"]] == ["high_z", "low_z", "high_z"]
+    assert all(s["width_mm"] > 0 and s["length_mm"] > 0 for s in env.data["sections"])
+
+
+def test_synthesize_stepped_impedance_lpf_tool_error_envelope() -> None:
+    env = server.synthesize_stepped_impedance_lpf(
+        components={"L1": 5e-9},
+        cutoff_hz=1e9,
+        substrate={"er": 4.4, "h_mm": 1.6},
+        z_high_ohm=40.0,  # not above the 50 Ω system impedance
+        z_low_ohm=20.0,
+    )
+    assert env.status == "error"
+    assert "z_high" in env.error
+
+
 def test_run_sp_analysis_returns_error_when_qucs_missing(monkeypatch) -> None:
     monkeypatch.setattr("mcp_qucs_s.server.is_qucs_available", lambda: False)
     env = server.run_sp_analysis(netlist_path="/nope.net", output_s2p="/nope.s2p")
