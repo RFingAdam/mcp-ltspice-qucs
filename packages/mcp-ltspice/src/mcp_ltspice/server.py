@@ -125,6 +125,7 @@ from mcp_ltspice.synthesis import (
 )
 from mcp_ltspice.validate import result_to_payload as _validation_payload
 from mcp_ltspice.validate import validate_against_spice as _validate_against_spice
+from mcp_ltspice.vendor_fetch import register_user_vendor_dir as _register_user_vendor_dir
 from mcp_ltspice.vendor_models import (
     list_vendor_parts as _list_vendor_parts,
 )
@@ -2126,6 +2127,36 @@ def validate_against_spice(
         return error(f"validate_against_spice failed: {e}", tool_version=__version__)
 
 
+@mcp.tool(
+    description=(
+        "Index a directory of user-supplied vendor models (.s2p / .lib) so "
+        "they appear as substitution candidates under a namespace. After "
+        "registering, substitute_real_components(inductor_vendor='<namespace>', "
+        "...) uses them like any curated series. Kind (L/C), value and SRF are "
+        "recovered from the measured reactance (series-through fixture) and the "
+        "filename shorthand (e.g. part_L_3n3.s2p). Re-registering a directory "
+        "refreshes the index. Per-file errors are reported, not fatal."
+    ),
+)
+def register_user_vendor_dir(
+    directory: Annotated[str, Field(description="Directory of .s2p / .lib model files.")],
+    namespace: Annotated[
+        str, Field(description="Label for this set, e.g. 'user' or 'user_wurth'.")
+    ] = "user",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _register_user_vendor_dir(directory, namespace=namespace)
+        env: Envelope[dict[str, Any]] = ok(
+            result, runtime_sec=timer.elapsed(), tool_version=__version__
+        )
+        for err in result.get("errors", []):
+            env.warnings.append(f"{err['file']}: {err['error']}")
+        return env
+    except Exception as e:
+        return error(f"register_user_vendor_dir failed: {e}", tool_version=__version__)
+
+
 # ---------------------------------------------------------------------------
 # Tool namespacing — register namespaced aliases alongside the flat names
 # ---------------------------------------------------------------------------
@@ -2150,6 +2181,7 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "monte_carlo_analysis": "filter.monte_carlo",
     "stability_check": "filter.stability_check",
     "validate_against_spice": "filter.validate_against_spice",
+    "register_user_vendor_dir": "filter.register_user_vendor_dir",
     "parameter_sweep": "filter.parameter_sweep",
     "corner_analysis": "filter.corner_analysis",
     "sensitivity_analysis": "filter.sensitivity",
