@@ -12,6 +12,7 @@ from mcp_qucs_s import __version__
 from mcp_qucs_s.couplers import synthesize_coupler as _synthesize_coupler
 from mcp_qucs_s.distributed import coupled_line_bpf as _coupled_line_bpf
 from mcp_qucs_s.distributed import hairpin_bpf as _hairpin_bpf
+from mcp_qucs_s.distributed import interdigital_bpf as _interdigital_bpf
 from mcp_qucs_s.distributed import stepped_impedance_lpf as _stepped_impedance_lpf
 from mcp_qucs_s.harmonic_balance import analyze as _hb_analyze
 from mcp_qucs_s.harmonic_balance import sweep_compression as _hb_sweep_compression
@@ -102,6 +103,7 @@ def status() -> Envelope[dict[str, Any]]:
                 "synthesize_stepped_impedance_lpf",
                 "synthesize_coupled_line_bpf",
                 "synthesize_hairpin_bpf",
+                "synthesize_interdigital_bpf",
             ],
             "sim_tools_requiring_qucs_s": [
                 "run_sp_analysis",
@@ -358,6 +360,44 @@ def synthesize_hairpin_bpf(
         return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"synthesize_hairpin_bpf failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize an interdigital microstrip BPF from LPF prototype "
+        "g-coefficients: N coupled λ/4 resonators, alternately shorted, "
+        "tapped I/O. Couplings k = Δ/√(g_i·g_j) are realised exactly on the "
+        "same-velocity TEM array model (closed-form pair-resonance split); "
+        "the tap point comes from the shorted-λ/4 slope parameter. Returns "
+        "resonator/coupling tables with per-pair (W, S) plus the exact array "
+        "description (y_c, segments, terminations) for simulation. "
+        "Unrealizable Δ/Z_resonator combinations are rejected."
+    ),
+)
+def synthesize_interdigital_bpf(
+    g_coefficients: list[float],
+    f0_hz: Annotated[float, Field(gt=0, description="Passband centre frequency.")],
+    fractional_bandwidth: Annotated[float, Field(gt=0, lt=1)],
+    substrate: dict[str, float] | str,
+    z0_ohm: Annotated[float, Field(gt=0)] = 50.0,
+    z_resonator_ohm: Annotated[float, Field(gt=0)] = 70.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        sub = _substrate(substrate)
+        result = _interdigital_bpf(
+            g_coefficients,
+            f0_hz,
+            fractional_bandwidth,
+            z0=z0_ohm,
+            substrate=sub,
+            z_resonator_ohm=z_resonator_ohm,
+        )
+        result = dict(result)
+        result["y_c"] = [[float(v) for v in row] for row in result["y_c"]]
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"synthesize_interdigital_bpf failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
