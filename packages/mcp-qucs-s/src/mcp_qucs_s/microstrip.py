@@ -63,7 +63,7 @@ def _eff_permittivity(w_h: float, er: float) -> float:
         + (1.0 / 18.7) * math.log(1.0 + (w_h / 18.1) ** 3)
     )
     b = 0.564 * ((er - 0.9) / (er + 3.0)) ** 0.053
-    return (er + 1) / 2 + (er - 1) / 2 * (1 + 10 / w_h) ** (-a * b)
+    return float((er + 1) / 2 + (er - 1) / 2 * (1 + 10 / w_h) ** (-a * b))
 
 
 def _impedance(w_h: float, er_eff: float) -> float:
