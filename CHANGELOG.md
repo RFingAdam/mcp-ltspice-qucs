@@ -9,6 +9,41 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — elliptic band-pass / band-stop synthesis (#26, mcp-ltspice + mcp-qucs-s)
+
+`synthesize_lc_bpf` and `synthesize_lc_bsf` now accept
+`filter_type="elliptic"` (odd order ≥ 3), completing the elliptic family
+started by the HPF in the previous release. The Pozar §8.5 band transforms
+act on each L and C of the LPF prototype *separately*, so every shunt
+series-LC trap becomes a **four-element composite branch** — a series-LC in
+series with a parallel-LC tank, to ground — that shorts at the two images
+of the prototype zero: `ω = ω₀(√(b²+1) ± b)` with `b = ω_z·Δ/2` (BPF,
+notch pairs straddling the passband) or `b = Δ/(2ω_z)` (BSF, pairs inside
+the notch; the main-path tanks add a zero at ω₀ itself).
+
+Supporting plumbing, since no existing element type could express that
+branch:
+
+- `mcp_ltspice.extract` gains the `shunt_composite_trap` element
+  (`{L_s, C_s, L_p, C_p}`), and `components_dict_to_elements` pairs the
+  four-key refdes group `{Lk_s, Ck_s, Lk, Ck}` emitted by the synthesis.
+- `mcp_qucs_s.netlist.generate_ladder_netlist` emits the branch as four
+  uniquely-named parts (`L3s/C3s/L3p/C3p`).
+- The v0.2.0 math-consistency invariant generalises: reported
+  `transmission_zeros_hz` are the roots of
+  `u²·L_sC_sL_pC_p − u·(L_sC_s + L_pC_p + L_pC_s) + 1 = 0` computed from
+  the *physical* component values, and tests pin them to the closed-form
+  mapped zeros to 1e-9 relative.
+- Validated against real qucsator-RF at orders 5/7/9 for both kinds:
+  analytical ladder and simulator agree to within 0.02 mdB across a
+  100 MHz–10 GHz sweep.
+- The `synthesize_lc_hpf_filter` / `_bpf_filter` / `_bsf_filter` MCP tool
+  descriptions no longer claim elliptic is unsupported (stale since the
+  HPF landed), and all three now return `transmission_zeros_hz`.
+
+Elliptic BPF/BSF designs are always `series_first` (the prototype
+extraction is T-form only); a `shunt_first` request is coerced.
+
 ### Added — register_user_vendor_dir (#11, mcp-ltspice)
 
 Engineers routinely have third-party or measured `.s2p` files — Würth, AVX,
