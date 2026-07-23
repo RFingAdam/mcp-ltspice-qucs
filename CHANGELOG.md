@@ -9,6 +9,18 @@ grouped by package.
 
 ## [Unreleased]
 
+### CI — windows-latest job for native simulator discovery (#40)
+
+A `windows-latest` job now runs the suite on real `nt`: it asserts
+`_needs_wine()` is `False` for a native `.exe` without the `os_name`
+test hook, exercises `find_ltspice()` walking the `C:/Program Files`
+candidates with no `WINEPREFIX`, and shakes out Windows `Path`
+semantics across the tests (LTspice itself is proprietary and not
+installed; simulator-gated tests skip cleanly). First Windows landmine
+fixed on the way: the render server-tool test used `/proc/...` as an
+"unwritable" path, which Windows would happily create — replaced with a
+file-as-parent-directory, which fails on every platform.
+
 ### Chore — mypy ratchet complete: zero disabled error codes (#37)
 
 The last three deferred type-completeness codes are re-enabled and
