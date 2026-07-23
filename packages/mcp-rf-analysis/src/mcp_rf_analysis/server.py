@@ -25,6 +25,9 @@ from mcp_rf_analysis.coex import (
 from mcp_rf_analysis.coex import (
     lookup_harmonic_victims as _lookup_harmonic_victims,
 )
+from mcp_rf_analysis.coex_zeros import (
+    place_zeros_for_coex as _place_zeros_for_coex,
+)
 
 # Phase 7
 from mcp_rf_analysis.emc import (
@@ -362,6 +365,45 @@ def check_coex_matrix(
         rx_list,
         antenna_iso_db=antenna_iso_db,
         default_filter_rejection_db=default_filter_rejection_db,
+    )
+
+
+@mcp.tool(
+    description=(
+        "Compute optimal elliptic-filter transmission-zero frequencies for "
+        "coexistence: for each harmonic landing [n·f_lo, n·f_hi], the zero "
+        "goes at the severity-weighted centroid of the victim-band overlap "
+        "intervals (not the landing centre). Victims come from the caller "
+        "(optional per-band severity) plus, optionally, this package's GNSS "
+        "and FCC-restricted tables. Returns zeros with trap-index hints "
+        "matching mcp-ltspice's elliptic convention (lowest zero → trap 2) "
+        "for direct composition with place_transmission_zero, a markdown "
+        "rationale, and the victims left unprotected by the zero budget."
+    )
+)
+def place_zeros_for_coex(
+    passband_hz: Annotated[
+        list[float], Field(description="[f_low_hz, f_high_hz] of the TX passband.")
+    ],
+    harmonics: Annotated[list[int], Field(description="Harmonic orders to protect, e.g. [2, 3].")],
+    victim_bands: Annotated[
+        list[dict[str, Any]],
+        Field(description="[{name, freq_range_hz: [lo, hi], severity?}] — severity defaults to 1."),
+    ],
+    n_zeros: Annotated[
+        int | None, Field(description="Zero budget; default = one per harmonic.")
+    ] = None,
+    include_gnss: bool = True,
+    include_fcc_restricted: bool = True,
+) -> Envelope[dict[str, Any]]:
+    return _wrap(
+        _place_zeros_for_coex,
+        (passband_hz[0], passband_hz[1]) if len(passband_hz) == 2 else tuple(passband_hz),
+        harmonics,
+        victim_bands,
+        n_zeros=n_zeros,
+        include_gnss=include_gnss,
+        include_fcc_restricted=include_fcc_restricted,
     )
 
 
