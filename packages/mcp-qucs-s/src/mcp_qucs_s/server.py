@@ -11,6 +11,7 @@ from pydantic import Field
 from mcp_qucs_s import __version__
 from mcp_qucs_s.couplers import synthesize_coupler as _synthesize_coupler
 from mcp_qucs_s.distributed import coupled_line_bpf as _coupled_line_bpf
+from mcp_qucs_s.distributed import hairpin_bpf as _hairpin_bpf
 from mcp_qucs_s.distributed import stepped_impedance_lpf as _stepped_impedance_lpf
 from mcp_qucs_s.harmonic_balance import analyze as _hb_analyze
 from mcp_qucs_s.harmonic_balance import sweep_compression as _hb_sweep_compression
@@ -100,6 +101,7 @@ def status() -> Envelope[dict[str, Any]]:
                 "lumped_to_distributed",
                 "synthesize_stepped_impedance_lpf",
                 "synthesize_coupled_line_bpf",
+                "synthesize_hairpin_bpf",
             ],
             "sim_tools_requiring_qucs_s": [
                 "run_sp_analysis",
@@ -317,6 +319,45 @@ def synthesize_coupled_line_bpf(
         return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"synthesize_coupled_line_bpf failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a hairpin microstrip BPF (folded edge-coupled / "
+        "Cristal-Frankel hairpin-line) from LPF prototype g-coefficients. "
+        "Each half-wave resonator is folded into a U; the bend connector's "
+        "electrical length is compensated by shortening every coupled section "
+        "to 90° − θ_bend/2 so resonators stay at exactly 180° at f0. Returns "
+        "the coupled sections (W, S, L), the per-resonator arm/bend table, "
+        "and honest notes on what is not modeled (corner discontinuities, "
+        "cross-arm self-coupling)."
+    ),
+)
+def synthesize_hairpin_bpf(
+    g_coefficients: list[float],
+    f0_hz: Annotated[float, Field(gt=0, description="Passband centre frequency.")],
+    fractional_bandwidth: Annotated[float, Field(gt=0, lt=1)],
+    substrate: dict[str, float] | str,
+    z0_ohm: Annotated[float, Field(gt=0)] = 50.0,
+    bend_mm: Annotated[
+        float | None,
+        Field(description="U-bend connector length; default 3× the mean arm width."),
+    ] = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        sub = _substrate(substrate)
+        result = _hairpin_bpf(
+            g_coefficients,
+            f0_hz,
+            fractional_bandwidth,
+            z0=z0_ohm,
+            substrate=sub,
+            bend_mm=bend_mm,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"synthesize_hairpin_bpf failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
