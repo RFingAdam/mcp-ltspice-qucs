@@ -36,9 +36,24 @@ def predict_radiated_emissions_loop(
     - ``measurement_distance_m``: 3m or 10m per the standard
 
     Returns: E-field in dBµV/m at the measurement distance.
+
+    Regime: this is the **far-field** small-loop expression
+    (equivalently ``E = 131.6e-16 · f² · A · I / r`` — Ott's constant is
+    η₀·π/c² = 131.68×10⁻¹⁶). It is valid only for ``r > λ/2π`` (beyond
+    the radian sphere) and loop dimensions ≪ λ; inside the near field
+    the 1/r² and 1/r³ terms dominate and this formula under-predicts,
+    so the guard below raises rather than returning a silently wrong
+    regulatory number.
     """
     if current_a <= 0 or loop_area_cm2 <= 0 or freq_hz <= 0:
         raise ValueError("All inputs must be positive")
+    boundary_m = C0 / (2.0 * math.pi * freq_hz)
+    if measurement_distance_m <= boundary_m:
+        raise ValueError(
+            f"Near-field: measurement_distance_m={measurement_distance_m:g} m is inside "
+            f"the radian sphere λ/2π = {boundary_m:.3g} m at {freq_hz / 1e6:.3g} MHz — "
+            "the far-field small-loop formula does not apply there."
+        )
     a_m2 = loop_area_cm2 * 1e-4
     h_a_per_m = (math.pi * current_a * a_m2 * freq_hz**2) / (C0**2 * measurement_distance_m)
     e_v_per_m = ETA0 * h_a_per_m
