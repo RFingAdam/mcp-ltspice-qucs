@@ -75,6 +75,36 @@ jobs:
       - name: Run pytest with coverage
         run: uv run pytest -q --cov --cov-report=xml --cov-report=term
 
+  test-windows:
+    # Covers the native-Windows simulator-discovery branch (issue #40):
+    # _needs_wine() on a real nt platform without the os_name test hook,
+    # find_ltspice() walking C:/Program Files candidates with no
+    # WINEPREFIX, and Windows Path semantics across the suite. LTspice
+    # itself is proprietary and not installed; ltspice/ngspice/qucs
+    # -gated tests skip cleanly.
+    name: Test (windows-latest, native discovery)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync workspace
+        run: uv sync --all-packages
+
+      - name: Native discovery branch (no os_name hook)
+        run: uv run python -c "from pathlib import Path; from mcp_ltspice.runner import _needs_wine, find_ltspice; assert _needs_wine(Path('C:/Program Files/ADI/LTspice/LTspice.exe')) is False, 'a native .exe must not need wine on nt'; print('needs_wine: False OK; find_ltspice ->', find_ltspice())"
+
+      - name: Run pytest
+        run: uv run pytest -q
+
   example:
     name: Basic LPF design example
     runs-on: ubuntu-latest
