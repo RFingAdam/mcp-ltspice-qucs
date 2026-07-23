@@ -100,7 +100,8 @@ jobs:
         run: uv sync --all-packages
 
       - name: Native discovery branch (no os_name hook)
-        run: uv run python -c "from pathlib import Path; from mcp_ltspice.runner import _needs_wine, find_ltspice; assert _needs_wine(Path('C:/Program Files/ADI/LTspice/LTspice.exe')) is False, 'a native .exe must not need wine on nt'; print('needs_wine: False OK; find_ltspice ->', find_ltspice())"
+        run: |
+          uv run python -c "from pathlib import Path; from mcp_ltspice.runner import _needs_wine, find_ltspice; assert _needs_wine(Path('C:/Program Files/ADI/LTspice/LTspice.exe')) is False, 'a native .exe must not need wine on nt'; print('needs_wine False OK / find_ltspice ->', find_ltspice())"
 
       - name: Run pytest
         run: uv run pytest -q
