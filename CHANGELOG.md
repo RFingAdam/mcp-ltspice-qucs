@@ -9,6 +9,38 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — stepped-impedance microstrip LPF (#27, first distributed topology, mcp-qucs-s)
+
+`synthesize_stepped_impedance_lpf` maps a lumped LPF ladder (the same
+composition contract as `lumped_to_distributed`) to alternating high-Z /
+low-Z microstrip sections per Pozar §8.6: series L → high-Z section with
+`βl = ω_c·L/Z_h`, shunt C → low-Z section with `βl = ω_c·C·Z_l`, widths
+and lengths from the existing Hammerstad-Jensen synthesis. Sections
+exceeding the `βl < 45°` short-line approximation are flagged in notes.
+The math is pinned to Pozar 4e Example 8.6 — the six electrical lengths
+(11.86°, 33.76°, 44.27°, 46.12°, 32.41°, 12.36°) and the section widths
+(11.27 mm / 0.430 mm vs the published 11.3 mm / 0.428 mm) reproduce the
+book design.
+
+Validation plumbing, all probe-verified against qucsator-RF 1.0.7:
+
+- `generate_ladder_netlist` gains a `series_tline` element (ideal line;
+  qucsator's `TLIN` propagates at c, so the emitter encodes electrical
+  length as `L = θ/360 · c/f_ref` — established with a λ/4-inverter probe
+  netlist that returned |S11| = 0.6000 exactly).
+- New `generate_microstrip_ladder_netlist` emits a shared `SUBST` card
+  plus an `MLIN` cascade (Hammerstad model, Kirschning dispersion), so
+  designs run through qucsator's *real* microstrip model.
+- New `tline_cascade_sparams` computes the analytical ideal-line cascade;
+  it matches the qucsator TLIN netlist to numerical precision (< 1 µdB).
+- End-to-end on the Pozar example: analytical −3 dB at 2.418 GHz (−3.3%
+  vs design — the known approximation shift), real-microstrip MLIN run
+  −3 dB at 2.398 GHz (−4.1%) with 21 dB stopband at 4 GHz, matching the
+  published response.
+
+Remaining #27 topologies (hairpin, interdigital, combline) ship
+separately.
+
 ### Added — elliptic band-pass / band-stop synthesis (#26, mcp-ltspice + mcp-qucs-s)
 
 `synthesize_lc_bpf` and `synthesize_lc_bsf` now accept
