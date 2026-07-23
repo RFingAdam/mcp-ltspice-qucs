@@ -9,6 +9,19 @@ grouped by package.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.5.0] — 2026-07-23
+
+The release that emptied the issue tracker. Every simulation backend
+(ngspice, LTspice, qucsator-RF, Xyce) is driveable and validated; the
+filter portfolio gains the full elliptic family and all five
+distributed microstrip topologies on an exact coupled-line TEM model;
+the coexistence chain runs closed-loop from victim bands to a realized,
+vendor-substituted design; mypy runs with zero disabled error codes;
+and CI covers Linux (3.11–3.13) plus native Windows discovery.
+Highlights below, in reverse-merge order.
+
 ### CI — windows-latest job for native simulator discovery (#40)
 
 A `windows-latest` job now runs the suite on real `nt`: it asserts
