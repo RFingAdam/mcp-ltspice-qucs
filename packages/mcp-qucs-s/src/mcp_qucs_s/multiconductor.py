@@ -59,6 +59,34 @@ def mutual_for_k(k_target: float) -> float:
     return float(brentq(lambda r: interdigital_pair_k(r) - k_target, 1e-12, 0.999, xtol=1e-14))
 
 
+def combline_pair_split(
+    y_r: float, y_m: float, theta0_deg: float, f0_hz: float
+) -> tuple[float, float]:
+    """Resonance split of two adjacent combline resonators.
+
+    Both lines are shorted at the same end and tuned by
+    ``C = Y_r·cot(θ0)/ω0``. Keeping both top ends, the coupling block is
+    the same-end (−j·cotθ) one, so ``det = 0`` gives the exact
+    transcendental ``ω·C = (Y_r ± y_m)·cot(θ(ω))`` — the − branch is the
+    lower resonance, the + branch the upper. Returns ``(f_low, f_high)``.
+    """
+    if y_r <= 0 or y_m < 0 or not 0.0 < theta0_deg < 90.0:
+        raise ValueError(f"invalid pair: y_r={y_r}, y_m={y_m}, theta0={theta0_deg}")
+    t0 = math.radians(theta0_deg)
+    c_load = y_r * math.cos(t0) / math.sin(t0) / (2.0 * math.pi * f0_hz)
+
+    def residual(f: float, sign: float) -> float:
+        theta = t0 * f / f0_hz
+        return 2.0 * math.pi * f * c_load - (y_r + sign * y_m) / math.tan(theta)
+
+    # cotθ is monotone-decreasing on (0, π): one root per branch; the
+    # brackets keep θ safely inside (0, π).
+    f_180 = f0_hz * math.pi / t0
+    f_low = float(brentq(residual, 1e-3 * f0_hz, f0_hz, args=(-1.0,), xtol=1e-6))
+    f_high = float(brentq(residual, f0_hz, 0.99 * f_180, args=(+1.0,), xtol=1e-6))
+    return f_low, f_high
+
+
 def segmented_array_sparams(
     y_c: NDArray[np.float64],
     freq_hz: NDArray[np.float64],
@@ -68,6 +96,7 @@ def segmented_array_sparams(
     bottom: list[str],
     top: list[str],
     ports: list[tuple[int, int]] | None = None,
+    cap_loads: list[tuple[int, int, float]] | None = None,
     z0_system: float = 50.0,
 ) -> NDArray[np.complex128]:
     """Exact S-parameters of a stack of commensurate TEM array segments.
@@ -81,6 +110,8 @@ def segmented_array_sparams(
     ``"open"`` or ``"port"``); ``ports`` adds interior tap ports as
     (level, line) pairs. Port ordering: bottom ports by line index,
     then the ``ports`` list in order, then top ports by line index.
+    ``cap_loads`` attaches lumped capacitors to ground at (level, line,
+    farad) — combline loading; a load on a shorted node is rejected.
 
     Returns S of shape (npoints, nports, nports). Frequencies where a
     segment hits θ = m·π (the commensurate-line poles) are filled with
@@ -115,6 +146,13 @@ def segmented_array_sparams(
     if short_nodes & set(port_nodes):
         raise ValueError("a node cannot be both a short and a port")
 
+    load_entries: list[tuple[int, float]] = []
+    for level, line, farad in cap_loads or []:
+        n = node(level, line)
+        if n in short_nodes:
+            raise ValueError(f"cap load at ({level}, {line}) sits on a shorted node")
+        load_entries.append((n, farad))
+
     total = n_levels * n_lines
     keep = [n for n in range(total) if n not in short_nodes]
     kept_index = {n: i for i, n in enumerate(keep)}
@@ -146,6 +184,8 @@ def segmented_array_sparams(
         if singular:
             s_out[fi] = -eye_p
             continue
+        for n, farad in load_entries:
+            y_full[n, n] += 1j * 2.0 * math.pi * f * farad
 
         y_kept = y_full[np.ix_(keep, keep)]
         y_pp = y_kept[np.ix_(p_idx, p_idx)]
