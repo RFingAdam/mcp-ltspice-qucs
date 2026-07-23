@@ -133,9 +133,11 @@ class TestBpfSynthesis:
         with pytest.raises(ValueError, match="must exceed"):
             synthesize_lc_bpf("butterworth", order=3, f_low_hz=1100e6, f_high_hz=900e6)
 
-    def test_elliptic_raises(self):
-        with pytest.raises(NotImplementedError):
-            synthesize_lc_bpf("elliptic", order=5, f_low_hz=900e6, f_high_hz=1100e6)
+    def test_elliptic_is_supported(self):
+        """Elliptic BPF shipped with issue #26; the deep coverage lives in
+        test_elliptic_bpf_bsf.py — this is the API smoke check."""
+        d = synthesize_lc_bpf("elliptic", order=5, f_low_hz=900e6, f_high_hz=1100e6)
+        assert d.transmission_zeros_hz, "an elliptic BPF must report finite zeros"
 
 
 class TestBpfResponse:

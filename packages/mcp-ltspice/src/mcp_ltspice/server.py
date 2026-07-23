@@ -337,12 +337,13 @@ def synthesize_lc_filter(
         "Synthesize a high-pass LC ladder via the LPF→HPF frequency transformation "
         "(Pozar §8.5). Series inductors become series capacitors; shunt capacitors "
         "become shunt inductors. Components emitted as C1, L2, C3, L4, ... (T-topology). "
-        "Currently supports Butterworth and Chebyshev I (elliptic HPF not implemented)."
+        "Elliptic (odd order ≥3) inverts the LPF prototype ladder element-by-element, "
+        "moving each finite zero to ω_c²/ω_z in the lower stopband."
     ),
 )
 def synthesize_lc_hpf_filter(
     filter_type: Annotated[
-        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+        str, Field(description="'butterworth' | 'chebyshev1' | 'elliptic' (odd order ≥3).")
     ],
     order: Annotated[int, Field(ge=1, le=15)],
     cutoff_hz: Annotated[float, Field(gt=0, description="-3 dB cutoff frequency.")],
@@ -368,6 +369,7 @@ def synthesize_lc_hpf_filter(
             {
                 "components": design.components,
                 "g_coefficients": design.g,
+                "transmission_zeros_hz": design.transmission_zeros_hz,
                 "topology": design.topology.value,
                 "cutoff_hz": design.cutoff_hz,
                 "z0": z0,
@@ -387,12 +389,15 @@ def synthesize_lc_hpf_filter(
         "shunt capacitors become shunt-LC tanks (parallel-resonant). Component count "
         "doubles vs. the LPF prototype. f₀ = √(f_low · f_high) (geometric mean); "
         "fractional bandwidth Δ = (f_high - f_low) / f₀. Components emitted with "
-        "'_s' suffix on series-LC pairs. Butterworth / Chebyshev I only."
+        "'_s' suffix on series-LC pairs. Elliptic (odd order ≥3) maps each LPF trap "
+        "to a four-element composite shunt branch {Lk_s, Ck_s, Lk, Ck} whose two "
+        "resonances are the images ω₀(√(b²+1) ± b), b = ω_z·Δ/2, of the prototype "
+        "zero — notch pairs straddling the passband."
     ),
 )
 def synthesize_lc_bpf_filter(
     filter_type: Annotated[
-        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+        str, Field(description="'butterworth' | 'chebyshev1' | 'elliptic' (odd order ≥3).")
     ],
     order: Annotated[int, Field(ge=1, le=15)],
     f_low_hz: Annotated[float, Field(gt=0, description="Lower band edge.")],
@@ -420,6 +425,7 @@ def synthesize_lc_bpf_filter(
             {
                 "components": design.components,
                 "g_coefficients": design.g,
+                "transmission_zeros_hz": design.transmission_zeros_hz,
                 "topology": design.topology.value,
                 "f_0_hz": design.metadata["f_0_hz"],
                 "f_low_hz": design.metadata["f_low_hz"],
@@ -440,12 +446,14 @@ def synthesize_lc_bpf_filter(
         "Synthesize a band-stop LC ladder via the LPF→BSF frequency transformation "
         "(Pozar §8.5). Series inductors become parallel-LC anti-resonators (open at f₀); "
         "shunt capacitors become series-LC resonators (short at f₀). Used to notch out "
-        "a specific band (e.g., LO leakage, image rejection). Butterworth / Chebyshev I only."
+        "a specific band (e.g., LO leakage, image rejection). Elliptic (odd order ≥3) "
+        "maps each LPF trap to a four-element composite shunt branch {Lk_s, Ck_s, Lk, Ck} "
+        "with zero pairs ω₀(√(b²+1) ± b), b = Δ/(2ω_z), inside the notch."
     ),
 )
 def synthesize_lc_bsf_filter(
     filter_type: Annotated[
-        str, Field(description="'butterworth' | 'chebyshev1' (elliptic not supported).")
+        str, Field(description="'butterworth' | 'chebyshev1' | 'elliptic' (odd order ≥3).")
     ],
     order: Annotated[int, Field(ge=1, le=15)],
     f_low_hz: Annotated[float, Field(gt=0, description="Lower stopband edge.")],
@@ -473,6 +481,7 @@ def synthesize_lc_bsf_filter(
             {
                 "components": design.components,
                 "g_coefficients": design.g,
+                "transmission_zeros_hz": design.transmission_zeros_hz,
                 "topology": design.topology.value,
                 "f_0_hz": design.metadata["f_0_hz"],
                 "f_low_hz": design.metadata["f_low_hz"],

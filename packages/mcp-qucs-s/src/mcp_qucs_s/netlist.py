@@ -36,6 +36,7 @@ LadderElementType = Literal[
     "shunt_lc_parallel",  # parallel LC to ground — BPF shunt section
     "series_lc_series",  # series LC in the main path — BPF series section
     "series_lc_parallel",  # parallel LC in the main path — BSF series section
+    "shunt_composite_trap",  # series LC + parallel LC in series, to ground — elliptic BPF/BSF trap
 ]
 
 SweepType = Literal["log", "lin"]
@@ -118,9 +119,21 @@ def _emit_element(
         lines.append(f'C:C{index} {node_in} {out} C="{_fmt(need("C"))}"')
         return lines, out
 
+    if kind == "shunt_composite_trap":
+        # Elliptic BPF/BSF trap image: series-LC (L_s, C_s) from the signal
+        # node into the tank node, then the parallel tank (L_p ∥ C_p) to
+        # ground. The branch shorts at its two mapped transmission zeros.
+        mid = nodes.next("_t")
+        tank = nodes.next("_t")
+        lines.append(f'L:L{index}s {node_in} {mid} L="{_fmt(need("L_s"))}"')
+        lines.append(f'C:C{index}s {mid} {tank} C="{_fmt(need("C_s"))}"')
+        lines.append(f'L:L{index}p {tank} {GROUND} L="{_fmt(need("L_p"))}"')
+        lines.append(f'C:C{index}p {tank} {GROUND} C="{_fmt(need("C_p"))}"')
+        return lines, node_in
+
     raise ValueError(
         f"Unknown ladder element {kind!r} at position {index}. "
-        f"Expected one of: {', '.join(sorted(_SERIES_KINDS | {'shunt_l', 'shunt_c', 'shunt_lc_trap', 'shunt_lc_parallel'}))}"
+        f"Expected one of: {', '.join(sorted(_SERIES_KINDS | {'shunt_l', 'shunt_c', 'shunt_lc_trap', 'shunt_lc_parallel', 'shunt_composite_trap'}))}"
     )
 
 

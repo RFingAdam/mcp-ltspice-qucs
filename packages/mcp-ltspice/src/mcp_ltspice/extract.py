@@ -41,6 +41,7 @@ ElementType = Literal[
     "series_lc_series",  # series-LC in main path (BPF series-section)
     "shunt_lc_parallel",  # parallel-LC to GND (BPF shunt-section)
     "series_lc_parallel",  # parallel-LC in main path (BSF series-section)
+    "shunt_composite_trap",  # series-LC + parallel-LC in series, to GND (elliptic BPF/BSF trap)
 ]
 
 
@@ -87,6 +88,7 @@ def ladder_sparams_from_components(
     - ``("series_lc_series", {"L": ..., "C": ...})`` — series-LC in main path (BPF series-section). ``Z = sL + 1/(sC)``; impedance dips at ω₀.
     - ``("shunt_lc_parallel", {"L": ..., "C": ...})`` — parallel-LC to GND (BPF shunt-section). ``Y = sC + 1/(sL)``; admittance dips at ω₀, blocking signal flow into the shunt branch in-band so it passes to the next series element.
     - ``("series_lc_parallel", {"L": ..., "C": ...})`` — parallel-LC in main path (BSF series-section). ``Z = sL / (s²LC + 1)``; impedance peaks at ω₀.
+    - ``("shunt_composite_trap", {"L_s": ..., "C_s": ..., "L_p": ..., "C_p": ...})`` — series-LC (L_s, C_s) in series with a parallel-LC tank (L_p ∥ C_p), the whole branch to GND. The image of an elliptic LPF trap under the BPF/BSF transform. ``Z = sL_s + 1/(sC_s) + sL_p/(s²L_pC_p + 1)``; the branch shorts at the two mapped transmission zeros — the roots of ``u²·L_sC_sL_pC_p − u·(L_sC_s + L_pC_p + L_pC_s) + 1 = 0`` in ``u = ω²``.
 
     Returns S of shape (npoints, 2, 2).
     """
@@ -152,6 +154,22 @@ def ladder_sparams_from_components(
                 den = np.where(np.abs(den) < den_floor, den_floor + 0j, den)
                 z_par = s_axis * l_t / den
             mat = _abcd_series_z(z_par)
+        elif kind == "shunt_composite_trap":
+            # Series-LC in series with a parallel-LC tank, to ground. Two
+            # floors: the tank denominator (its anti-resonance is a pole of
+            # the branch impedance — benign, Y → 0) and |Z| itself (the two
+            # branch resonances are shorts to ground, Y → ∞), mirroring the
+            # shunt_lc_trap / series_lc_parallel handling above.
+            l_s, c_s = params["L_s"], params["C_s"]
+            l_p, c_p = params["L_p"], params["C_p"]
+            den = s_axis**2 * l_p * c_p + 1.0
+            floor = 1e-30
+            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+                den = np.where(np.abs(den) < floor, floor + 0j, den)
+                z_branch: ComplexArray = s_axis * l_s + 1.0 / (s_axis * c_s) + s_axis * l_p / den
+                z_branch = np.where(np.abs(z_branch) < floor, floor + 0j, z_branch)
+                y = 1.0 / z_branch
+            mat = _abcd_shunt_y(y)
         else:
             raise ValueError(f"Unknown element type: {kind}")
         abcd = _chain(abcd, mat)
@@ -233,6 +251,9 @@ def components_dict_to_elements(
 
     - **Elliptic** — components are ``L1, L2+C2 (trap), L3, L4+C4 (trap), L5, ...``.
       ``Lk + Ck`` pairs at even ``k`` form shunt LC traps; lone ``Lk`` are series.
+      Under ``kind="bandpass"`` / ``"bandstop"`` each trap instead appears as
+      the four-key group ``{Lk_s, Ck_s, Lk, Ck}`` — a shunt composite branch
+      (series-LC + parallel tank in series, to ground).
 
     The ``transmission_zeros`` flag selects which interpretation to apply:
 
@@ -275,7 +296,9 @@ def components_dict_to_elements(
     sorted_names = sorted(components.keys(), key=_idx)
     elements: list[tuple[ElementType, dict[str, float]]] = []
 
-    # Bandpass: each LPF reactive maps to an LC pair.
+    # Bandpass: each LPF reactive maps to an LC pair — except an elliptic
+    # LPF trap, whose L and C transform separately into a FOUR-element
+    # composite shunt branch {Lk_s, Ck_s} (series pair) + {Lk, Ck} (tank).
     # series-first ⇒ odd-k = series-LC-series (BPF series section),
     #                 even-k = shunt-LC-parallel (BPF shunt section).
     if kind == "bandpass":
@@ -283,13 +306,32 @@ def components_dict_to_elements(
         sorted_indices = sorted({_idx(n) for n in components})
         for k in sorted_indices:
             l_key = f"L{k}"
+            l_s_key = f"L{k}_s"
             c_s_key = f"C{k}_s"
             c_key = f"C{k}"
             is_odd_k = k % 2 == 1
             in_main_path = (is_odd_k and topology == "series_first") or (
                 not is_odd_k and topology == "shunt_first"
             )
-            if l_key in components and c_s_key in components and in_main_path:
+            if l_s_key in components:
+                if in_main_path or not all(x in components for x in (c_s_key, l_key, c_key)):
+                    raise ValueError(
+                        f"BPF kind: {l_s_key} marks an elliptic composite trap, which "
+                        f"requires all of {{L{k}_s, C{k}_s, L{k}, C{k}}} at a shunt position"
+                    )
+                elements.append(
+                    (
+                        "shunt_composite_trap",
+                        {
+                            "L_s": components[l_s_key],
+                            "C_s": components[c_s_key],
+                            "L_p": components[l_key],
+                            "C_p": components[c_key],
+                        },
+                    )
+                )
+                seen.update({l_s_key, c_s_key, l_key, c_key})
+            elif l_key in components and c_s_key in components and in_main_path:
                 # series-LC pair in main path — BPF series section
                 elements.append(
                     ("series_lc_series", {"L": components[l_key], "C": components[c_s_key]})
@@ -311,20 +353,39 @@ def components_dict_to_elements(
                 )
         return elements
 
-    # Bandstop: same component-pair shape as BPF but resonator types flip.
+    # Bandstop: same component-pair shape as BPF but resonator types flip;
+    # the elliptic composite trap keeps the same four-key shape.
     # series-first ⇒ odd-k = series-LC-parallel (anti-resonant in main path),
     #                 even-k = shunt-LC-trap (series LC to ground).
     if kind == "bandstop":
         sorted_indices = sorted({_idx(n) for n in components})
         for k in sorted_indices:
             l_key = f"L{k}"
+            l_s_key = f"L{k}_s"
             c_s_key = f"C{k}_s"
             c_key = f"C{k}"
             is_odd_k = k % 2 == 1
             in_main_path = (is_odd_k and topology == "series_first") or (
                 not is_odd_k and topology == "shunt_first"
             )
-            if l_key in components and c_s_key in components and in_main_path:
+            if l_s_key in components:
+                if in_main_path or not all(x in components for x in (c_s_key, l_key, c_key)):
+                    raise ValueError(
+                        f"BSF kind: {l_s_key} marks an elliptic composite trap, which "
+                        f"requires all of {{L{k}_s, C{k}_s, L{k}, C{k}}} at a shunt position"
+                    )
+                elements.append(
+                    (
+                        "shunt_composite_trap",
+                        {
+                            "L_s": components[l_s_key],
+                            "C_s": components[c_s_key],
+                            "L_p": components[l_key],
+                            "C_p": components[c_key],
+                        },
+                    )
+                )
+            elif l_key in components and c_s_key in components and in_main_path:
                 # parallel-LC in main path — BSF series section
                 elements.append(
                     ("series_lc_parallel", {"L": components[l_key], "C": components[c_s_key]})
