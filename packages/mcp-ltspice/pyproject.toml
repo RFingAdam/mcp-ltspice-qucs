@@ -10,6 +10,7 @@ keywords = ["mcp", "ltspice", "ngspice", "spice", "filter-design", "rf-engineeri
 
 dependencies = [
     "rf-mcp-common",
+    "mcp-rf-analysis",
     "fastmcp>=2.0.0",
     "spicelib>=1.4.0",
     "scipy>=1.11",
