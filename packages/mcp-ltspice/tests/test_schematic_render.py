@@ -91,7 +91,8 @@ def test_server_tools_ok_and_error(tmp_path) -> None:
     blocker = tmp_path / "not_a_dir.txt"
     blocker.write_text("occupied")
     bad = server.render_lc_ladder_schematic(
-        components=BUTTER, output_path=str(blocker / "x.svg")  # file as parent dir fails everywhere
+        components=BUTTER,
+        output_path=str(blocker / "x.svg"),  # file as parent dir fails everywhere
     )
     assert bad.status == "error"
 

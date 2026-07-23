@@ -8,6 +8,7 @@ runner-detection tests still run to verify the auto-discovery logic.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -160,6 +161,9 @@ def test_to_wine_path_translates_via_winepath(monkeypatch) -> None:
     assert _to_wine_path(Path("/usr/bin/wine"), Path("/home/u/lpf.asc")) == "Z:\\home\\u\\lpf.asc"
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="exercises the Wine path, which never runs on native Windows"
+)
 def test_to_wine_path_falls_back_when_winepath_unavailable(monkeypatch) -> None:
     """A missing/broken winepath must not abort the run."""
 
@@ -301,6 +305,9 @@ def test_refdes_index_parses_and_rejects() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="exercises the Wine path, which never runs on native Windows"
+)
 def test_first_run_pending_when_no_ini_present(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("WINEPREFIX", str(tmp_path))
     (tmp_path / "drive_c/users/someone/AppData/Roaming").mkdir(parents=True)
@@ -327,6 +334,9 @@ def test_native_windows_exe_is_never_first_run_gated(tmp_path, monkeypatch) -> N
     assert ltspice_first_run_pending(Path("C:/LTspice.exe")) is False
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="exercises the Wine path, which never runs on native Windows"
+)
 def test_timeout_is_reported_with_first_run_guidance(tmp_path, monkeypatch) -> None:
     """A hang must surface as an actionable RuntimeError, not TimeoutExpired."""
     monkeypatch.setenv("WINEPREFIX", str(tmp_path))
