@@ -9,6 +9,25 @@ grouped by package.
 
 ## [Unreleased]
 
+### Tests — EMC closed-form anchors + schematic_render coverage (#34, #36)
+
+- `predict_radiated_emissions_loop` is now pinned to the textbook
+  far-field small-loop expression (Ott's `E = 131.6e-16·f²·A·I/r`;
+  the module's exact constant η₀·π/c² = 131.68e-16 agrees to 0.005 dB),
+  with dimensional-consistency checks (double area → +6.02 dB, double
+  distance → −6.02 dB) and a **new near-field guard**: measurements
+  inside the radian sphere (r ≤ λ/2π) now raise instead of returning a
+  silently wrong regulatory number, and the docstring states the regime.
+- `predict_conducted_emissions` is pinned to a hand-computed CISPR 16
+  LISN divider at 1 MHz (|Z| = 49.53 Ω, 100 µA → 73.90 dBµV, the full
+  complex arithmetic written out in the test docstring) plus current
+  scaling.
+- `schematic_render.py` (previously zero tests): ladder + elliptic
+  designs rendered to SVG and PNG headless, every refdes and formatted
+  value asserted present in the SVG text (catches silent mislabeling a
+  size check would miss), the .asc round-trip, and both server tools'
+  ok/error envelopes.
+
 ### Added — synthesize_for_coex_target closed loop (#14, mcp-ltspice)
 
 One MCP call now closes the loop the engineer used to orchestrate by
