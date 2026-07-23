@@ -123,6 +123,8 @@ from mcp_ltspice.synthesis import (
 from mcp_ltspice.synthesis import (
     place_transmission_zero as _place_transmission_zero,
 )
+from mcp_ltspice.validate import result_to_payload as _validation_payload
+from mcp_ltspice.validate import validate_against_spice as _validate_against_spice
 from mcp_ltspice.vendor_models import (
     list_vendor_parts as _list_vendor_parts,
 )
@@ -2053,6 +2055,77 @@ def build_design_report_pdf(
         )
 
 
+@mcp.tool(
+    description=(
+        "Run a real SPICE simulation on a schematic and reconcile it against "
+        "the closed-form analytical S2P for the same components. Reports the "
+        "per-region |S21| divergence and a verdict (agree / minor_disagreement "
+        "/ disagree). Use this before trusting a reported yield or margin that "
+        "came only from the fast analytical preview. If no simulator is "
+        "installed it returns verdict='spice_unavailable' with the analytical "
+        "response rather than failing."
+    ),
+)
+def validate_against_spice(
+    asc_path: Annotated[str, Field(description="Path to the .asc schematic to simulate.")],
+    components: Annotated[
+        dict[str, float],
+        Field(description="{refdes: value} describing the same ladder the .asc draws."),
+    ],
+    topology: Annotated[
+        str, Field(description="'series_first' or 'shunt_first'.")
+    ] = "series_first",
+    kind: Annotated[
+        str, Field(description="'lowpass', 'highpass', 'bandpass' or 'bandstop'.")
+    ] = "lowpass",
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    passband_threshold_db: Annotated[float, Field(gt=0)] = 0.5,
+    stopband_threshold_db: Annotated[float, Field(gt=0)] = 3.0,
+    prefer: Annotated[str | None, Field(description="'ltspice' | 'ngspice' | null (auto).")] = None,
+    output_spice_s2p: str | None = None,
+    output_analytical_s2p: str | None = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _validate_against_spice(
+            asc_path,
+            components,
+            topology=topology,
+            kind=kind,
+            z0=z0,
+            passband_threshold_db=passband_threshold_db,
+            stopband_threshold_db=stopband_threshold_db,
+            prefer=prefer,
+            timeout_sec=timeout_sec,
+        )
+
+        if output_analytical_s2p and result.analytical_network is not None:
+            write_touchstone(result.analytical_network, output_analytical_s2p)
+        if output_spice_s2p and result.spice_network is not None:
+            write_touchstone(result.spice_network, output_spice_s2p)
+
+        payload = _validation_payload(result, top_n_points=10)
+        if output_analytical_s2p and result.analytical_network is not None:
+            payload["analytical_s2p_path"] = str(output_analytical_s2p)
+        if output_spice_s2p and result.spice_network is not None:
+            payload["spice_s2p_path"] = str(output_spice_s2p)
+
+        env: Envelope[dict[str, Any]] = ok(
+            payload, runtime_sec=timer.elapsed(), tool_version=__version__
+        )
+        if result.note:
+            env.warnings.append(result.note)
+        if result.verdict.value == "disagree":
+            env.warnings.append(
+                "SPICE and the analytical preview disagree in the passband; the "
+                "analytical yield/margin numbers should not be trusted for this design."
+            )
+        return env
+    except Exception as e:
+        return error(f"validate_against_spice failed: {e}", tool_version=__version__)
+
+
 # ---------------------------------------------------------------------------
 # Tool namespacing — register namespaced aliases alongside the flat names
 # ---------------------------------------------------------------------------
@@ -2076,6 +2149,7 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "optimize_filter": "filter.optimize",
     "monte_carlo_analysis": "filter.monte_carlo",
     "stability_check": "filter.stability_check",
+    "validate_against_spice": "filter.validate_against_spice",
     "parameter_sweep": "filter.parameter_sweep",
     "corner_analysis": "filter.corner_analysis",
     "sensitivity_analysis": "filter.sensitivity",
