@@ -88,8 +88,11 @@ def test_server_tools_ok_and_error(tmp_path) -> None:
     env = server.render_lc_ladder_schematic(components=BUTTER, output_path=str(tmp_path / "ok.svg"))
     assert env.status == "ok"
 
+    blocker = tmp_path / "not_a_dir.txt"
+    blocker.write_text("occupied")
     bad = server.render_lc_ladder_schematic(
-        components=BUTTER, output_path="/proc/definitely/unwritable/x.svg"
+        components=BUTTER,
+        output_path=str(blocker / "x.svg"),  # file as parent dir fails everywhere
     )
     assert bad.status == "error"
 
