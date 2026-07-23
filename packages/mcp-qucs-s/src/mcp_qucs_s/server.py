@@ -10,6 +10,7 @@ from pydantic import Field
 
 from mcp_qucs_s import __version__
 from mcp_qucs_s.couplers import synthesize_coupler as _synthesize_coupler
+from mcp_qucs_s.distributed import stepped_impedance_lpf as _stepped_impedance_lpf
 from mcp_qucs_s.harmonic_balance import analyze as _hb_analyze
 from mcp_qucs_s.harmonic_balance import sweep_compression as _hb_sweep_compression
 from mcp_qucs_s.microstrip import (
@@ -96,6 +97,7 @@ def status() -> Envelope[dict[str, Any]]:
                 "analyze_microstrip",
                 "synthesize_coupler",
                 "lumped_to_distributed",
+                "synthesize_stepped_impedance_lpf",
             ],
             "sim_tools_requiring_qucs_s": [
                 "run_sp_analysis",
@@ -241,6 +243,43 @@ def lumped_to_distributed(
         return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"lumped_to_distributed failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a stepped-impedance microstrip LPF (Pozar §8.6) from a "
+        "lumped LPF ladder: series inductors become short high-Z sections "
+        "(βl = ω_c·L/Z_h), shunt capacitors short low-Z sections "
+        "(βl = ω_c·C·Z_l). Returns per-section impedance, electrical length "
+        "at cutoff, and microstrip width/length on the given substrate. "
+        "Sections exceeding the βl < 45° approximation are flagged in notes. "
+        "Simulate the result with simulate_lc_ladder-style netlists via "
+        "generate_microstrip_ladder_netlist (real MLIN model) or ideal "
+        "series_tline elements."
+    ),
+)
+def synthesize_stepped_impedance_lpf(
+    components: dict[str, float],
+    cutoff_hz: Annotated[float, Field(gt=0)],
+    substrate: dict[str, float] | str,
+    z0_ohm: Annotated[float, Field(gt=0)] = 50.0,
+    z_high_ohm: Annotated[float, Field(gt=0, description="High-Z section impedance.")] = 120.0,
+    z_low_ohm: Annotated[float, Field(gt=0, description="Low-Z section impedance.")] = 20.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        sub = _substrate(substrate)
+        result = _stepped_impedance_lpf(
+            components,
+            cutoff_hz,
+            z0=z0_ohm,
+            z_high=z_high_ohm,
+            z_low=z_low_ohm,
+            substrate=sub,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"synthesize_stepped_impedance_lpf failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
