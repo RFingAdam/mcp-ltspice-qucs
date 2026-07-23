@@ -9,6 +9,36 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — synthesize_for_coex_target closed loop (#14, mcp-ltspice)
+
+One MCP call now closes the loop the engineer used to orchestrate by
+hand: place transmission zeros on the victim-weighted harmonic
+centroids (#12) → synthesize the elliptic LPF and aim its traps
+(E24-snapped) → substitute real vendor parts → evaluate the realized
+ladder's rejection analytically → run the GNSS-aware coex matrix
+(#15) → escalate the order by 2 until the worst-case desense meets the
+target or `max_order` is reached (best-so-far returned with
+`converged=False` and the full iteration log either way).
+
+Realism handled explicitly rather than hidden:
+
+- The SRF spec targets the highest *placed zero* with the issue's 1.2
+  margin, degrading gracefully (1.2 → 1.0 → unchecked) with the margin
+  used reported per iteration — a 14 nH 0402 with SRF ≥ 3.3 GHz does
+  not exist, and a turn-key loop should say so, not die.
+- Zeros default to the dominant 2H/3H PA products (4H/5H sit ≥ 50 dBc
+  down pre-filter and their broad FCC landings would otherwise both
+  outrank 2H/3H and push the SRF spec beyond what 0402 can build); the
+  matrix still evaluates all harmonics through 5H.
+- The fundamental sees the filter's in-band rejection, each harmonic's
+  dBc is deepened by the rejection at n·f0, and GNSS victims get the
+  realized filter's rejection at *their* frequency injected into the
+  ΔC/N₀ model automatically.
+
+This is the one place mcp-ltspice depends on mcp-rf-analysis
+(one-directional, no cycle). Tests drive the real pipeline end to end —
+real synthesis fits, real vendor tables, real matrix, no mocks.
+
 ### Added — GNSS-specific desense in check_coex_matrix (#15, mcp-rf-analysis)
 
 RX entries may now set `victim_type: "gnss"`, switching that victim to
