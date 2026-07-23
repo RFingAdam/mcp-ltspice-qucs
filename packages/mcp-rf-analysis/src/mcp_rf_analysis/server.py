@@ -351,7 +351,16 @@ def lookup_harmonic_victims(
 
 
 @mcp.tool(
-    description="Compute the multi-radio coex aggressor × victim matrix with predicted desense."
+    description=(
+        "Compute the multi-radio coex aggressor × victim matrix with predicted "
+        "desense. RX entries may set victim_type='gnss' to switch to the "
+        "GNSS-specific model: broadband PA noise at the GNSS frequency "
+        "(rx.pa_broadband_noise_dbm_hz_at_offset or tx.broadband_noise_dbm_hz, "
+        "default -150 dBm/Hz) plus chip-rate-spread in-band CW landings, "
+        "reported as delta_cn0_db_hz with mechanism "
+        "fundamental/harmonic_n/broadband_noise and documented assumptions; "
+        "desense_margin_db for GNSS entries = 1 dB C/N0 budget - dCN0."
+    )
 )
 def check_coex_matrix(
     tx_list: list[dict[str, Any]],

@@ -9,6 +9,29 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — GNSS-specific desense in check_coex_matrix (#15, mcp-rf-analysis)
+
+RX entries may now set `victim_type: "gnss"`, switching that victim to
+the GNSS-specific model with the industry ΔC/N₀ (dB-Hz) metric instead
+of a generic blocking margin:
+
+- **Broadband PA noise** (the dominant real mechanism, evaluated once
+  per TX×RX pair): `I₀ = PA_noise − filter_rejection_at_victim −
+  antenna_iso`; `ΔC/N₀ = 10·log₁₀(1 + 10^((I₀−N₀)/10))` against
+  `N₀ = −174 + NF`. PA noise comes from the victim's
+  `pa_broadband_noise_dbm_hz_at_offset`, else the TX's
+  `broadband_noise_dbm_hz`, else a documented −150 dBm/Hz default.
+- **In-band CW landings** (fundamental/harmonics falling inside the
+  GNSS band): the correlator spreads the tone over the code rate,
+  `I₀ = J − 10·log₁₀(chip_rate)` (GPS C/A 1.023 Mcps default, Q = 1
+  assumed and stated in the per-entry `assumptions`).
+- Entries carry `mechanism` (`fundamental` / `harmonic_n` /
+  `broadband_noise`), `delta_cn0_db_hz`, `i0_dbm_hz`, the noise floor,
+  and full assumptions; `desense_margin_db` for GNSS = a 1 dB C/N₀
+  budget minus ΔC/N₀ so mixed matrices stay worst-first sortable.
+  Generic victims are unchanged. All model points are pinned by
+  hand-computed tests (I₀ = N₀ → exactly 3.010 dB, etc.).
+
 ### Added — place_zeros_for_coex (#12, mcp-rf-analysis)
 
 Restricted-band-aware transmission-zero placement: for each harmonic
