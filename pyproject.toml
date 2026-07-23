@@ -97,11 +97,7 @@ exclude = ['packages/.*/tests/.*']
 # parameter) to a ratchet (issue #37). Do not add codes here to silence a new
 # error. no-untyped-def has been retired from this list — every internal helper
 # is now annotated.
-disable_error_code = [
-    "no-any-return",    # numpy/pandas returns widened to Any
-    "type-arg",         # bare `dict`/`list`/`ndarray` generics
-    "no-untyped-call",  # calls into untyped third-party (matplotlib, schemdraw)
-]
+disable_error_code = []
 mypy_path = [
     "packages/rf-mcp-common/src",
     "packages/mcp-ltspice/src",
@@ -112,6 +108,10 @@ mypy_path = [
 [[tool.mypy.overrides]]
 module = ["spicelib.*", "skrf.*", "scipy.*", "joblib.*", "schemdraw.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["mcp_ltspice.schematic_render", "mcp_ltspice.report_pdf"]
+disable_error_code = ["no-untyped-call"]  # schemdraw elements / matplotlib PdfPages.savefig are unannotated
 
 [tool.pytest.ini_options]
 minversion = "8.0"

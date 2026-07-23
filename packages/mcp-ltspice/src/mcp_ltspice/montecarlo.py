@@ -83,7 +83,7 @@ def _single_run(
 
 def monte_carlo_analysis(
     components: dict[str, float],
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     *,
     tolerance_pct: dict[str, float] | float = 5.0,
     n_runs: int = 1000,

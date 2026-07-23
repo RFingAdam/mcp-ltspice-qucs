@@ -100,7 +100,7 @@ def _make_freq_grid(spec: FilterSpec, n: int = 401) -> np.ndarray:
 def parameter_sweep(
     components: dict[str, float],
     sweep: dict[str, list[float]],
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     *,
     z0: float = 50.0,
     transmission_zeros: bool = True,
@@ -152,7 +152,7 @@ def parameter_sweep(
 def corner_analysis(
     components: dict[str, float],
     corners: dict[str, dict[str, float]],
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     *,
     z0: float = 50.0,
     transmission_zeros: bool = True,
@@ -205,7 +205,7 @@ def corner_analysis(
 
 def sensitivity_analysis(
     components: dict[str, float],
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     *,
     perturbation_pct: float = 1.0,
     z0: float = 50.0,

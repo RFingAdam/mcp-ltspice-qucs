@@ -617,7 +617,7 @@ def place_transmission_zero(
 )
 def evaluate_filter_spec_tool(
     s2p_path: Annotated[str, Field(description="Path to Touchstone .s2p.")],
-    spec: Annotated[dict, Field(description="Spec dict (see tool description).")],
+    spec: Annotated[dict[str, Any], Field(description="Spec dict (see tool description).")],
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -650,7 +650,7 @@ def render_response(
         Field(description="Optional [f_min, f_max] window in Hz."),
     ] = None,
     markers: Annotated[
-        list[list] | None,
+        list[list[Any]] | None,
         Field(description="List of [freq_hz, label] pairs for vertical guides."),
     ] = None,
     title: Annotated[str | None, Field(description="Plot title (default: filename).")] = None,
@@ -734,7 +734,7 @@ def substitute_real_components(
     capacitor_vendor: str = "murata_gjm_c0g",
     srf_margin: Annotated[float, Field(ge=0)] = 0.0,
     max_spec_freq_hz: Annotated[float | None, Field(gt=0)] = None,
-    spec: dict | None = None,
+    spec: dict[str, Any] | None = None,
     max_value_drift_pct: Annotated[float | None, Field(gt=0)] = 25.0,
 ) -> Envelope[dict[str, dict[str, Any]]]:
     timer = Timer()
@@ -783,7 +783,7 @@ def list_vendor_parts(vendor: str) -> Envelope[list[float]]:
 )
 def optimize_filter(
     initial_components: dict[str, float],
-    spec: dict,
+    spec: dict[str, Any],
     tune: list[str] | None = None,
     transmission_zeros: bool = True,
     z0: Annotated[float, Field(gt=0)] = 50.0,
@@ -838,7 +838,7 @@ def optimize_filter(
 )
 def monte_carlo_analysis(
     components: dict[str, float],
-    spec: dict,
+    spec: dict[str, Any],
     tolerance_pct: dict[str, float] | float = 5.0,
     n_runs: Annotated[int, Field(gt=0, le=100000)] = 1000,
     z0: Annotated[float, Field(gt=0)] = 50.0,
@@ -931,7 +931,7 @@ def _wrap(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Envelope[Any]:
 def parameter_sweep(
     components: dict[str, float],
     sweep: dict[str, list[float]],
-    spec: dict,
+    spec: dict[str, Any],
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool = True,
 ) -> Envelope[dict[str, Any]]:
@@ -975,7 +975,7 @@ def parameter_sweep(
 def corner_analysis(
     components: dict[str, float],
     corners: dict[str, dict[str, float]],
-    spec: dict,
+    spec: dict[str, Any],
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool = True,
 ) -> Envelope[dict[str, Any]]:
@@ -998,7 +998,7 @@ def corner_analysis(
 )
 def sensitivity_analysis(
     components: dict[str, float],
-    spec: dict,
+    spec: dict[str, Any],
     perturbation_pct: Annotated[float, Field(gt=0, le=10)] = 1.0,
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool = True,
@@ -1025,7 +1025,7 @@ def sensitivity_analysis(
 )
 def srf_audit(
     components: dict[str, float],
-    spec: dict,
+    spec: dict[str, Any],
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
     margin_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
@@ -1957,7 +1957,7 @@ def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
 def compare_filter_orders(
     orders: list[int],
     cutoff_hz: Annotated[float, Field(gt=0)],
-    spec: dict,
+    spec: dict[str, Any],
     zero_targets_hz: list[float],
     ripple_db: Annotated[float, Field(gt=0)] = 0.1,
     stopband_atten_db: Annotated[float, Field(gt=0)] = 50.0,

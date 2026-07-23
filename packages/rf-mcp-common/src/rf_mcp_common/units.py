@@ -44,7 +44,7 @@ def db(linear: float) -> float:
 
 def lin(db_value: float) -> float:
     """dB → linear power ratio."""
-    return 10.0 ** (db_value / 10.0)
+    return float(10.0 ** (db_value / 10.0))
 
 
 def w_to_dbm(power_w: float) -> float:
@@ -56,4 +56,4 @@ def w_to_dbm(power_w: float) -> float:
 
 def dbm_to_w(dbm: float) -> float:
     """dBm → power in watts."""
-    return 10.0 ** (dbm / 10.0) / 1000.0
+    return float(10.0 ** (dbm / 10.0)) / 1000.0

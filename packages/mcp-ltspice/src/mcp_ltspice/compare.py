@@ -278,7 +278,7 @@ def compare_filter_orders(
     *,
     orders: list[int],
     cutoff_hz: float,
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     zero_targets_hz: list[float],
     ripple_db: float = 0.1,
     stopband_atten_db: float = 50.0,

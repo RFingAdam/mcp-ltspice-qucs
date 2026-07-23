@@ -25,7 +25,7 @@ from mcp_ltspice.vendor_models import lookup_part
 
 def srf_audit(
     components: dict[str, float],
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     *,
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",

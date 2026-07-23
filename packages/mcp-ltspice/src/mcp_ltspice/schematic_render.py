@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 # Lock matplotlib backend before any schemdraw drawing is made
 import matplotlib
@@ -356,7 +356,7 @@ def render_sallen_key_schematic(
 
 
 def render_cascaded_lpf_schematic(
-    cascaded_design: dict,
+    cascaded_design: dict[str, Any],
     output_dir: str | Path,
     *,
     base_name: str = "stage",

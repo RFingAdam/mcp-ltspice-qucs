@@ -25,7 +25,7 @@ Format notes, verified against qucsator-RF 1.0.7:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from mcp_qucs_s.microstrip import C0, Substrate
 
@@ -393,7 +393,7 @@ def generate_coupled_microstrip_netlist(
 
 
 def generate_hairpin_netlist(
-    design: dict,
+    design: dict[str, Any],
     substrate: Substrate,
     output_path: str | Path,
     *,
@@ -472,7 +472,7 @@ def generate_hairpin_netlist(
 
 
 def generate_coupled_array_netlist(
-    design: dict,
+    design: dict[str, Any],
     output_path: str | Path,
     *,
     z0: float = 50.0,
