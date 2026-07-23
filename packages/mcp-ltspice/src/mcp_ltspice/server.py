@@ -36,6 +36,9 @@ from mcp_ltspice.asc_io import (
     read_components,
     update_component,
 )
+from mcp_ltspice.coex_loop import (
+    synthesize_for_coex_target as _synthesize_for_coex_target,
+)
 from mcp_ltspice.compare import compare_filter_orders as _compare_orders
 from mcp_ltspice.digital import (
     DigitalAggressor,
@@ -495,6 +498,57 @@ def synthesize_lc_bsf_filter(
         )
     except Exception as e:
         return error(f"synthesize_lc_bsf_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Closed-loop coex-driven synthesis: iterate elliptic LPF order until "
+        "the coexistence matrix meets a desense target. Each iteration places "
+        "transmission zeros on the victim-weighted harmonic centroids "
+        "(place_zeros_for_coex), aims the traps, substitutes real vendor "
+        "parts (SRF-checked with graceful margin fallback 1.2→1.0→off, "
+        "reported per iteration), evaluates the realized ladder's rejection "
+        "analytically, and runs the GNSS-aware coex matrix. Victim entries "
+        "are coex-matrix RX dicts; victim_type='gnss' gets the realized "
+        "filter's rejection at its frequency injected automatically. Returns "
+        "converged flag, chosen order, realized components, the zero plan, "
+        "the final matrix, and the full iteration log (best-so-far when not "
+        "converged)."
+    ),
+)
+def synthesize_for_coex_target(
+    passband_hz: Annotated[
+        list[float], Field(description="[f_low_hz, f_high_hz] of the TX passband.")
+    ],
+    pa_power_dbm: float,
+    victim_bands: list[dict[str, Any]],
+    target_max_desense_db: float = 0.0,
+    antenna_iso_db: Annotated[float, Field(ge=0)] = 25.0,
+    min_order: Annotated[int, Field(ge=3, le=15)] = 5,
+    max_order: Annotated[int, Field(ge=3, le=15)] = 11,
+    inductor_vendor: str = "coilcraft_0402hp",
+    capacitor_vendor: str = "murata_gjm_c0g",
+    ripple_db: Annotated[float, Field(gt=0, le=3)] = 0.1,
+    stopband_atten_db: Annotated[float, Field(gt=0)] = 50.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        result = _synthesize_for_coex_target(
+            (passband_hz[0], passband_hz[1]),
+            pa_power_dbm,
+            victim_bands,
+            target_max_desense_db=target_max_desense_db,
+            antenna_iso_db=antenna_iso_db,
+            min_order=min_order,
+            max_order=max_order,
+            inductor_vendor=inductor_vendor,
+            capacitor_vendor=capacitor_vendor,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+        )
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"synthesize_for_coex_target failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
