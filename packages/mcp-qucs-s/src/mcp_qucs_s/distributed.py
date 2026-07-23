@@ -599,3 +599,210 @@ def interdigital_bpf(
         "worst_inband_return_loss_db": float(s11_db[in_band].max()),
     }
     return result
+
+
+def combline_bpf(
+    g: list[float],
+    f0_hz: float,
+    fractional_bandwidth: float,
+    *,
+    z0: float = 50.0,
+    substrate: Substrate,
+    z_resonator_ohm: float = 70.0,
+    theta0_deg: float = 45.0,
+) -> dict[str, Any]:
+    """Combline BPF: N coupled lines shorted at the SAME end, each tuned
+    by a lumped capacitor at the open end, resonator length θ0 < 90°
+    (default 45°) — on the exact TEM array model.
+
+    - Tuning: ``C = Y_r·cot(θ0)/ω0`` per resonator (pure TEM combline
+      genuinely needs the caps — at θ0 = 90° there is no passband).
+    - Couplings hit ``k = Δ/√(g_i·g_{i+1})`` by inverting the exact pair
+      transcendental ``ωC = (Y_r ± y_m)·cot(θ(ω))``
+      (:func:`mcp_qucs_s.multiconductor.combline_pair_split`).
+    - Tapped feed from the loaded resonator's slope parameter
+      ``b = (Y_r/2)(cotθ0 + θ0·csc²θ0)``:
+      ``θ_t = arcsin(sinθ0·√(b/(G0·Qe)))`` — reduces to the interdigital
+      formula at θ0 = 90°.
+    - Upper stopband is the topology's selling point: the next resonance
+      branch needs cotθ > 0 again, so a 45° combline is clean to ≈ 4·f0
+      (vs the edge-coupled spurious at 2·f0).
+
+    Same honesty mechanisms as the interdigital synthesis: stub
+    admittances must stay positive, taps must be realizable, and the
+    returned ``achieved`` block reports the exact-model response.
+    """
+    if len(g) < 3:
+        raise ValueError(
+            f"g must be the full prototype vector g0..g_(N+1) with at least 3 entries "
+            f"(order ≥ 1); got {len(g)}"
+        )
+    if not 0.0 < fractional_bandwidth < 1.0:
+        raise ValueError(f"fractional_bandwidth must be in (0, 1); got {fractional_bandwidth}")
+    if any(gi <= 0 for gi in g):
+        raise ValueError("all g coefficients must be positive")
+    if not 10.0 <= theta0_deg < 90.0:
+        raise ValueError(f"theta0_deg must be in [10, 90); got {theta0_deg}")
+
+    from scipy.optimize import brentq
+
+    from mcp_qucs_s.multiconductor import combline_pair_split, segmented_array_sparams
+
+    order = len(g) - 2
+    delta = fractional_bandwidth
+    y_r = 1.0 / z_resonator_ohm
+    g0_load = 1.0 / z0
+    t0 = math.radians(theta0_deg)
+    c_load = y_r / math.tan(t0) / (2.0 * math.pi * f0_hz)
+
+    def pair_k(y_m: float) -> float:
+        fl, fh = combline_pair_split(y_r, y_m, theta0_deg, f0_hz)
+        return (fh * fh - fl * fl) / (fh * fh + fl * fl)
+
+    k_targets = [delta / math.sqrt(g[i] * g[i + 1]) for i in range(1, order)]
+    y_mutual: list[float] = []
+    for k in k_targets:
+        if k >= pair_k(0.95 * y_r):
+            raise ValueError(
+                f"Unrealizable coupling k={k:.3f} for {z_resonator_ohm:.0f} Ω "
+                f"combline resonators at θ0={theta0_deg:.0f}° — narrow Δ."
+            )
+        y_mutual.append(float(brentq(lambda ym, kt=k: pair_k(ym) - kt, 1e-9 * y_r, 0.95 * y_r)))
+
+    y_stub: list[float] = []
+    for i in range(order):
+        left = y_mutual[i - 1] if i > 0 else 0.0
+        right = y_mutual[i] if i < order - 1 else 0.0
+        stub = y_r - left - right
+        if stub <= 0.0:
+            raise ValueError(
+                f"Unrealizable: resonator {i + 1}'s stub admittance goes non-positive "
+                f"({stub:.4g} S) — the bandwidth is too wide for {z_resonator_ohm:.0f} Ω "
+                "resonators. Narrow Δ or lower z_resonator_ohm."
+            )
+        y_stub.append(stub)
+
+    slope_b = (y_r / 2.0) * (math.cos(t0) / math.sin(t0) + t0 / math.sin(t0) ** 2)
+
+    def tap_deg(qe: float) -> float:
+        arg = math.sin(t0) * math.sqrt(slope_b / (g0_load * qe))
+        if arg > 1.0:
+            raise ValueError(
+                f"Unrealizable tap: Qe={qe:.2f} needs arcsin({arg:.2f}) — the "
+                "bandwidth is too wide for a tapped combline at this Z_resonator."
+            )
+        return math.degrees(math.asin(arg))
+
+    qe_in = g[0] * g[1] / delta
+    qe_out = g[order] * g[order + 1] / delta
+    tap_in = tap_deg(qe_in)
+    tap_out = tap_deg(qe_out)
+
+    bottom = ["short"] * order
+    top = ["open"] * order
+    breakpoints = sorted({round(h, 12) for h in (tap_in, tap_out) if 0.0 < h < theta0_deg})
+    boundaries = [0.0, *breakpoints, theta0_deg]
+    segments_deg = [b - a for a, b in itertools.pairwise(boundaries)]
+    level_of = {round(h, 12): i + 1 for i, h in enumerate(breakpoints)}
+    ports = [(level_of[round(tap_in, 12)], 0), (level_of[round(tap_out, 12)], order - 1)]
+    n_levels = len(segments_deg)
+    cap_loads = [(n_levels, i, c_load) for i in range(order)]
+
+    y_c = np.zeros((order, order))
+    for i in range(order):
+        y_c[i, i] = y_r
+    for i, ym in enumerate(y_mutual):
+        y_c[i, i + 1] = -ym
+        y_c[i + 1, i] = -ym
+
+    couplings: list[dict[str, Any]] = []
+    er_effs: list[float] = []
+    for i, ym in enumerate(y_mutual):
+        z0e = 1.0 / (y_r - ym)
+        z0o = 1.0 / (y_r + ym)
+        w_mm, s_mm = synthesize_coupled_microstrip(z0e, z0o, substrate)
+        modes = analyze_coupled_microstrip(w_mm, s_mm, substrate)
+        er_effs.append((modes["er_eff_e"] + modes["er_eff_o"]) / 2.0)
+        couplings.append(
+            {
+                "between": (i + 1, i + 2),
+                "k": k_targets[i],
+                "y_mutual": ym,
+                "z0e_ohm": z0e,
+                "z0o_ohm": z0o,
+                "width_mm": w_mm,
+                "gap_mm": s_mm,
+            }
+        )
+    er_avg = sum(er_effs) / len(er_effs) if er_effs else substrate.er
+    length_mm = (theta0_deg / 360.0) * C0 / (f0_hz * math.sqrt(er_avg)) * 1e3
+
+    resonators = [
+        {
+            "index": i + 1,
+            "z_ohm": z_resonator_ohm,
+            "y_total": y_r,
+            "y_stub": y_stub[i],
+            "shorted_end": "bottom",
+            "length_mm": length_mm,
+            "c_load_farad": c_load,
+        }
+        for i in range(order)
+    ]
+
+    result: dict[str, Any] = {
+        "f0_hz": f0_hz,
+        "fractional_bandwidth": delta,
+        "z0": z0,
+        "order": order,
+        "theta0_deg": theta0_deg,
+        "resonators": resonators,
+        "couplings": couplings,
+        "tap_deg": tap_in,
+        "tap_deg_out": tap_out,
+        "tap_mm": tap_in / theta0_deg * length_mm,
+        "y_c": y_c,
+        "segments_deg": segments_deg,
+        "bottom": bottom,
+        "top": top,
+        "ports": ports,
+        "cap_loads": cap_loads,
+        "notes": [
+            f"Combline at θ0 = {theta0_deg:.0f}°: loading caps "
+            f"{c_load * 1e12:.3f} pF tune each shorted stub to f0; the next "
+            f"resonance branch sits near {180.0 / theta0_deg:.1f}·f0, so the "
+            "upper stopband is clean well past 2·f0 (the edge-coupled spurious "
+            "frequency).",
+            f"Tapped feed at {tap_in:.2f}° from the short (loaded-resonator "
+            "slope parameter, isolated-resonator approximation — see 'achieved').",
+            "Physical (W, S) is a first-cut per-pair Garg-Bahl mapping; loading "
+            "caps are ideal lumped elements (chip caps or screw tuners in "
+            "hardware). EM-refine before hardware.",
+        ],
+    }
+
+    f_grid = np.linspace(f0_hz * (1.0 - 3.0 * delta), f0_hz * (1.0 + 3.0 * delta), 1201)
+    s = segmented_array_sparams(
+        y_c,
+        f_grid,
+        f0_hz,
+        segments_deg=segments_deg,
+        bottom=bottom,
+        top=top,
+        ports=ports,
+        cap_loads=cap_loads,
+        z0_system=z0,
+    )
+    s21_db = 20.0 * np.log10(np.maximum(np.abs(s[:, 1, 0]), 1e-12))
+    s11_db = 20.0 * np.log10(np.maximum(np.abs(s[:, 0, 0]), 1e-12))
+    pk = int(np.argmax(s21_db))
+    above = f_grid[s21_db > s21_db[pk] - 3.0]
+    in_band = np.abs(f_grid - f0_hz) < (delta / 2.0) * f0_hz * 0.9
+    result["achieved"] = {
+        "peak_db": float(s21_db[pk]),
+        "f_peak_hz": float(f_grid[pk]),
+        "band_center_hz": float(math.sqrt(above[0] * above[-1])),
+        "bw_3db_frac": float((above[-1] - above[0]) / f0_hz),
+        "worst_inband_return_loss_db": float(s11_db[in_band].max()),
+    }
+    return result

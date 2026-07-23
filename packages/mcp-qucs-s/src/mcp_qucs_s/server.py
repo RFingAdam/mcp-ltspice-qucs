@@ -10,6 +10,7 @@ from pydantic import Field
 
 from mcp_qucs_s import __version__
 from mcp_qucs_s.couplers import synthesize_coupler as _synthesize_coupler
+from mcp_qucs_s.distributed import combline_bpf as _combline_bpf
 from mcp_qucs_s.distributed import coupled_line_bpf as _coupled_line_bpf
 from mcp_qucs_s.distributed import hairpin_bpf as _hairpin_bpf
 from mcp_qucs_s.distributed import interdigital_bpf as _interdigital_bpf
@@ -104,6 +105,7 @@ def status() -> Envelope[dict[str, Any]]:
                 "synthesize_coupled_line_bpf",
                 "synthesize_hairpin_bpf",
                 "synthesize_interdigital_bpf",
+                "synthesize_combline_bpf",
             ],
             "sim_tools_requiring_qucs_s": [
                 "run_sp_analysis",
@@ -398,6 +400,47 @@ def synthesize_interdigital_bpf(
         return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"synthesize_interdigital_bpf failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    description=(
+        "Synthesize a combline microstrip BPF from LPF prototype "
+        "g-coefficients: N coupled lines shorted at the same end, each tuned "
+        "by a lumped capacitor at the open end, resonator length θ0 (default "
+        "45°). Couplings solved on the exact TEM pair transcendental "
+        "ωC = (Y_r ± y_m)·cotθ; tap from the loaded-resonator slope "
+        "parameter b = (Y_r/2)(cotθ0 + θ0·csc²θ0). Clean upper stopband to "
+        "≈ (180/θ0)·f0. Returns resonator (incl. c_load_farad) and coupling "
+        "tables, the exact array description, and self-reported 'achieved' "
+        "response metrics. Unrealizable Δ/Z_resonator combinations rejected."
+    ),
+)
+def synthesize_combline_bpf(
+    g_coefficients: list[float],
+    f0_hz: Annotated[float, Field(gt=0, description="Passband centre frequency.")],
+    fractional_bandwidth: Annotated[float, Field(gt=0, lt=1)],
+    substrate: dict[str, float] | str,
+    z0_ohm: Annotated[float, Field(gt=0)] = 50.0,
+    z_resonator_ohm: Annotated[float, Field(gt=0)] = 70.0,
+    theta0_deg: Annotated[float, Field(ge=10, lt=90)] = 45.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        sub = _substrate(substrate)
+        result = _combline_bpf(
+            g_coefficients,
+            f0_hz,
+            fractional_bandwidth,
+            z0=z0_ohm,
+            substrate=sub,
+            z_resonator_ohm=z_resonator_ohm,
+            theta0_deg=theta0_deg,
+        )
+        result = dict(result)
+        result["y_c"] = [[float(v) for v in row] for row in result["y_c"]]
+        return ok(result, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as e:
+        return error(f"synthesize_combline_bpf failed: {e}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------

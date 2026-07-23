@@ -9,6 +9,29 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — combline BPF (#27 complete, mcp-qucs-s)
+
+`synthesize_combline_bpf` finishes the #27 distributed-filter set:
+N coupled lines shorted at the same end, each tuned by a lumped
+capacitor at the open end (`C = Y_r·cot(θ0)/ω0`; pure TEM combline
+genuinely needs the caps), resonator length θ0 default 45°. Couplings
+hit `k = Δ/√(g_i·g_{i+1})` by inverting the exact pair transcendental
+`ωC = (Y_r ± y_m)·cot(θ(ω))` (new `combline_pair_split`); the tap comes
+from the loaded-resonator slope parameter
+`b = (Y_r/2)(cotθ0 + θ0·csc²θ0)`, which reduces to the interdigital
+formula at θ0 = 90°. `segmented_array_sparams` gains `cap_loads`
+(lumped C on any node), the graph netlister generalises to
+`generate_coupled_array_netlist` (ideal `C` elements at the loaded
+nodes; `generate_interdigital_netlist` kept as an alias), and the
+design self-reports `achieved` metrics like the interdigital tool.
+
+Validation: qucsator graph netlist (TLIN + TLIN4P + C) matches the
+exact solver at numerical precision; on the 2 GHz / 10% / 0.5 dB N=3
+design — 11.39 mm resonators (half the interdigital length), 1.137 pF
+loading caps, band centre 1.994 GHz, BW 11.7%, and the topology's
+selling point confirmed: first upper spurious at 3.75·f0 with the
+1.5–3·f0 stopband below −39 dB (edge-coupled spurs at 2·f0).
+
 ### Added — interdigital BPF on exact N-line TEM machinery (#27, mcp-qucs-s)
 
 The N-conductor obstacle (a physical line cannot sit in two `MCOUPLED`
