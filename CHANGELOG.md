@@ -9,6 +9,39 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — interdigital BPF on exact N-line TEM machinery (#27, mcp-qucs-s)
+
+The N-conductor obstacle (a physical line cannot sit in two `MCOUPLED`
+elements) is bypassed exactly: a same-velocity TEM array's 2N-port
+Y-matrix is **linear** in the characteristic-admittance matrix, so a
+tridiagonal array decomposes into ordinary TLIN stubs plus floating
+TLIN4P connector lines — probe-verified to reproduce the CTLIN coupled
+section at 0.0000 mdB. New `multiconductor` module:
+
+- `segmented_array_sparams` — exact S-parameters of stacked commensurate
+  array segments with per-line short/open/port terminations and interior
+  tap ports (validated against the closed-form coupled section at 1e-9
+  and against the qucsator graph netlist at 0.0001 mdB).
+- `interdigital_pair_k` / `mutual_for_k` — the interdigitally-terminated
+  pair's resonance split is closed form (`cosθ = ±y_m/Y_r`), giving the
+  coupling coefficient without book tables.
+
+`synthesize_interdigital_bpf`: N coupled λ/4 resonators, alternately
+shorted, tapped I/O. Couplings hit `k = Δ/√(g_i·g_{i+1})` exactly on the
+TEM model; the tap angle comes from the shorted-λ/4 slope parameter
+`θ_t = arcsin(√(π·Y_r/(4·G0·Qe)))`. Unrealizable Δ/Z_resonator
+combinations (stub admittance ≤ 0, Qe below the end-fed minimum) are
+rejected with explanations. The design **self-reports** its achieved
+response (`achieved`: band centre, −3 dB bandwidth, worst in-band return
+loss) computed on the exact model — the tapped-feed isolated-resonator
+approximation degrades ripple vs the prototype (measured: band centre
+2.003 GHz on a 2 GHz/10% design, BW 11.8%, worst in-band S11 −5.9 dB)
+and an MCP consumer should see that number, not assume the spec.
+`generate_interdigital_netlist` emits the exact ideal-TEM graph netlist
+(stubs to gnd for shorts, TLIN4P per coupling, ports on tap nodes).
+Physical per-pair (W, S) via the existing Garg-Bahl inversion, flagged
+first-cut.
+
 ### Added — hairpin microstrip BPF (#27, mcp-qucs-s)
 
 `synthesize_hairpin_bpf` folds the edge-coupled filter into the
