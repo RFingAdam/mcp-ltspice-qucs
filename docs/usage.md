@@ -102,6 +102,32 @@ The agent calls `monte_carlo_analysis` with `n=1000, sigma=0.05`. It
 returns **99% yield** — the design has enough margin to survive 5%
 component variation.
 
+## Step 5 — Confirm it against real SPICE
+
+Everything up to here runs on the fast closed-form ladder — no simulator
+touched. That is the right default for a 1000-trial Monte Carlo loop, but
+before quoting a yield you should confirm the analytical preview actually
+matches what SPICE says the circuit does.
+
+> *"Run ngspice on the schematic and reconcile it against the analytical
+> response."*
+
+The agent calls `validate_against_spice` with the `.asc` and the component
+dict. It runs a real ngspice AC sweep, extracts the S-parameters, computes
+the analytical response on the same grid, and returns a **verdict**:
+
+- `agree` — SPICE and analytical match within threshold (0.5 dB passband,
+  3 dB stopband by default). Trust the yield number.
+- `minor_disagreement` — a marginal or stopband-only miss.
+- `disagree` — they diverge in the passband; the analytical margin is not
+  reliable for this design, and the response carries a warning saying so.
+- `spice_unavailable` — no simulator installed; you still get the
+  analytical S2P back rather than an error.
+
+This is the gate to run before reporting a yield or margin that came only
+from the preview — especially once real-vendor `.include` models are wired
+in, where the SPICE run is the only path that sees their true effect.
+
 ---
 
 ## What just happened
