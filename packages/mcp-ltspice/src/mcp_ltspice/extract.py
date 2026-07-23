@@ -342,32 +342,38 @@ def components_dict_to_elements(
                 )
         return elements
 
-    # Highpass: odd-k = series-C, even-k = shunt-L (series_first); reversed for shunt_first.
+    # Highpass. All-pole: odd-k = series-C, even-k = shunt-L (series_first),
+    # reversed for shunt_first. Elliptic: the LPF→HPF transform leaves each
+    # shunt series-LC trap a shunt series-LC trap (see synthesize_lc_hpf), so
+    # an even-index L+C pair is a trap and the series positions carry C.
     if kind == "highpass":
+        has_traps = any(
+            f"L{_idx(n)}" in components and f"C{_idx(n)}" in components for n in components
+        )
+        seen_hp: set[str] = set()
         for name in sorted_names:
+            if name in seen_hp:
+                continue
             idx = _idx(name)
-            value = components[name]
-            kind_letter = name[0]
+            l_key, c_key = f"L{idx}", f"C{idx}"
             is_odd_k = idx % 2 == 1
-            if topology == "series_first":
-                if is_odd_k:
-                    # series position — must be a C in HPF
-                    if kind_letter != "C":
-                        raise ValueError(f"HPF series_first expects C at odd index, got {name}")
-                    elements.append(("series_c", {"C": value}))
-                else:
-                    if kind_letter != "L":
-                        raise ValueError(f"HPF series_first expects L at even index, got {name}")
-                    elements.append(("shunt_l", {"L": value}))
-            else:  # shunt_first
-                if is_odd_k:
-                    if kind_letter != "L":
-                        raise ValueError(f"HPF shunt_first expects L at odd index, got {name}")
-                    elements.append(("shunt_l", {"L": value}))
-                else:
-                    if kind_letter != "C":
-                        raise ValueError(f"HPF shunt_first expects C at even index, got {name}")
-                    elements.append(("series_c", {"C": value}))
+            series_position = (is_odd_k and topology == "series_first") or (
+                not is_odd_k and topology == "shunt_first"
+            )
+            if has_traps and l_key in components and c_key in components:
+                # Elliptic shunt trap: series LC to ground, notch at 1/2π√(LC).
+                elements.append(("shunt_lc_trap", {"L": components[l_key], "C": components[c_key]}))
+                seen_hp.update({l_key, c_key})
+            elif series_position:
+                if name[0] != "C":
+                    raise ValueError(f"HPF expects C in a series position, got {name}")
+                elements.append(("series_c", {"C": components[name]}))
+                seen_hp.add(name)
+            else:
+                if name[0] != "L":
+                    raise ValueError(f"HPF expects L in a shunt position, got {name}")
+                elements.append(("shunt_l", {"L": components[name]}))
+                seen_hp.add(name)
         return elements
 
     if not transmission_zeros:
