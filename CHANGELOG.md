@@ -9,6 +9,26 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — hairpin microstrip BPF (#27, mcp-qucs-s)
+
+`synthesize_hairpin_bpf` folds the edge-coupled filter into the
+Cristal-Frankel hairpin-line. The fold is a circuit-graph no-op apart
+from the U-bend connector: each half-wave resonator (the two arm halves
+the diagonal MCOUPLED chain already joins) gains the bend's electrical
+length θ_b, so every coupled section is shortened to 90° − θ_b/2 — with
+one bend length (an MLIN at the mean arm width, default 3×W) this keeps
+every resonator at exactly 180° at f₀ in closed form. Zero bend
+degenerates to the edge-coupled design bit-for-bit.
+
+Validated in real qucsator via the new `generate_hairpin_netlist`
+(MCOUPLED cascade + bend MLINs at the internal junctions): with a 2 mm
+bend (8.1° at 2 GHz) the compensated design centres at 1.976 GHz
+(−1.2%, matching the unfolded filter's −1.1%) with 9.0% bandwidth,
+while the *uncompensated* variant sags to 1.891 GHz (−5.5%) — the
+differential test proves the compensation mechanism rather than just
+plausibility. Corner discontinuities and cross-arm self-coupling are
+documented as the field-solver residual.
+
 ### Added — edge-coupled (parallel coupled-line) microstrip BPF (#27, mcp-qucs-s)
 
 `synthesize_coupled_line_bpf` implements the coupled-section BPF core
