@@ -28,7 +28,11 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from mcp_qucs_s.microstrip import Substrate, synthesize_microstrip_line
+from mcp_qucs_s.coupled_microstrip import (
+    analyze_coupled_microstrip,
+    synthesize_coupled_microstrip,
+)
+from mcp_qucs_s.microstrip import C0, Substrate, synthesize_microstrip_line
 from mcp_qucs_s.richards import _refdes_index
 
 
@@ -165,4 +169,148 @@ def tline_cascade_sparams(
     s[:, 0, 1] = s21  # det(ABCD) = 1 per section ⇒ S12 = S21
     s[:, 1, 0] = s21
     s[:, 1, 1] = (-a + b / z0_system - c * z0_system + d) / denom
+    return s
+
+
+def coupled_line_bpf(
+    g: list[float],
+    f0_hz: float,
+    fractional_bandwidth: float,
+    *,
+    z0: float = 50.0,
+    substrate: Substrate,
+) -> dict[str, Any]:
+    """Edge-coupled (parallel coupled-line) BPF synthesis (Pozar §8.7).
+
+    ``g`` is the full prototype vector ``g0..g_{N+1}`` — exactly what the
+    ``mcp-ltspice`` synthesis tools return as ``g_coefficients`` — so an
+    order-N filter yields N+1 quarter-wave coupled sections via the
+    J-inverter constants (Pozar 8.121):
+
+        Z₀J₁     = √(πΔ / (2·g₀·g₁))
+        Z₀Jₙ     = πΔ / (2·√(g_{n−1}·g_n))      n = 2..N
+        Z₀J_{N+1} = √(πΔ / (2·g_N·g_{N+1}))
+        Z₀e = Z₀(1 + JZ₀ + (JZ₀)²),  Z₀o = Z₀(1 − JZ₀ + (JZ₀)²)
+
+    Each section's (W, S) comes from the Garg-Bahl inversion and its
+    physical length is a quarter-wave at f₀ using the mean of the two
+    mode permittivities. This is the electrical core of the hairpin
+    filter as well — a hairpin is this filter with the resonators
+    folded; the fold's slide factor is not modelled here.
+    """
+    if len(g) < 3:
+        raise ValueError(
+            f"g must be the full prototype vector g0..g_(N+1) with at least 3 entries "
+            f"(order ≥ 1); got {len(g)}"
+        )
+    if not 0.0 < fractional_bandwidth < 1.0:
+        raise ValueError(f"fractional_bandwidth must be in (0, 1); got {fractional_bandwidth}")
+    if any(gi <= 0 for gi in g):
+        raise ValueError("all g coefficients must be positive")
+
+    order = len(g) - 2
+    delta = fractional_bandwidth
+    jz0: list[float] = [math.sqrt(math.pi * delta / (2.0 * g[0] * g[1]))]
+    for n in range(2, order + 1):
+        jz0.append(math.pi * delta / (2.0 * math.sqrt(g[n - 1] * g[n])))
+    jz0.append(math.sqrt(math.pi * delta / (2.0 * g[order] * g[order + 1])))
+
+    sections: list[dict[str, Any]] = []
+    for n, j in enumerate(jz0, start=1):
+        ze = z0 * (1.0 + j + j * j)
+        zo = z0 * (1.0 - j + j * j)
+        w_mm, s_mm = synthesize_coupled_microstrip(ze, zo, substrate)
+        modes = analyze_coupled_microstrip(w_mm, s_mm, substrate)
+        er_avg = (modes["er_eff_e"] + modes["er_eff_o"]) / 2.0
+        length_mm = C0 / (4.0 * f0_hz * math.sqrt(er_avg)) * 1e3
+        sections.append(
+            {
+                "index": n,
+                "jz0": j,
+                "z0e_ohm": ze,
+                "z0o_ohm": zo,
+                "electrical_length_deg": 90.0,
+                "width_mm": w_mm,
+                "gap_mm": s_mm,
+                "length_mm": length_mm,
+                "er_eff_e": modes["er_eff_e"],
+                "er_eff_o": modes["er_eff_o"],
+            }
+        )
+
+    return {
+        "f0_hz": f0_hz,
+        "fractional_bandwidth": delta,
+        "z0": z0,
+        "order": order,
+        "n_sections": len(sections),
+        "sections": sections,
+        "notes": [
+            "Each section is λ/4 at f0; physical length uses the mean of the "
+            "even/odd effective permittivities (the two modes travel at "
+            "different speeds — the classic edge-coupled spurious-response "
+            "mechanism at 2·f0).",
+            "Hairpin realisation: fold each resonator into a U; the coupled "
+            "sections keep these (W, S, L) but the fold adds a slide factor "
+            "not modelled here.",
+        ],
+    }
+
+
+def coupled_section_sparams(
+    sections: list[tuple[float, float]],
+    freq_hz: NDArray[np.float64],
+    f_ref_hz: float,
+    *,
+    z0_system: float = 50.0,
+) -> NDArray[np.complex128]:
+    """S-parameters of cascaded ideal coupled-line BPF sections.
+
+    ``sections`` is an ordered list of ``(Z0e, Z0o)`` pairs, each a
+    quarter-wave at ``f_ref_hz``, connected diagonally with the other
+    two ports open (probe-verified to match qucsator's ``CTLIN`` to
+    numerical precision). Per section, with θ = (π/2)·f/f_ref:
+
+        A = D = (Z0e+Z0o)/(Z0e−Z0o)·cosθ
+        B = j·[(Z0e−Z0o)² − (Z0e+Z0o)²·cos²θ] / [2·(Z0e−Z0o)·sinθ]
+        C = j·2·sinθ/(Z0e−Z0o)
+
+    Frequencies where sinθ = 0 (DC, 2·f0, ...) are transmission nulls of
+    the open-circuited section; non-finite bins are filled with the
+    fully-reflective limit (S11 = −1, S21 = 0).
+    """
+    theta = (math.pi / 2.0) * freq_hz / f_ref_hz
+
+    a = np.ones_like(freq_hz, dtype=np.complex128)
+    b = np.zeros_like(a)
+    c = np.zeros_like(a)
+    d = np.ones_like(a)
+
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        for ze, zo in sections:
+            zsum = ze + zo
+            zdif = ze - zo
+            cos_t = np.cos(theta)
+            sin_t = np.sin(theta)
+            ea = (zsum / zdif) * cos_t
+            eb = 1j * (zdif**2 - zsum**2 * cos_t**2) / (2.0 * zdif * sin_t)
+            ec = 1j * 2.0 * sin_t / zdif
+            # section D equals A (symmetric two-port)
+            a, b, c, d = (
+                a * ea + b * ec,
+                a * eb + b * ea,
+                c * ea + d * ec,
+                c * eb + d * ea,
+            )
+
+        denom = a + b / z0_system + c * z0_system + d
+        s11 = (a + b / z0_system - c * z0_system - d) / denom
+        s21 = 2.0 / denom
+        s22 = (-a + b / z0_system - c * z0_system + d) / denom
+
+    s = np.zeros((freq_hz.size, 2, 2), dtype=np.complex128)
+    s[:, 0, 0] = np.where(np.isfinite(s11), s11, -1.0)
+    s[:, 0, 1] = np.where(np.isfinite(s21), s21, 0.0)  # det = 1 ⇒ S12 = S21
+    s[:, 1, 0] = s[:, 0, 1]
+    s[:, 1, 1] = np.where(np.isfinite(s22), s22, -1.0)
     return s
