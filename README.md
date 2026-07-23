@@ -31,30 +31,41 @@ It collapses a typical filter-design loop — hours of LTspice nudging
 component values, swapping SPICE models, re-running, eyeballing S21 —
 into an agent-driven iteration at the **design intent** layer.
 
-Drive it from any MCP client. `mcp-ltspice` exposes 56 flat tools plus
+Drive it from any MCP client. `mcp-ltspice` exposes 59 flat tools plus
 matching namespaced aliases (`filter.*`, `power.*`, `analog.*`).
-`mcp-qucs-s` adds native S-parameter sim and closed-form microstrip
-synthesis with 16 substrate presets. `mcp-rf-analysis` adds
-simulator-agnostic skrf wrappers, band databases, and FCC / ETSI / 3GPP
-spec evaluation. Validated against the bundled example designs
-(427 passing tests, 4 simulator-gated skips).
+`mcp-qucs-s` adds native S-parameter simulation, Xyce harmonic balance,
+and closed-form microstrip / distributed-filter synthesis with 16
+substrate presets. `mcp-rf-analysis` adds simulator-agnostic skrf
+wrappers, band databases, FCC / ETSI / 3GPP spec evaluation, and
+multi-radio coexistence analysis. Every synthesis path is validated
+against real simulator output — ngspice, LTspice, qucsator-RF, and
+Xyce — not just its own math (876 passing tests).
 
 **What mcp-ltspice-qucs does well:**
 
-- 🤖 **AI-native via MCP.** Three first-class [Model Context Protocol](https://modelcontextprotocol.io)
-  servers. Any Claude / LLM agent can iterate filter topologies, sweep
-  vendor parts, and run Monte Carlo yield analyses.
-- 🧪 **Real simulators, not toy math.** Drives **LTspice** (with ngspice
-  fallback) for time + AC + noise sweeps, **Qucs-S** for native
-  S-parameter sim with harmonic-balance scaffolding.
-- 📐 **Closed-form synthesis + optimization.** LC ladder (Butterworth /
-  Chebyshev / Elliptic, LPF/HPF/BPF/BSF), Sallen-Key, MFB, Richards-
-  Kuroda lumped-to-distributed, Hammerstad-Jensen microstrip.
-- ⚡ **Vendor parasitics built in.** Coilcraft 0402HP, Murata GJM, Johanson,
-  TDK SPICE models with E24/E96/E192 snap.
-- ✅ **CISPR-aware.** Conducted-emission prediction against CISPR 22 /
-  CISPR 32 Class A / B before you build.
-- 🔒 **AGPL-3.0-or-later.**
+- **AI-native via MCP.** Three first-class [Model Context Protocol](https://modelcontextprotocol.io)
+  servers. Any MCP agent can iterate filter topologies, sweep vendor
+  parts, and run Monte Carlo yield analyses.
+- **Real simulators, not toy math.** Drives **LTspice** (native or
+  under Wine), **ngspice**, **Qucs-S / qucsator-RF** for native
+  S-parameter simulation, and **Xyce** for harmonic balance. Analytical
+  models are cross-checked against simulator output at millidB level.
+- **Closed-form synthesis and optimization.** LC ladders (Butterworth /
+  Chebyshev / elliptic, all of LPF / HPF / BPF / BSF including elliptic
+  band-transforms), Sallen-Key, MFB, Richards-Kuroda, and a complete
+  distributed set: stepped-impedance, edge-coupled, hairpin,
+  interdigital, and combline microstrip filters on an exact
+  coupled-line TEM model.
+- **Coexistence-driven design.** Victim-weighted transmission-zero
+  placement against LTE / 5G NR / GNSS / FCC-restricted bands, a
+  GNSS ΔC/N₀ desense model, and a closed loop that iterates filter
+  order until the coex matrix meets a desense target.
+- **Vendor parasitics built in.** Coilcraft 0402HP, Murata GJM,
+  Johanson, TDK models with SRF checks and E24/E96/E192 snap, plus
+  user-supplied measured-model directories.
+- **CISPR-aware.** Conducted and radiated emission prediction against
+  CISPR 22 / 32 and FCC Part 15 limits, anchored to closed-form
+  references, before you build.
 
 ---
 
@@ -66,7 +77,7 @@ spec evaluation. Validated against the bundled example designs
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs.git
 cd mcp-ltspice-qucs
 uv sync --all-packages
-uv run pytest -q                  # 427 pass, 4 simulator-gated skips
+uv run pytest -q                  # 876 pass; simulator-gated tests skip when tools are absent
 uv run python examples/basic_lpf/design.py
 ```
 
@@ -94,13 +105,13 @@ example: **all 5 spec criteria pass at 99% yield.**
 
 ## Tools
 
-`mcp-ltspice-qucs` ships three MCP servers, 99 tools total:
+`mcp-ltspice-qucs` ships three MCP servers, 110 tools total:
 
 | Server                | Tools | Purpose                                                                 |
 | --------------------- | ----: | ----------------------------------------------------------------------- |
-| **`mcp-ltspice`**     | 56    | LTspice + ngspice. LC ladder synth, vendor parts, Monte Carlo, SMPS sizing + EMC, active filters, op-amp/MOSFET/BJT/diode/Vref catalogs |
-| **`mcp-qucs-s`**      | 10    | Qucs-S native S-param sim. Microstrip + 16 substrate presets, couplers, Richards-Kuroda |
-| **`mcp-rf-analysis`** | 33    | Touchstone I/O, skrf wrappers, LTE / 5G NR / ISM / HaLow / GNSS bands, FCC / ETSI / 3GPP eval, coexistence matrix |
+| **`mcp-ltspice`**     | 59    | LTspice + ngspice. LC ladder synthesis (incl. elliptic BPF/BSF), coex-driven closed-loop design, vendor parts, Monte Carlo, SMPS sizing + EMC, active filters, device catalogs |
+| **`mcp-qucs-s`**      | 17    | Qucs-S native S-param sim + Xyce harmonic balance. Microstrip + 16 substrate presets, couplers, Richards-Kuroda, stepped-impedance / edge-coupled / hairpin / interdigital / combline filters |
+| **`mcp-rf-analysis`** | 34    | Touchstone I/O, skrf wrappers, LTE / 5G NR / ISM / HaLow / GNSS bands, FCC / ETSI / 3GPP eval, coex matrix with GNSS ΔC/N₀ model, victim-weighted zero placement, EMC predictors |
 
 Tools register under both flat names (back-compat) and categorised
 aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`,
@@ -119,7 +130,8 @@ aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`,
 | SMPS EMC pre-compliance  | `design_pi_filter`, `predict_conducted_emissions`, `design_snubber`, `design_cm_choke` | CISPR 22 / CISPR 32                |
 | Microstrip + coupler     | `microstrip_synth`, `branchline_coupler`, `rat_race`, `lange_coupler` | Hammerstad-Jensen                  |
 | Monte Carlo yield        | `monte_carlo_analysis` (joblib parallel)                         | Gaussian component tolerance       |
-| Multi-radio coexistence  | `coexistence_matrix`, `lte_band_lookup`, `wifi_halow_channel`    | 3GPP TS 36.101, WiFi-HaLow         |
+| Distributed filters      | `synthesize_stepped_impedance_lpf`, `synthesize_coupled_line_bpf`, `synthesize_hairpin_bpf`, `synthesize_interdigital_bpf`, `synthesize_combline_bpf` | Pozar §8.6-8.7, exact TEM N-line model |
+| Multi-radio coexistence  | `place_zeros_for_coex` → `synthesize_for_coex_target` → `check_coex_matrix` (GNSS ΔC/N₀) | 3GPP TS 36.101, FCC restricted bands |
 
 Five worked examples ship under [`examples/`](examples/):
 `basic_lpf`, `buck_smps`, `emc_compliance`, `filter_compare`,
@@ -160,12 +172,12 @@ full boundary statement, decision flow, and cross-MCP workflow examples.
 
 ## Documentation
 
-- 📘 **[Getting started](docs/getting-started.md)** — install through first call.
-- 🛠️ **[Tool catalog](docs/tool-catalog.md)** — all 99 tools, per-server pages under [`docs/tools/`](docs/tools/).
-- 📐 **[Usage example](docs/usage.md)** — practical end-to-end walkthrough.
-- 🏗️ **[Architecture](docs/architecture.md)** — interop contract between servers.
-- 🔗 **[Suite architecture](docs/suite-architecture.md)** — how this MCP fits in eng-mcp-suite.
-- 📝 **[Changelog](CHANGELOG.md)**
+- **[Getting started](docs/getting-started.md)** — install through first call.
+- **[Tool catalog](docs/tool-catalog.md)** — all 110 tools, per-server pages under [`docs/tools/`](docs/tools/).
+- **[Usage example](docs/usage.md)** — practical end-to-end walkthrough.
+- **[Architecture](docs/architecture.md)** — interop contract between servers.
+- **[Suite architecture](docs/suite-architecture.md)** — how this MCP fits in eng-mcp-suite.
+- **[Changelog](CHANGELOG.md)**
 
 ---
 
