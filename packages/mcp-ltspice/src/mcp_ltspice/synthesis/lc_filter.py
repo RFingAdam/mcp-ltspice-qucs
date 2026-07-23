@@ -625,6 +625,141 @@ def synthesize_lc_hpf(
     )
 
 
+def _elliptic_prototype_sections(
+    order: int, ripple_db: float, stopband_atten_db: float
+) -> tuple[list[float], list[tuple[float, float]], list[float]]:
+    """Split the elliptic synthesis vector into its ladder sections.
+
+    Returns ``(series_g, traps, g)`` where ``series_g`` are the normalized
+    series-inductor values, ``traps`` the normalized ``(L_t, C_t)`` shunt
+    trap pairs in ladder order, and ``g`` the raw vector for reporting.
+    """
+    g, _ = g_coefficients("elliptic", order, ripple_db, stopband_atten_db)
+    n_traps = (len(g) - 3) // 3
+    n_series = n_traps + 1
+    idx = 1
+    series_g: list[float] = []
+    traps: list[tuple[float, float]] = []
+    for i in range(n_series):
+        series_g.append(g[idx])
+        idx += 1
+        if i < n_traps:
+            traps.append((g[idx], g[idx + 1]))
+            idx += 2
+    return series_g, traps, g
+
+
+def _composite_branch_zeros_hz(l_s: float, c_s: float, l_p: float, c_p: float) -> list[float]:
+    """The two resonances (shorts) of a shunt composite trap branch.
+
+    ``Z = sL_s + 1/(sC_s) + sL_p/(s²L_pC_p + 1)`` vanishes at the roots of
+    ``u²·L_sC_sL_pC_p − u·(L_sC_s + L_pC_p + L_pC_s) + 1 = 0`` in ``u = ω²``.
+    Solved in the cancellation-safe form ``q = (b + √(b²−4a))/2``,
+    ``u = q/a`` and ``1/q``.
+    """
+    a = (l_s * c_s) * (l_p * c_p)
+    b = l_s * c_s + l_p * c_p + l_p * c_s
+    q = (b + math.sqrt(b * b - 4.0 * a)) / 2.0
+    return sorted(math.sqrt(u) / (2.0 * math.pi) for u in (q / a, 1.0 / q))
+
+
+def _synthesize_elliptic_bandxform(
+    kind: Literal["bandpass", "bandstop"],
+    order: int,
+    f_low_hz: float,
+    f_high_hz: float,
+    *,
+    ripple_db: float,
+    stopband_atten_db: float,
+    z0: float,
+) -> FilterDesign:
+    """Elliptic BPF / BSF by transforming the elliptic LPF prototype's
+    ladder element-by-element (Pozar §8.5).
+
+    The prototype is series-L sections interleaved with shunt series-LC
+    traps. The band transforms act on each L and C *separately*, so a trap
+    becomes a four-element composite shunt branch — series-LC in series
+    with a parallel tank, to ground:
+
+    - **bandpass** (``ω → (1/Δ)(ω/ω₀ − ω₀/ω)``): every L → series-LC,
+      every C → parallel tank. Main path: ``{Lk, Ck_s}`` resonant at ω₀.
+      Trap-L → ``{Lk_s, Ck_s}``, trap-C → ``{Lk, Ck}``.
+    - **bandstop** (``ω → Δ/(ω/ω₀ − ω₀/ω)``): every L → parallel tank,
+      every C → series-LC. Main path: ``{Lk, Ck_s}`` anti-resonant at ω₀.
+      Trap-L → ``{Lk, Ck}``, trap-C → ``{Lk_s, Ck_s}``.
+
+    Each LPF zero ``ω_z`` maps to a geometric mirror-pair about ω₀ —
+    ``ω = ω₀(√(b²+1) ± b)`` with ``b = ω_z·Δ/2`` (BPF) or ``Δ/(2ω_z)``
+    (BSF). The reported ``transmission_zeros_hz`` are computed back from
+    the *physical* branch values (the v0.2.0 math-consistency invariant);
+    for bandstop the main-path tanks add a zero at ω₀ itself.
+
+    The elliptic prototype extraction is T-form only, so the design is
+    always ``series_first`` regardless of the caller's topology argument.
+    """
+    series_g, traps, g = _elliptic_prototype_sections(order, ripple_db, stopband_atten_db)
+
+    omega_low = 2.0 * math.pi * f_low_hz
+    omega_high = 2.0 * math.pi * f_high_hz
+    omega_0 = math.sqrt(omega_low * omega_high)
+    delta = (omega_high - omega_low) / omega_0
+    f0_hz = omega_0 / (2.0 * math.pi)
+
+    out: dict[str, float] = {}
+    zeros_hz: list[float] = []
+    ref = 1
+    for i, l_n in enumerate(series_g):
+        if kind == "bandpass":
+            out[f"L{ref}"] = l_n * z0 / (delta * omega_0)
+            out[f"C{ref}_s"] = delta / (l_n * z0 * omega_0)
+        else:
+            out[f"L{ref}"] = l_n * z0 * delta / omega_0
+            out[f"C{ref}_s"] = 1.0 / (l_n * z0 * delta * omega_0)
+        ref += 1
+        if i < len(traps):
+            l_t, c_t = traps[i]
+            if kind == "bandpass":
+                l_s = l_t * z0 / (delta * omega_0)
+                c_s = delta / (l_t * z0 * omega_0)
+                l_p = delta * z0 / (c_t * omega_0)
+                c_p = c_t / (delta * z0 * omega_0)
+            else:
+                l_s = z0 / (c_t * delta * omega_0)
+                c_s = c_t * delta / (z0 * omega_0)
+                l_p = l_t * z0 * delta / omega_0
+                c_p = 1.0 / (l_t * z0 * delta * omega_0)
+            out[f"L{ref}_s"] = l_s
+            out[f"C{ref}_s"] = c_s
+            out[f"L{ref}"] = l_p
+            out[f"C{ref}"] = c_p
+            zeros_hz.extend(_composite_branch_zeros_hz(l_s, c_s, l_p, c_p))
+            ref += 1
+
+    if kind == "bandstop":
+        zeros_hz.append(f0_hz)  # the main-path tanks all anti-resonate at ω₀
+
+    return FilterDesign(
+        filter_type="elliptic",
+        order=2 * order,
+        cutoff_hz=f0_hz,
+        z0=z0,
+        topology=Topology.SERIES_FIRST,
+        g=g,
+        components=out,
+        transmission_zeros_hz=sorted(zeros_hz),
+        metadata={
+            "kind": kind,
+            "prototype_order": order,
+            "f_low_hz": f_low_hz,
+            "f_high_hz": f_high_hz,
+            "f_0_hz": f0_hz,
+            "fractional_bandwidth": delta,
+            "ripple_db": ripple_db,
+            "stopband_atten_db": stopband_atten_db,
+        },
+    )
+
+
 def synthesize_lc_bpf(
     filter_type: FilterType,
     order: int,
@@ -666,14 +801,25 @@ def synthesize_lc_bpf(
     series-LC components are emitted with a ``"_s"`` suffix (e.g.
     ``L1`` and ``C1_s`` for the series-LC pair at position 1).
 
-    Currently supports Butterworth and Chebyshev I.
+    For **elliptic** (odd order ≥ 3) the transform is applied to the
+    prototype's ladder element-by-element: each shunt trap becomes a
+    four-element composite branch ``{Lk_s, Ck_s, Lk, Ck}`` whose two
+    resonances are the images of the LPF zero — see
+    :func:`_synthesize_elliptic_bandxform`. Elliptic designs are always
+    ``series_first``.
     """
-    if filter_type == "elliptic":
-        raise NotImplementedError(
-            "synthesize_lc_bpf does not support elliptic. Use Butterworth or Chebyshev I."
-        )
     if f_high_hz <= f_low_hz:
         raise ValueError(f"f_high_hz ({f_high_hz}) must exceed f_low_hz ({f_low_hz})")
+    if filter_type == "elliptic":
+        return _synthesize_elliptic_bandxform(
+            "bandpass",
+            order,
+            f_low_hz,
+            f_high_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+        )
     if isinstance(topology, str):
         topology = Topology(topology)
 
@@ -754,14 +900,24 @@ def synthesize_lc_bsf(
 
     Series-LC components emitted with ``"_s"`` suffix as in BPF.
 
-    Currently supports Butterworth and Chebyshev I.
+    For **elliptic** (odd order ≥ 3) each prototype trap becomes a
+    four-element composite shunt branch — see
+    :func:`_synthesize_elliptic_bandxform`; the main-path tanks add a
+    transmission zero at ω₀ itself. Elliptic designs are always
+    ``series_first``.
     """
-    if filter_type == "elliptic":
-        raise NotImplementedError(
-            "synthesize_lc_bsf does not support elliptic. Use Butterworth or Chebyshev I."
-        )
     if f_high_hz <= f_low_hz:
         raise ValueError(f"f_high_hz ({f_high_hz}) must exceed f_low_hz ({f_low_hz})")
+    if filter_type == "elliptic":
+        return _synthesize_elliptic_bandxform(
+            "bandstop",
+            order,
+            f_low_hz,
+            f_high_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+        )
     if isinstance(topology, str):
         topology = Topology(topology)
 
