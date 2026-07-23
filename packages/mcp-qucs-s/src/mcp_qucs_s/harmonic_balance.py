@@ -65,7 +65,7 @@ def dbm_to_source_amplitude(dbm: float, z0: float = 50.0) -> float:
     return math.sqrt(8.0 * z0 * p_watts)
 
 
-def volts_to_dbm(v_peak: float | NDArray[np.float64], z0: float = 50.0):
+def volts_to_dbm(v_peak: float | NDArray[np.float64], z0: float = 50.0) -> NDArray[np.float64]:
     """Peak volts across ``z0`` to dBm."""
     p_watts = np.asarray(v_peak) ** 2 / (2.0 * z0)
     with np.errstate(divide="ignore"):
