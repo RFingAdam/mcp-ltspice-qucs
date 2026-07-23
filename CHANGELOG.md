@@ -9,6 +9,40 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — edge-coupled (parallel coupled-line) microstrip BPF (#27, mcp-qucs-s)
+
+`synthesize_coupled_line_bpf` implements the coupled-section BPF core
+that hairpin / interdigital / combline all build on. Input is the LPF
+prototype `g_coefficients` vector (exactly what the lumped synthesis
+tools return); order N yields N+1 quarter-wave coupled sections via the
+J-inverter constants (Pozar §8.7 eq. 8.121). The electrical math is
+pinned to Pozar 4e Example 8.7: Z₀e/Z₀o = 70.61/39.24 and 56.64/44.77 Ω
+reproduced to 0.05 Ω.
+
+Physical (W, S) realisation comes from a new `coupled_microstrip` module:
+quasi-static Garg-Bahl even/odd-mode capacitance analysis (single-line
+fringe reused from the Hammerstad-Jensen code, exact elliptic-integral
+gap term via scipy) plus numerical inversion. Unrealizable couplings
+(coupler-grade Ze/Zo ratios) are rejected with an explanation rather
+than returning a bound-clipped corner.
+
+Validation, probe-verified against qucsator-RF 1.0.7:
+
+- qucsator's ideal coupled line is `CTLIN` (vacuum velocity; node order
+  line1-near / line1-far / line2-far / line2-near, established by
+  terminating all four ports and reading through/coupled/isolated =
+  0.9573/0.2849/0.0140 against theory 0.9585/0.2856/0).
+- The diagonal-connected section (others open) matches the closed-form
+  section ABCD to 0.0000 mdB; the new `coupled_line_section` netlist
+  element and `coupled_section_sparams` cascade agree with qucsator at
+  numerical precision across the whole sweep.
+- End-to-end through qucsator's real Kirschning `MCOUPLED` model (new
+  `generate_coupled_microstrip_netlist`, diagonal chaining): on a
+  Rogers-class laminate the Pozar design centres at 1.979 GHz (−1.1% vs
+  design), −3 dB bandwidth 9.4% vs the 10% spec, −1.76 dB midband loss.
+  On FR-4 the measured 4.05 dB midband loss matches the classical
+  4.343·Σg/(Δ·Qu) estimate — real dielectric loss, noted in the tests.
+
 ### Added — stepped-impedance microstrip LPF (#27, first distributed topology, mcp-qucs-s)
 
 `synthesize_stepped_impedance_lpf` maps a lumped LPF ladder (the same
