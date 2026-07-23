@@ -374,7 +374,7 @@ def lookup_part_with_srf_margin(
 
 
 def _resolve_max_spec_freq_hz(
-    spec: dict | None,
+    spec: dict[str, Any] | None,
     max_spec_freq_hz: float | None,
 ) -> float | None:
     """Coerce a FilterSpec dict (or explicit Hz) into a single max-target Hz."""
@@ -399,7 +399,7 @@ def substitute_real_components(
     *,
     srf_margin: float = 0.0,
     max_spec_freq_hz: float | None = None,
-    spec: dict | None = None,
+    spec: dict[str, Any] | None = None,
     max_value_drift_pct: float | None = 25.0,
 ) -> dict[str, dict[str, float]]:
     """Return a mapping of refdes → {ideal_value, snapped_value, Cp/Ls,

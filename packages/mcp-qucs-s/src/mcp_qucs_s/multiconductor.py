@@ -118,7 +118,7 @@ def segmented_array_sparams(
     the fully-reflective limit.
     """
     y_c = np.asarray(y_c, dtype=np.float64)
-    n_lines = y_c.shape[0]
+    n_lines = int(y_c.shape[0])
     if y_c.shape != (n_lines, n_lines):
         raise ValueError(f"y_c must be square; got {y_c.shape}")
     if len(bottom) != n_lines or len(top) != n_lines:

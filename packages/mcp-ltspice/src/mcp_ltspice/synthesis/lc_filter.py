@@ -19,9 +19,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, cast
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy import signal
 
 
@@ -208,7 +209,7 @@ def _fit_lc_to_prototype(
     def _residuals(x: np.ndarray) -> np.ndarray:
         if np.any(x[1:-1] <= 0):
             return np.full_like(target_db, 1e6)
-        return weights * (_response_db(x) - target_db)
+        return cast(NDArray[np.float64], weights * (_response_db(x) - target_db))
 
     from scipy.optimize import least_squares
 
@@ -310,7 +311,7 @@ def _ladder_response_db(
             a, b, c, d = new_a, new_b, new_c, new_d
 
     s21 = 2.0 / (a + b / rl + c * rs + d * (rs / rl))
-    return 20.0 * np.log10(np.maximum(np.abs(s21), 1e-12))
+    return cast(NDArray[np.float64], 20.0 * np.log10(np.maximum(np.abs(s21), 1e-12)))
 
 
 def g_coefficients(

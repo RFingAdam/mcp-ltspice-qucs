@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import skrf as rf
@@ -187,4 +188,4 @@ def s21_db_at(net: rf.Network, freq_hz: float) -> float:
 
 def s21_db_array(net: rf.Network, freq_hz: NDArray[np.float64]) -> NDArray[np.float64]:
     s21 = np.interp(freq_hz, net.f, np.abs(net.s[:, 1, 0]))
-    return 20.0 * np.log10(np.maximum(s21, 1e-12))
+    return cast(NDArray[np.float64], 20.0 * np.log10(np.maximum(s21, 1e-12)))

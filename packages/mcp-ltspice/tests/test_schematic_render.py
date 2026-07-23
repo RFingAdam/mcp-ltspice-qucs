@@ -12,8 +12,6 @@ assertion below makes that explicit rather than incidental.
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from mcp_ltspice.schematic_render import (
@@ -31,10 +29,13 @@ def elliptic_components() -> dict[str, float]:
     return dict(synthesize_lc_lpf("elliptic", 5, 1e9, stopband_atten_db=40).components)
 
 
-def test_runs_headless() -> None:
-    assert not os.environ.get("DISPLAY"), (
-        "these tests must exercise the no-DISPLAY path; unset DISPLAY in CI"
-    )
+def test_runs_headless(tmp_path, monkeypatch) -> None:
+    """Rendering must work with no DISPLAY at all — delete it and render,
+    rather than asserting the environment happens to be headless (which
+    would fail on any developer machine with X running)."""
+    monkeypatch.delenv("DISPLAY", raising=False)
+    out = render_lc_ladder_schematic(BUTTER, tmp_path / "headless.png")
+    assert out.is_file() and out.stat().st_size > 500
 
 
 @pytest.mark.parametrize("ext", ["svg", "png"])

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import skrf as rf
+from numpy.typing import NDArray
 from pydantic import BaseModel, Field
 
 from rf_mcp_common.touchstone import read_touchstone
@@ -63,13 +64,13 @@ def _s11_db_at(net: rf.Network, freq_hz: float) -> float:
     return float(20.0 * np.log10(max(abs(s11), 1e-12)))
 
 
-def _band_mask(net: rf.Network, f_start: float, f_stop: float) -> np.ndarray:
-    return (net.f >= f_start) & (net.f <= f_stop)
+def _band_mask(net: rf.Network, f_start: float, f_stop: float) -> NDArray[np.bool_]:
+    return cast(NDArray[np.bool_], (net.f >= f_start) & (net.f <= f_stop))
 
 
 def evaluate_filter_spec(
     s2p_path: str | Path,
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
 ) -> SpecEvalResult:
     """Evaluate a Touchstone S₂ₚ file against a spec.
 

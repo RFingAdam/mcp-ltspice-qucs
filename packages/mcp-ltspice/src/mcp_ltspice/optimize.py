@@ -97,7 +97,7 @@ def _snap_to_vendor(value: float, vendor: str, kind: Literal["L", "C"]) -> float
 
 def optimize_filter(
     initial_components: dict[str, float],
-    spec: FilterSpec | dict,
+    spec: FilterSpec | dict[str, Any],
     *,
     tune: list[str] | None = None,
     transmission_zeros: bool = True,
