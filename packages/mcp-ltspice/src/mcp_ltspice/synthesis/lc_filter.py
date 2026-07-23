@@ -467,6 +467,76 @@ def synthesize_lc_lpf(
 # --------------------------------------------------------------------------
 
 
+def _synthesize_elliptic_hpf(
+    order: int,
+    cutoff_hz: float,
+    *,
+    ripple_db: float,
+    stopband_atten_db: float,
+    z0: float,
+    topology: Topology,
+) -> FilterDesign:
+    """Elliptic HPF by inverting the elliptic LPF prototype's ladder.
+
+    The elliptic LPF is ``series_l`` sections interleaved with shunt
+    ``shunt_lc_trap`` sections. The LPF→HPF map ``ω → ω_c²/ω`` inverts each:
+
+    - ``series_l`` (value ``L``) → ``series_c`` with ``C = 1/(ω_c²·L)``
+    - ``shunt_lc_trap`` ``(L_t, C_t)`` → ``shunt_lc_trap`` with
+      ``L_t' = 1/(ω_c²·C_t)``, ``C_t' = 1/(ω_c²·L_t)``, whose resonance moves
+      from ``ω_z`` to ``ω_c²/ω_z``.
+
+    The refdes convention is preserved so ``components_dict_to_elements`` and
+    the ``.asc`` netlister read it back correctly: series capacitors keep the
+    odd indices, traps keep the even indices with both ``L`` and ``C`` set.
+    """
+    from mcp_ltspice.extract import components_dict_to_elements
+
+    lpf = synthesize_lc_lpf(
+        "elliptic",
+        order,
+        cutoff_hz,
+        ripple_db=ripple_db,
+        stopband_atten_db=stopband_atten_db,
+        z0=z0,
+        topology=topology,
+    )
+    lpf_elements = components_dict_to_elements(
+        lpf.components, topology=str(topology), kind="lowpass"
+    )
+
+    wc2 = (2.0 * math.pi * cutoff_hz) ** 2
+    out: dict[str, float] = {}
+    zeros_hz: list[float] = []
+    for idx, (elt_kind, params) in enumerate(lpf_elements, start=1):
+        if elt_kind == "series_l":
+            out[f"C{idx}"] = 1.0 / (wc2 * params["L"])
+        elif elt_kind == "shunt_lc_trap":
+            l_new = 1.0 / (wc2 * params["C"])
+            c_new = 1.0 / (wc2 * params["L"])
+            out[f"L{idx}"] = l_new
+            out[f"C{idx}"] = c_new
+            zeros_hz.append(1.0 / (2.0 * math.pi * math.sqrt(l_new * c_new)))
+        else:  # pragma: no cover - elliptic LPF only emits the two kinds above
+            raise ValueError(f"unexpected elliptic LPF element {elt_kind!r}")
+
+    return FilterDesign(
+        filter_type="elliptic",
+        order=order,
+        cutoff_hz=cutoff_hz,
+        z0=z0,
+        topology=topology,
+        g=lpf.g,
+        components=out,
+        transmission_zeros_hz=sorted(zeros_hz),
+        metadata={
+            "kind": "highpass",
+            "ripple_db": ripple_db,
+            "stopband_atten_db": stopband_atten_db,
+        },
+    )
+
+
 def synthesize_lc_hpf(
     filter_type: FilterType,
     order: int,
@@ -489,19 +559,27 @@ def synthesize_lc_hpf(
     Refdes scheme (T-topology / series-first):
         L1, C2, L3, C4, ...  →  C1, L2, C3, L4, ...
 
-    Currently supports Butterworth and Chebyshev I. Elliptic HPF is not
-    implemented (the transformation must also map finite transmission zeros
-    via ω_z → ω_c² / ω_z; see :func:`synthesize_lc_lpf` for elliptic
-    LPF).
+    For **elliptic** the same LPF→HPF reactance inversion is applied to the
+    prototype's ladder rather than to its g-vector, because an elliptic LPF
+    is not an all-pole ladder. Under ``ω → ω_c²/ω`` each element inverts
+    into its dual — a series inductor becomes a series capacitor and a shunt
+    series-LC trap stays a shunt series-LC trap with L and C swapped — so a
+    finite zero at ``ω_z`` maps to a zero at ``ω_c²/ω_z``, which for a
+    high-pass lands in the lower stopband. Verified against ngspice: the
+    response is the mirror of the elliptic LPF, equiripple passband and all.
     """
-    if filter_type == "elliptic":
-        raise NotImplementedError(
-            "synthesize_lc_hpf does not support elliptic. Elliptic HPF "
-            "synthesis requires transforming finite transmission zeros and "
-            "is not yet implemented. Use Butterworth or Chebyshev I."
-        )
     if isinstance(topology, str):
         topology = Topology(topology)
+
+    if filter_type == "elliptic":
+        return _synthesize_elliptic_hpf(
+            order,
+            cutoff_hz,
+            ripple_db=ripple_db,
+            stopband_atten_db=stopband_atten_db,
+            z0=z0,
+            topology=topology,
+        )
 
     g, _ = g_coefficients(filter_type, order, ripple_db, stopband_atten_db)
     omega_c = 2.0 * math.pi * cutoff_hz

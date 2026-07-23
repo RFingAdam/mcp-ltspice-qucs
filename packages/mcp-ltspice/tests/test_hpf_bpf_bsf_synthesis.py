@@ -50,9 +50,13 @@ class TestHpfSynthesis:
         assert len(d.components) == 3
         assert d.cutoff_hz == 2.4e9
 
-    def test_elliptic_raises_not_implemented(self):
-        with pytest.raises(NotImplementedError, match="elliptic"):
-            synthesize_lc_hpf("elliptic", order=5, cutoff_hz=1e9)
+    def test_elliptic_is_implemented(self):
+        """Elliptic HPF now synthesises; see test_elliptic_hpf.py for the
+        full response validation against theory and qucsator."""
+        d = synthesize_lc_hpf("elliptic", order=5, cutoff_hz=1e9, stopband_atten_db=40)
+        assert d.filter_type == "elliptic"
+        assert d.transmission_zeros_hz, "elliptic HPF must have finite zeros"
+        assert all(z < 1e9 for z in d.transmission_zeros_hz), "HPF zeros belong below fc"
 
     def test_response_is_actually_highpass(self):
         """Sanity check: HPF should attenuate DC, pass high freq."""

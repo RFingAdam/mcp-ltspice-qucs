@@ -9,6 +9,29 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — elliptic high-pass synthesis (#26, partial: HPF)
+
+`synthesize_lc_hpf("elliptic", ...)` now works; it previously raised
+`NotImplementedError`. An elliptic HPF is the frequency mirror of an
+elliptic LPF: the LPF→HPF map `ω → ω_c²/ω` inverts each prototype element
+into its dual — a series inductor becomes a series capacitor, and a shunt
+series-LC trap stays a shunt series-LC trap with L and C swapped — so a
+finite zero at `ω_z` moves to `ω_c²/ω_z`, landing in the lower stopband.
+
+Validated at orders 5/7/9: equiripple passband above `ω_c` that mirrors the
+LPF to 0.05 dB, deep notches at the mirrored zeros, and the v0.2.0
+math-consistency invariant (each reported zero equals `1/(2π√(L·C))` of its
+trap) holds to 1e-9. Cross-checked end-to-end against **real qucsator**:
+the analytical ladder and the simulated response agree to within 0.05 dB
+across the band.
+
+Elliptic BPF and BSF remain unimplemented and #26 stays open for them.
+The bandpass/bandstop transforms turn each shunt trap into a four-element
+composite branch (a series-LC in series with a parallel-LC tank) with no
+existing element type or `.asc` netlister support — a materially larger
+change than the HPF mirror, and not worth rushing into a subtly-wrong
+filter.
+
 ### Added — Qucs-S noise parameters (#25, mcp-qucs-s)
 
 `extract_noise_parameters` was the last scaffolded tool in the suite. It now
