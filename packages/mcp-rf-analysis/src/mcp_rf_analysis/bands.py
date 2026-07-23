@@ -9,7 +9,7 @@ from __future__ import annotations
 import functools
 import json
 from importlib import resources
-from typing import Any
+from typing import Any, cast
 
 
 @functools.cache
@@ -18,7 +18,7 @@ def _load_band_json(name: str) -> dict[str, Any]:
     pkg_resources = resources.files("mcp_rf_analysis").joinpath("resources/bands")
     path = pkg_resources.joinpath(f"{name}.json")
     with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 @functools.cache
@@ -26,13 +26,13 @@ def _load_limit_json(name: str) -> dict[str, Any]:
     pkg_resources = resources.files("mcp_rf_analysis").joinpath("resources/limits")
     path = pkg_resources.joinpath(f"{name}.json")
     with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 def list_lte_bands(region: str | None = None) -> list[dict[str, Any]]:
     """Return LTE bands. ``region`` filters by substring match on the
     band's ``region`` field (e.g. 'Americas', 'EMEA', 'Japan')."""
-    data = _load_band_json("lte")["bands"]
+    data: list[dict[str, Any]] = _load_band_json("lte")["bands"]
     if region is None:
         return data
     needle = region.lower()
@@ -53,13 +53,13 @@ def list_5gnr_bands(family: str = "fr1") -> list[dict[str, Any]]:
     key = f"bands_{family.lower()}"
     if key not in data:
         raise ValueError(f"Unknown 5G NR family: {family}")
-    return data[key]
+    return cast(list[dict[str, Any]], data[key])
 
 
 def list_gnss_bands(system: str | None = None) -> list[dict[str, Any]]:
     """Return GNSS signals. ``system`` filters by 'GPS', 'GLONASS',
     'Galileo', 'BeiDou'."""
-    data = _load_band_json("gnss")["bands"]
+    data: list[dict[str, Any]] = _load_band_json("gnss")["bands"]
     if system is None:
         return data
     needle = system.lower()
@@ -72,7 +72,7 @@ def list_gnss_bands(system: str | None = None) -> list[dict[str, Any]]:
 
 def list_ism_bands(region: int | None = None) -> list[dict[str, Any]]:
     """Return ISM band allocations. ``region`` is 1, 2, or 3 (ITU)."""
-    data = _load_band_json("ism")["bands"]
+    data: list[dict[str, Any]] = _load_band_json("ism")["bands"]
     if region is None:
         return data
     matches = [b for b in data if region in b.get("regions", [])]
@@ -87,7 +87,7 @@ def list_halow_channels(region: str = "US") -> dict[str, Any]:
     data = _load_band_json("halow")["regions"]
     if region not in data:
         raise ValueError(f"Unknown HaLow region: {region}; available: {sorted(data)}")
-    return data[region]
+    return cast(dict[str, Any], data[region])
 
 
 def lookup_band_by_freq(freq_hz: float) -> dict[str, list[dict[str, Any]]]:
@@ -131,7 +131,7 @@ def lookup_band_by_freq(freq_hz: float) -> dict[str, list[dict[str, Any]]]:
 
 def list_fcc_restricted_bands() -> list[dict[str, Any]]:
     """FCC §15.205 restricted bands (no fundamental emission allowed)."""
-    return _load_limit_json("fcc")["restricted_bands"]
+    return cast(list[dict[str, Any]], _load_limit_json("fcc")["restricted_bands"])
 
 
 def is_in_restricted_band(freq_hz: float) -> tuple[bool, dict[str, Any] | None]:

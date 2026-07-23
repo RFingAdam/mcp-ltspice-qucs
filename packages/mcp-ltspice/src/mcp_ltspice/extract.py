@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 import skrf as rf
@@ -67,7 +67,7 @@ def _abcd_shunt_y(y: ComplexArray) -> NDArray[np.complex128]:
 
 def _chain(a: NDArray[np.complex128], b: NDArray[np.complex128]) -> NDArray[np.complex128]:
     """Per-frequency 2×2 matrix product for ABCD chain."""
-    return np.einsum("nij,njk->nik", a, b)
+    return cast(NDArray[np.complex128], np.einsum("nij,njk->nik", a, b))
 
 
 def ladder_sparams_from_components(

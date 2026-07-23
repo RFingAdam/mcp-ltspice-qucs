@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import skrf as rf
@@ -100,7 +100,7 @@ def fit_equivalent_circuit(
     from scipy.optimize import least_squares
 
     net = read_touchstone(s2p_path)
-    omega = 2 * np.pi * net.f
+    omega: NDArray[np.float64] = 2 * np.pi * net.f
     z0 = float(net.z0[0, 0].real)
     target_s21 = net.s[:, 1, 0]
 
@@ -121,7 +121,7 @@ def fit_equivalent_circuit(
         c = yc
         d = np.ones_like(omega) + 0j
         denom = a + b / z0 + c * z0 + d
-        return 2.0 / denom
+        return cast(NDArray[np.complex128], 2.0 / denom)
 
     if topology == "series_l":
 

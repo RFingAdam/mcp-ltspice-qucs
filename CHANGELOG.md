@@ -9,6 +9,20 @@ grouped by package.
 
 ## [Unreleased]
 
+### Chore — mypy ratchet complete: zero disabled error codes (#37)
+
+The last three deferred type-completeness codes are re-enabled and
+their 54 accumulated errors fixed: `no-any-return` (numpy/JSON returns
+wrapped in `float()`/`int()` or precisely `cast(...)`), `type-arg`
+(bare `dict`/`list`/`ndarray` generics parameterized with the real
+types), and `no-untyped-call` (all 10 were genuinely third-party —
+schemdraw element constructors and matplotlib's `PdfPages.savefig` —
+handled by a targeted two-module `[[tool.mypy.overrides]]`, not per-line
+ignores). The global `disable_error_code` list is now empty: type
+correctness AND completeness are both enforced. Also fixed
+`test_runs_headless` from #58 to delete `DISPLAY` and render, instead
+of asserting the environment happens to be headless.
+
 ### Tests — EMC closed-form anchors + schematic_render coverage (#34, #36)
 
 - `predict_radiated_emissions_loop` is now pinned to the textbook

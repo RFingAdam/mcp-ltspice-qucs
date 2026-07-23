@@ -104,7 +104,7 @@ def _split_markdown_into_pages(md_text: str, lines_per_page: int = 70) -> list[l
     return pages
 
 
-def _add_summary_page(pdf: PdfPages, design_dir: Path, artifacts: dict) -> None:
+def _add_summary_page(pdf: PdfPages, design_dir: Path, artifacts: dict[str, list[Path]]) -> None:
     """First page: design name + artifact inventory."""
     fig = plt.figure(figsize=(8.5, 11), dpi=150)
     ax = fig.add_subplot(111)
