@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import skrf as rf
+from numpy.typing import NDArray
 
 from rf_mcp_common.touchstone import read_touchstone
 
@@ -124,7 +125,7 @@ def fit_equivalent_circuit(
 
     if topology == "series_l":
 
-        def res(x):
+        def res(x: NDArray[np.float64]) -> NDArray[np.float64]:
             return np.concatenate(
                 [
                     (_model_series_l(x[0]) - target_s21).real,
@@ -137,7 +138,7 @@ def fit_equivalent_circuit(
 
     if topology == "shunt_c":
 
-        def res(x):
+        def res(x: NDArray[np.float64]) -> NDArray[np.float64]:
             return np.concatenate(
                 [(_model_shunt_c(x[0]) - target_s21).real, (_model_shunt_c(x[0]) - target_s21).imag]
             )
@@ -147,7 +148,7 @@ def fit_equivalent_circuit(
 
     if topology == "series_l_shunt_c":
 
-        def res(x):
+        def res(x: NDArray[np.float64]) -> NDArray[np.float64]:
             return np.concatenate(
                 [
                     (_model_l_section(x[0], x[1]) - target_s21).real,

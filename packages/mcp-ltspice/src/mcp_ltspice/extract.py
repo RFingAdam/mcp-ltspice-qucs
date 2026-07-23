@@ -446,7 +446,7 @@ def write_sparams_touchstone(
 RAW_DIALECTS = ("ngspice", "ltspice", "xyce", "qspice")
 
 
-def _open_raw(raw_path: str | Path, dialect: str | None = None):
+def _open_raw(raw_path: str | Path, dialect: str | None = None) -> Any:
     """Open a ``.raw`` file, falling back to explicit dialects.
 
     spicelib infers the dialect from the header, which is not stable across
@@ -536,7 +536,7 @@ def extract_sparams_from_raw(
     p1_node = port_map[1]
     p2_node = port_map[2]
 
-    def _trace(name: str):
+    def _trace(name: str) -> Any:
         """``get_trace`` raises rather than returning ``None`` for an unknown
         trace, so the old ``is None`` guards below were unreachable."""
         try:
