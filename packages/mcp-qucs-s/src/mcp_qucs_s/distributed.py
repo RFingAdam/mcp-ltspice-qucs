@@ -314,3 +314,88 @@ def coupled_section_sparams(
     s[:, 1, 0] = s[:, 0, 1]
     s[:, 1, 1] = np.where(np.isfinite(s22), s22, -1.0)
     return s
+
+
+def hairpin_bpf(
+    g: list[float],
+    f0_hz: float,
+    fractional_bandwidth: float,
+    *,
+    z0: float = 50.0,
+    substrate: Substrate,
+    bend_mm: float | None = None,
+) -> dict[str, Any]:
+    """Hairpin BPF — the folded edge-coupled filter (Cristal-Frankel).
+
+    Builds on :func:`coupled_line_bpf`: each half-wave resonator (line2
+    of coupled section i joined to line1 of section i+1) is folded into
+    a U, and the U-bend connector of physical length ``bend_mm`` (an
+    MLIN at the mean arm width; default 3× that width ≈ arm spacing of
+    2W plus two corners) adds electrical length θ_b to every resonator.
+    To keep each resonator at exactly 180° at f₀, every coupled section
+    is shortened to θ = 90° − θ_b/2 — exact when one bend length serves
+    all resonators, which is what is done here.
+
+    Shortening the sections below 90° weakens the J-inverter couplings
+    slightly (the classic hairpin bandwidth-shrink trade); corner
+    discontinuities of the U and cross-arm self-coupling of the fold are
+    NOT modeled — they are the residual a field solver would refine.
+    """
+    base = coupled_line_bpf(g, f0_hz, fractional_bandwidth, z0=z0, substrate=substrate)
+    sections = base["sections"]
+    order = base["order"]
+
+    mean_w = sum(s["width_mm"] for s in sections) / len(sections)
+    if bend_mm is None:
+        bend_mm = 3.0 * mean_w
+    if bend_mm < 0:
+        raise ValueError(f"bend_mm must be ≥ 0; got {bend_mm}")
+
+    from mcp_qucs_s.microstrip import analyze_microstrip
+
+    bend_line = analyze_microstrip(mean_w, substrate, f0_hz)
+    theta_b = 360.0 * bend_mm / bend_line["wavelength_eff_mm"]
+    theta_section = 90.0 - theta_b / 2.0
+    if theta_section < 30.0:
+        raise ValueError(
+            f"bend_mm={bend_mm:.2f} mm is {theta_b:.1f}° at f0 — shortening the "
+            f"coupled sections to {theta_section:.1f}° leaves too little coupled "
+            "length to realise the filter. Use a shorter bend or a thinner substrate."
+        )
+
+    for s in sections:
+        s["length_mm"] = s["length_mm"] * (theta_section / 90.0)
+        s["electrical_length_deg"] = theta_section
+
+    resonators = [
+        {
+            "index": i,
+            "arm1_deg": sections[i - 1]["electrical_length_deg"],
+            "arm1_mm": sections[i - 1]["length_mm"],
+            "bend_deg": theta_b,
+            "bend_mm": bend_mm,
+            "arm2_deg": sections[i]["electrical_length_deg"],
+            "arm2_mm": sections[i]["length_mm"],
+        }
+        for i in range(1, order + 1)
+    ]
+
+    base.update(
+        {
+            "kind": "hairpin",
+            "bend_mm": bend_mm,
+            "bend_deg": theta_b,
+            "bend_width_mm": mean_w,
+            "resonators": resonators,
+        }
+    )
+    base["notes"] = [
+        "Folded edge-coupled (hairpin-line) design: every coupled section is "
+        f"shortened to {theta_section:.2f}° so each resonator's "
+        "arm + bend + arm totals exactly 180° at f0. The shortened sections "
+        "weaken the couplings slightly — the classic hairpin bandwidth trade.",
+        "Unmodeled residuals: the U's two corner discontinuities (bend "
+        "capacitance) and cross-arm self-coupling between the folded arms of "
+        "one resonator. Refine with a field solver if the layout is tight.",
+    ]
+    return base
