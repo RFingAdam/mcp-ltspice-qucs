@@ -9,6 +9,28 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — place_zeros_for_coex (#12, mcp-rf-analysis)
+
+Restricted-band-aware transmission-zero placement: for each harmonic
+landing `[n·f_lo, n·f_hi]`, the optimal elliptic-filter zero is the
+**severity-weighted centroid of the victim-band overlap intervals** —
+`TZ = Σ s·w·mid / Σ s·w` — not the landing's geometric centre (which is
+suboptimal whenever victims overlap the landing asymmetrically; the
+hand-pinned reference case moves the zero from 1800.0 to 1811.48 MHz).
+Victims come from the caller with optional severity weights, plus
+optional auto-loads from the package's GNSS and FCC-restricted tables
+(a 525 MHz TX's 3rd harmonic finds GPS L1 with no user input). The zero
+budget assigns highest-aggregate harmonics first, spare zeros fall back
+to landing centres (flagged), and the result carries trap-index hints
+matching mcp-ltspice's elliptic convention (lowest zero → trap 2) for
+direct composition with `place_transmission_zero`, a markdown
+rationale, plus `unprotected_victims` / `victims_not_at_risk` lists.
+
+Implemented in **mcp-rf-analysis** (`coex_zeros.py`) rather than
+mcp-ltspice as issue #12 sketched: the band data and harmonic lookups
+live here, and mcp-ltspice carries no runtime dependency on this
+package — the trap-hint contract is the composition point instead.
+
 ### Added — combline BPF (#27 complete, mcp-qucs-s)
 
 `synthesize_combline_bpf` finishes the #27 distributed-filter set:
