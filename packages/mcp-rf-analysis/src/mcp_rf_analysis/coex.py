@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from mcp_rf_analysis.bands import (
@@ -45,6 +46,71 @@ def lookup_harmonic_victims(
             }
         )
     return out
+
+
+# --- GNSS-specific desense model (issue #15) --------------------------------
+#
+# GNSS victims break the generic power-vs-sensitivity model: the real
+# mechanism for a co-located TX is broadband PA noise at the GNSS
+# frequency, and the industry metric is ΔC/N₀ (dB-Hz). Documented
+# assumptions, overridable per entry:
+
+#: PA broadband noise floor far from the carrier when neither the TX
+#: entry (``broadband_noise_dbm_hz``) nor the victim entry
+#: (``pa_broadband_noise_dbm_hz_at_offset``) specifies one.
+GNSS_DEFAULT_PA_NOISE_DBM_HZ = -150.0
+GNSS_DEFAULT_NF_DB = 2.0
+#: GPS C/A code rate — the correlator spreads an in-band CW tone over
+#: this bandwidth (spectral separation coefficient Q = 1 assumed).
+GNSS_DEFAULT_CHIP_RATE_HZ = 1.023e6
+#: C/N₀ degradation budget used to express GNSS entries as a
+#: ``desense_margin_db`` (budget − ΔC/N₀) so mixed matrices stay sortable.
+GNSS_CN0_BUDGET_DB = 1.0
+
+
+def _delta_cn0_db(i0_dbm_hz: float, n0_dbm_hz: float) -> float:
+    """Effective-noise-floor rise: ΔC/N₀ = 10·log₁₀(1 + 10^((I₀−N₀)/10))."""
+    return 10.0 * math.log10(1.0 + 10.0 ** ((i0_dbm_hz - n0_dbm_hz) / 10.0))
+
+
+def _gnss_concern(delta_cn0_db: float) -> str:
+    if delta_cn0_db >= 3.0:
+        return "critical"
+    if delta_cn0_db >= 1.0:
+        return "high"
+    if delta_cn0_db >= 0.5:
+        return "medium"
+    if delta_cn0_db >= 0.25:
+        return "low"
+    return "none"
+
+
+def _gnss_entry(
+    tx_name: str,
+    rx: dict[str, Any],
+    mechanism: str,
+    i0_dbm_hz: float,
+    assumptions: dict[str, Any],
+) -> dict[str, Any]:
+    nf_db = rx.get("noise_figure_db", GNSS_DEFAULT_NF_DB)
+    n0 = -174.0 + nf_db
+    delta = _delta_cn0_db(i0_dbm_hz, n0)
+    assumptions = {
+        "noise_figure_db": nf_db,
+        "cn0_budget_db": GNSS_CN0_BUDGET_DB,
+        **assumptions,
+    }
+    return {
+        "aggressor": tx_name,
+        "victim": rx["name"],
+        "mechanism": mechanism,
+        "i0_dbm_hz": i0_dbm_hz,
+        "gnss_noise_floor_dbm_hz": n0,
+        "delta_cn0_db_hz": delta,
+        "desense_margin_db": GNSS_CN0_BUDGET_DB - delta,
+        "concern": _gnss_concern(delta),
+        "assumptions": assumptions,
+    }
 
 
 def check_coex_matrix(
@@ -111,6 +177,27 @@ def check_coex_matrix(
                 if not (rx_low <= f_emit <= rx_high):
                     continue
 
+                if rx.get("victim_type") == "gnss":
+                    # In-band CW landing: the correlator spreads the tone
+                    # over the code rate, I₀ = J − 10·log₁₀(chip_rate).
+                    chip = rx.get("chip_rate_hz", GNSS_DEFAULT_CHIP_RATE_HZ)
+                    j_dbm = emit_dbm - rx.get("filter_rejection_db", 0.0) - antenna_iso_db
+                    matrix.append(
+                        _gnss_entry(
+                            tx_name,
+                            rx,
+                            mech,
+                            j_dbm - 10.0 * math.log10(chip),
+                            {
+                                "chip_rate_hz": chip,
+                                "spectral_separation_q": 1.0,
+                                "cw_power_at_rx_dbm": j_dbm,
+                                "f_emit_hz": f_emit,
+                            },
+                        )
+                    )
+                    continue
+
                 filt_rej = tx.get("filter_rejection_db", default_filter_rejection_db)
                 predicted_at_rx = compute_desense(
                     aggressor_power_dbm=emit_dbm,
@@ -133,6 +220,32 @@ def check_coex_matrix(
                         "concern": predicted_at_rx["concern_level"],
                     }
                 )
+
+    # Broadband PA noise at each GNSS victim — evaluated once per TX×RX
+    # pair, independent of harmonic landings (the dominant real-world
+    # GNSS desense mechanism for co-located transmitters).
+    for tx in tx_list:
+        for rx in rx_list:
+            if rx.get("victim_type") != "gnss" or rx["name"] == tx["name"]:
+                continue
+            pa_noise = rx.get(
+                "pa_broadband_noise_dbm_hz_at_offset",
+                tx.get("broadband_noise_dbm_hz", GNSS_DEFAULT_PA_NOISE_DBM_HZ),
+            )
+            i0 = pa_noise - rx.get("filter_rejection_db", 0.0) - antenna_iso_db
+            matrix.append(
+                _gnss_entry(
+                    tx["name"],
+                    rx,
+                    "broadband_noise",
+                    i0,
+                    {
+                        "pa_broadband_noise_dbm_hz": pa_noise,
+                        "filter_rejection_at_victim_db": rx.get("filter_rejection_db", 0.0),
+                        "antenna_iso_db": antenna_iso_db,
+                    },
+                )
+            )
 
     matrix.sort(key=lambda r: r["desense_margin_db"])  # worst (smallest margin) first
     return {
