@@ -94,12 +94,13 @@ exclude = ['packages/.*/tests/.*']
 # above, and CI masked that with `|| true`). Turning it on surfaced ~190 errors.
 # We enforce type *correctness* now — anything that indicates a real defect —
 # and defer type *completeness* (annotating every numpy return and generic
-# parameter) to a ratchet. Do not add codes here to silence a new error.
+# parameter) to a ratchet (issue #37). Do not add codes here to silence a new
+# error. no-untyped-def has been retired from this list — every internal helper
+# is now annotated.
 disable_error_code = [
     "no-any-return",    # numpy/pandas returns widened to Any
     "type-arg",         # bare `dict`/`list`/`ndarray` generics
     "no-untyped-call",  # calls into untyped third-party (matplotlib, schemdraw)
-    "no-untyped-def",   # unannotated internal helpers
 ]
 mypy_path = [
     "packages/rf-mcp-common/src",

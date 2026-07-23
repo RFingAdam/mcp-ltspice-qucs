@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -842,7 +843,7 @@ def stability_check(
 # ===========================================================================
 
 
-def _wrap(func, *args, **kwargs):
+def _wrap(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Envelope[Any]:
     """Run a callable inside the standard envelope contract."""
     timer = Timer()
     try:

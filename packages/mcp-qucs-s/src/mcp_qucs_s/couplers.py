@@ -62,7 +62,9 @@ def synthesize_coupler(
     raise ValueError(f"Unknown coupler kind: {kind}")
 
 
-def _branch_line(coupling_db, freq_hz, z0, substrate) -> CouplerDesign:
+def _branch_line(
+    coupling_db: float, freq_hz: float, z0: float, substrate: Substrate
+) -> CouplerDesign:
     """Standard 3 dB branch-line hybrid. The coupling is fixed by topology
     at 3 dB (equal split) for a single-section design; we accept the
     parameter but emit a warning if the user asks for anything else.
@@ -114,7 +116,7 @@ def _branch_line(coupling_db, freq_hz, z0, substrate) -> CouplerDesign:
     )
 
 
-def _rat_race(coupling_db, freq_hz, z0, substrate) -> CouplerDesign:
+def _rat_race(coupling_db: float, freq_hz: float, z0: float, substrate: Substrate) -> CouplerDesign:
     """180° rat-race hybrid: six λ/4 sections of the same Z₀√2 ring."""
     notes = []
     if abs(coupling_db - 3.0) > 0.5:
@@ -141,7 +143,9 @@ def _rat_race(coupling_db, freq_hz, z0, substrate) -> CouplerDesign:
     )
 
 
-def _coupled_line(kind, coupling_db, freq_hz, z0, substrate) -> CouplerDesign:
+def _coupled_line(
+    kind: CouplerKind, coupling_db: float, freq_hz: float, z0: float, substrate: Substrate
+) -> CouplerDesign:
     """Coupled-line / Lange backward-wave coupler.
 
     Coupling factor C = 10^(-|coupling_db|/20) (linear voltage ratio)
