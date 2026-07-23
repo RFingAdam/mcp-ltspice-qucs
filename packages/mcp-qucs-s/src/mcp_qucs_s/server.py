@@ -20,6 +20,7 @@ from mcp_qucs_s.microstrip import (
     synthesize_microstrip_line as _synthesize_microstrip_line,
 )
 from mcp_qucs_s.netlist import generate_ladder_netlist as _generate_ladder_netlist
+from mcp_qucs_s.noise import analyze_noise as _analyze_noise
 from mcp_qucs_s.richards import lumped_to_distributed as _lumped_to_distributed
 from mcp_qucs_s.runner import (
     is_qucs_available,
@@ -519,28 +520,76 @@ def export_touchstone(
 
 @mcp.tool(
     description=(
-        "Extract noise parameters (Fmin, Gamma_opt, Rn) from a Qucs-S "
-        "noise analysis. Scaffolded — requires Qucs-S installed."
+        "Run a Qucs-S noise analysis and return the four classical noise "
+        "parameters per frequency: NF50 (dB), Fmin (dB), Gamma_opt "
+        "(magnitude and angle) and Rn (ohms). Optionally also evaluates the "
+        "noise figure at a given source reflection coefficient, which is what "
+        "an LNA input match actually presents. Requires Qucs-S."
     ),
 )
 def extract_noise_parameters(
-    netlist_path: str,
+    dut_netlist: Annotated[
+        list[str],
+        Field(
+            description=(
+                "Qucs netlist lines for the circuit under test, referring to "
+                "nodes _p1 and _p2 and using gnd for ground. Ports and the .SP "
+                "analysis are added here. Example: "
+                "['R:R1 _p1 _p2 R=\"20\"', 'R:R2 _p2 gnd R=\"100\"']"
+            )
+        ),
+    ],
     f_start_hz: Annotated[float, Field(gt=0)],
     f_stop_hz: Annotated[float, Field(gt=0)],
+    points: Annotated[int, Field(ge=1, le=10_000)] = 21,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    temp_c: Annotated[
+        float | None,
+        Field(
+            description=(
+                "Noise temperature in Celsius applied to resistor lines lacking "
+                "an explicit Temp. Defaults to the IEEE reference 16.85 C (290 K), "
+                "at which a passive network's noise figure equals its loss. Qucs "
+                "itself defaults components to 26.85 C. Pass null to leave the "
+                "netlist untouched."
+            )
+        ),
+    ] = 16.85,
+    source_gamma_real: float | None = None,
+    source_gamma_imag: float | None = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 300.0,
 ) -> Envelope[dict[str, Any]]:
+    timer = Timer()
     try:
         if not is_qucs_available():
-            return error("Qucs-S not installed.", tool_version=__version__)
-        # Qucs-S noise-analysis output parsing (Fmin / Γopt / Rn / NF50)
-        # is not yet implemented. Tracked as a Tier-6 roadmap item; see CHANGELOG.
-        return error(
-            "extract_noise_parameters is not yet implemented. Qucs-S is "
-            "installed but the noise-analysis dataset parser (Fmin, "
-            "Gamma_opt, Rn, NF50) is pending. Tracked as a Tier-6 roadmap "
-            "item; see CHANGELOG. Use SPICE .NOISE in mcp-ltspice as an "
-            "interim workaround for input-referred noise spectral density.",
-            tool_version=__version__,
+            return error(
+                "Qucs-S not installed. See docs/installation.md to build "
+                "from source: github.com/ra3xdh/qucs_s",
+                tool_version=__version__,
+            )
+
+        params = _analyze_noise(
+            dut_netlist,
+            f_start_hz=f_start_hz,
+            f_stop_hz=f_stop_hz,
+            points=points,
+            z0=z0,
+            temp_c=temp_c,
+            timeout_sec=timeout_sec,
         )
+
+        payload: dict[str, Any] = {
+            "z0": z0,
+            "temp_c": temp_c,
+            "n_points": int(params.freq_hz.size),
+            "parameters": params.as_rows(),
+        }
+        if source_gamma_real is not None or source_gamma_imag is not None:
+            gamma_s = complex(source_gamma_real or 0.0, source_gamma_imag or 0.0)
+            payload["source_gamma"] = {"real": gamma_s.real, "imag": gamma_s.imag}
+            payload["nf_db_at_source"] = [float(v) for v in params.nf_db_at_source(gamma_s)]
+
+        return ok(payload, runtime_sec=timer.elapsed(), tool_version=__version__)
     except Exception as e:
         return error(f"extract_noise_parameters failed: {e}", tool_version=__version__)
 
