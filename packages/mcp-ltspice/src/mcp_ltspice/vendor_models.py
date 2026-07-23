@@ -234,11 +234,54 @@ _VENDOR_TABLES: dict[str, dict[float, ParasiticPart]] = {
 }
 
 
+#: Namespaces registered at runtime from user directories, kept apart from
+#: the curated catalogues above so a refresh or a bad scan can never corrupt
+#: them.
+_USER_VENDOR_TABLES: dict[str, dict[float, ParasiticPart]] = {}
+
+
+def register_vendor_table(namespace: str, table: dict[float, ParasiticPart]) -> None:
+    """Register (or replace) a runtime vendor table under ``namespace``.
+
+    Replaces any existing table for the namespace outright, which gives
+    re-registering a directory clean refresh semantics — new files appear,
+    deleted ones disappear — without leaking stale entries.
+    """
+    if namespace in _VENDOR_TABLES:
+        raise ValueError(
+            f"{namespace!r} is a curated catalogue and cannot be overwritten; "
+            "choose a different namespace for user models."
+        )
+    _USER_VENDOR_TABLES[namespace] = dict(table)
+
+
+def _table_for(vendor: str) -> dict[float, ParasiticPart]:
+    if vendor in _VENDOR_TABLES:
+        return _VENDOR_TABLES[vendor]
+    if vendor in _USER_VENDOR_TABLES:
+        return _USER_VENDOR_TABLES[vendor]
+    known = sorted([*_VENDOR_TABLES, *_USER_VENDOR_TABLES])
+    raise ValueError(f"Unknown vendor: {vendor}. Known: {', '.join(known)}")
+
+
 def list_vendor_parts(vendor: str) -> list[float]:
     """Return the value list (in farads or henrys) available for a vendor."""
-    if vendor not in _VENDOR_TABLES:
-        raise ValueError(f"Unknown vendor: {vendor}")
-    return sorted(_VENDOR_TABLES[vendor].keys())
+    return sorted(_table_for(vendor).keys())
+
+
+def _table_of_kind(vendor: str, kind: Literal["L", "C"]) -> dict[float, ParasiticPart]:
+    """Entries of ``vendor`` matching ``kind``.
+
+    Curated tables are single-kind, but a user-registered directory can hold
+    both, so filter by type rather than sampling one entry to classify the
+    whole table.
+    """
+    want = ParasiticInductor if kind == "L" else ParasiticCapacitor
+    matching = {v: part for v, part in _table_for(vendor).items() if isinstance(part, want)}
+    if not matching:
+        noun = "inductors" if kind == "L" else "capacitors"
+        raise ValueError(f"Vendor {vendor} does not carry {noun}")
+    return matching
 
 
 def lookup_part(
@@ -249,17 +292,8 @@ def lookup_part(
     Raises ``ValueError`` if the vendor doesn't carry components of the
     requested kind.
     """
-    if vendor not in _VENDOR_TABLES:
-        raise ValueError(f"Unknown vendor: {vendor}")
-    table = _VENDOR_TABLES[vendor]
-    sample = next(iter(table.values()))
-    if kind == "L" and not isinstance(sample, ParasiticInductor):
-        raise ValueError(f"Vendor {vendor} does not carry inductors")
-    if kind == "C" and not isinstance(sample, ParasiticCapacitor):
-        raise ValueError(f"Vendor {vendor} does not carry capacitors")
-
-    keys = sorted(table.keys())
-    nearest = min(keys, key=lambda k: abs(k - value))
+    table = _table_of_kind(vendor, kind)
+    nearest = min(table.keys(), key=lambda k: abs(k - value))
     return table[nearest]
 
 
@@ -287,15 +321,7 @@ def lookup_part_with_srf_margin(
     Returns ``(part, rejected_candidates)`` so the caller can surface
     the rejection trail in a diagnostic report.
     """
-    if vendor not in _VENDOR_TABLES:
-        raise ValueError(f"Unknown vendor: {vendor}")
-    table = _VENDOR_TABLES[vendor]
-    sample = next(iter(table.values()))
-    if kind == "L" and not isinstance(sample, ParasiticInductor):
-        raise ValueError(f"Vendor {vendor} does not carry inductors")
-    if kind == "C" and not isinstance(sample, ParasiticCapacitor):
-        raise ValueError(f"Vendor {vendor} does not carry capacitors")
-
+    table = _table_of_kind(vendor, kind)
     keys = sorted(table.keys())
     rejected: list[dict[str, Any]] = []
 

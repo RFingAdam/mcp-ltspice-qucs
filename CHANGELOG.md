@@ -9,6 +9,31 @@ grouped by package.
 
 ## [Unreleased]
 
+### Added — register_user_vendor_dir (#11, mcp-ltspice)
+
+Engineers routinely have third-party or measured `.s2p` files — Würth, AVX,
+TDK, distributor exports, in-house lab data — that live on no public URL and
+so could not be used as substitution candidates without hand-editing `.asc`
+files or forking the curated table.
+
+`register_user_vendor_dir` scans a directory of `.s2p` (and, by filename,
+`.lib`) models and registers them under a namespace, after which
+`substitute_real_components(inductor_vendor="<namespace>", ...)` uses them
+like any curated series. Each part's kind, value and SRF are recovered from
+the **measured reactance** — via `Z = 2·Z0·(1−S21)/S21` for the
+series-through fixture that is standard for two-terminal parts, not from
+`Z11` (singular for a series element) — and cross-checked against the
+filename shorthand (`part_L_3n3.s2p` → 3.3 nH). Value is averaged over the
+extracted L/C rather than the reactance, since a capacitor's reactance goes
+as 1/f and averaging it directly biases the result. A file whose measurement
+contradicts its name is indexed by the measurement with the conflict
+reported; per-file errors never abort the scan; re-registering a directory
+refreshes the index; and namespaces cannot shadow a curated catalogue.
+
+`lookup_part` and `lookup_part_with_srf_margin` now filter a vendor table by
+component kind instead of classifying it from one sampled entry, so a user
+directory holding both inductors and capacitors resolves correctly.
+
 ### Added — validate_against_spice (#16, mcp-ltspice)
 
 The whole pipeline — synthesise, place zeros, substitute real vendor parts,
