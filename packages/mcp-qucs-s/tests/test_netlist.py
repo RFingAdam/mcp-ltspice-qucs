@@ -90,6 +90,68 @@ def test_trap_puts_only_the_cap_on_ground(tmp_path) -> None:
     assert lines[1].split()[2] == "gnd"
 
 
+def test_composite_trap_chains_series_pair_into_the_tank(tmp_path) -> None:
+    """Elliptic BPF/BSF shunt branch: series-LC (L_s, C_s) from the signal
+    node into a mid node, then the parallel tank (L_p ∥ C_p) from that mid
+    node to ground. Four uniquely-named parts; the signal node is unchanged.
+    """
+    text = generate_ladder_netlist(
+        [("shunt_composite_trap", {"L_s": 4e-9, "C_s": 3e-12, "L_p": 6e-9, "C_p": 2e-12})],
+        tmp_path / "ct.net",
+    ).read_text()
+    lines = [ln for ln in text.splitlines() if ln.startswith(("L:", "C:"))]
+    assert len(lines) == 4
+    names = [ln.split()[0] for ln in lines]
+    assert len(set(names)) == 4, f"component names must be unique, got {names}"
+    ls, cs, lp, cp = lines
+    assert ls.split()[1] == "_p1", "series-LC starts at the signal node"
+    assert ls.split()[2] == cs.split()[1], "L_s feeds C_s"
+    tank_node = cs.split()[2]
+    assert tank_node != "gnd", "the series pair must not short straight to ground"
+    assert lp.split()[1] == tank_node and lp.split()[2] == "gnd"
+    assert cp.split()[1] == tank_node and cp.split()[2] == "gnd"
+    # shunt branch: both ports remain on the signal node
+    p2 = next(ln for ln in text.splitlines() if 'Num="2"' in ln).split()[1]
+    assert p2 == "_p1"
+
+
+def test_composite_trap_missing_param_is_rejected(tmp_path) -> None:
+    with pytest.raises(ValueError, match="missing required parameter"):
+        generate_ladder_netlist(
+            [("shunt_composite_trap", {"L_s": 4e-9, "C_s": 3e-12, "L_p": 6e-9})],
+            tmp_path / "bad.net",
+        )
+
+
+@requires_qucs
+@pytest.mark.qucs
+def test_composite_trap_notches_at_both_branch_resonances(tmp_path) -> None:
+    """qucsator must see the two shorts of the composite branch, at the
+    roots of u²·L_sC_sL_pC_p − u·(L_sC_s + L_pC_p + L_pC_s) + 1 = 0."""
+    params = {"L_s": 4e-9, "C_s": 3e-12, "L_p": 6e-9, "C_p": 2e-12}
+    lscs = params["L_s"] * params["C_s"]
+    lpcp = params["L_p"] * params["C_p"]
+    lpcs = params["L_p"] * params["C_s"]
+    roots_u = np.roots([lscs * lpcp, -(lscs + lpcp + lpcs), 1.0]).real
+    f_zeros = sorted(np.sqrt(roots_u) / (2.0 * np.pi))
+
+    net = generate_ladder_netlist(
+        [("series_l", {"L": 8e-9}), ("shunt_composite_trap", params)],
+        tmp_path / "ct.net",
+        f_start_hz=1e8,
+        f_stop_hz=2e10,
+        points=1500,
+    )
+    dat = tmp_path / "ct.dat"
+    exe = shutil.which("qucsator_rf") or shutil.which("qucsator")
+    subprocess.run([exe, "-i", str(net), "-o", str(dat)], capture_output=True, timeout=120)
+    nw = network_from_dat(dat)
+    s21_db = 20.0 * np.log10(np.maximum(np.abs(nw.s[:, 1, 0]), 1e-12))
+    for fz in f_zeros:
+        nearest = s21_db[int(np.argmin(np.abs(nw.f - fz)))]
+        assert nearest < -30.0, f"expected a notch near {fz / 1e9:.3f} GHz, got {nearest:.1f} dB"
+
+
 @pytest.mark.parametrize(
     ("bad", "match"),
     [
