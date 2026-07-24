@@ -11,6 +11,21 @@ grouped by package.
 
 Nothing yet.
 
+## [0.6.1] — 2026-07-24
+
+### Fixed — dependency security audit
+
+- v0.6.0's tag-triggered `release-validation` workflow ran for the first
+  time and found 47 disclosed CVEs across 10 locked transitive
+  dependencies: `cryptography`, `idna`, `joserfc`, the `mcp` SDK,
+  `pillow`, `pydantic-settings`, `pyjwt`, `pymdown-extensions`,
+  `python-multipart`, and `urllib3`. All ten are bumped to their patched
+  versions within the existing dependency bounds — no `pyproject.toml`
+  constraint changed, including the tight `fastmcp>=3.4.4,<3.5` pin.
+  `pip-audit` now reports zero known vulnerabilities. No API or behavior
+  change; the full test suite was re-verified against the upgraded `mcp`
+  SDK (1.27.0 → 1.28.1) with zero regressions.
+
 ## [0.6.0] — 2026-07-24
 
 ### Fixed — simulator run isolation and stale-artifact rejection
@@ -1161,7 +1176,8 @@ Initial release of the four-package monorepo.
   elliptic LPF for 802.11ah HaLow + multi-radio coex. Passes all 8 spec
   criteria with 86.6% Monte Carlo yield at 2% component tolerance.
 
-[Unreleased]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.5.0...v0.6.0
 [0.2.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/releases/tag/v0.1.0
