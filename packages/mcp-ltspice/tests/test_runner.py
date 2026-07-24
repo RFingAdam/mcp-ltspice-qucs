@@ -21,6 +21,7 @@ from mcp_ltspice.runner import (
     _check_produced_artifact,
     _needs_wine,
     _refdes_index,
+    _sandbox_ngspice_command,
     _to_wine_path,
     detect_simulator,
     find_ltspice,
@@ -61,6 +62,42 @@ def test_run_simulation_no_simulator_raises(tmp_path, monkeypatch) -> None:
     asc = generate_lpf_asc(design.components, tmp_path / "lpf.asc")
     with pytest.raises(RuntimeError, match="No SPICE simulator found"):
         run_simulation(asc)
+
+
+def test_sandbox_command_confines_workspace_and_disables_network(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr("mcp_ltspice.runner.shutil.which", lambda name: "/usr/bin/bwrap")
+    monkeypatch.setattr("mcp_ltspice.runner.bubblewrap_ready", lambda: True)
+    input_path = tmp_path / "input.cir"
+    output_path = tmp_path / "output.raw"
+
+    command = _sandbox_ngspice_command(
+        ["/usr/bin/ngspice", "-r", str(output_path), str(input_path)],
+        tmp_path,
+    )
+
+    assert "--unshare-net" in command
+    assert "--unshare-pid" in command
+    assert ["--bind", str(tmp_path), "/work"] == command[
+        command.index("--bind") : command.index("--bind") + 3
+    ]
+    assert "/work/input.cir" in command
+    assert "/work/output.raw" in command
+
+
+def test_sandbox_command_rejects_unavailable_profile(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("mcp_ltspice.runner.shutil.which", lambda name: "/usr/bin/bwrap")
+    monkeypatch.setattr("mcp_ltspice.runner.bubblewrap_ready", lambda: False)
+    with pytest.raises(RuntimeError, match="sandbox is unavailable"):
+        _sandbox_ngspice_command(["ngspice"], tmp_path)
+
+
+def test_ltspice_rejects_untrusted_sandbox_mode(tmp_path: Path) -> None:
+    asc = tmp_path / "x.asc"
+    asc.write_text("Version 4\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="no verified OS sandbox"):
+        run_simulation(asc, prefer=Simulator.LTSPICE, sandbox=True)
 
 
 @pytest.mark.ngspice
@@ -350,7 +387,7 @@ def test_timeout_is_reported_with_first_run_guidance(tmp_path, monkeypatch) -> N
     def _hang(*a, **kw):
         raise subprocess.TimeoutExpired(cmd="wine LTspice.exe", timeout=120.0)
 
-    monkeypatch.setattr(runner_mod.subprocess, "run", _hang)
+    monkeypatch.setattr(runner_mod, "run_process_tree", _hang)
 
     asc = tmp_path / "x.asc"
     asc.write_text("Version 4\n", encoding="utf-8")

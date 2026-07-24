@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from mcp_ltspice.eval import FilterSpec
@@ -78,6 +81,44 @@ def test_parameter_sweep_records_per_point_margins(lpf_design) -> None:
     assert "Passband IL" in p.margins
     assert "Passband RL" in p.margins
     assert "2x fc" in p.margins
+
+
+def test_parameter_sweep_rejects_cartesian_and_work_budget(lpf_design) -> None:
+    design, spec = lpf_design
+    with pytest.raises(ValueError, match="exceeding max_points"):
+        parameter_sweep(
+            design.components,
+            {"L1": [1e-9] * 101, "C2": [1e-12] * 101},
+            spec,
+            max_points=10_000,
+        )
+    with pytest.raises(ValueError, match="estimated cost"):
+        parameter_sweep(
+            design.components,
+            {"L1": [1e-9] * 3_000},
+            spec,
+            f_grid_npoints=10_000,
+            max_points=3_000,
+        )
+
+
+def test_large_sweep_is_streamed_to_artifact(lpf_design, tmp_path: Path) -> None:
+    design, spec = lpf_design
+    values = [design.components["L1"] * (0.9 + i * 0.0002) for i in range(1_001)]
+    result = parameter_sweep(
+        design.components,
+        {"L1": values},
+        spec,
+        artifact_parent=tmp_path,
+    )
+
+    assert result.n_points == 1_001
+    assert result.points == []
+    assert result.points_artifact is not None
+    lines = Path(result.points_artifact).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1_001
+    assert "parameters" in json.loads(lines[0])
+    assert result.artifact_manifest is not None
 
 
 # ---- corner_analysis -----------------------------------------------------

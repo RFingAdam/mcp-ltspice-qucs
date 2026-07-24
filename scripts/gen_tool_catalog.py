@@ -2,6 +2,7 @@
 live servers, so the catalog can never drift from reality again.
 
     uv run python scripts/gen_tool_catalog.py
+    uv run python scripts/gen_tool_catalog.py --check
 
 Everything between the BEGIN/END GENERATED markers is replaced; the
 hand-written envelope / see-also sections are left alone.
@@ -9,8 +10,10 @@ hand-written envelope / see-also sections are left alone.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,14 +35,18 @@ def first_sentence(text: str | None) -> str:
     return (out[:157] + "…") if len(out) > 160 else out
 
 
-def main() -> None:
+def rendered_catalog() -> tuple[str, int]:
     import importlib
 
     blocks: list[str] = []
     total = 0
+    ltspice_aliases = 0
     for label, module in SERVERS:
         mcp = importlib.import_module(module).mcp
-        tools = [t for t in asyncio.run(mcp.list_tools()) if "." not in t.name]
+        registered = asyncio.run(mcp.list_tools())
+        tools = [t for t in registered if "." not in t.name]
+        if label == "mcp-ltspice":
+            ltspice_aliases = sum("." in t.name for t in registered)
         total += len(tools)
         rows = "\n".join(
             f"    | `{t.name}` | {first_sentence(t.description)} |"
@@ -50,25 +57,48 @@ def main() -> None:
         )
 
     generated = (
-        f"Three servers, **{total} tools** total. Frequencies are always Hz on the\n"
+        f"Three servers, **{total} primary tools** total. Frequencies are always Hz on the\n"
         "wire; every tool returns the [Envelope](reference/envelope.md) shape.\n"
-        "`mcp-ltspice` additionally registers namespaced aliases "
+        f"`mcp-ltspice` additionally registers {ltspice_aliases} deprecated namespaced aliases "
         "(`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) "
-        "for every primary tool; only primaries are listed here.\n\n"
+        "for its primary tools; only primaries are listed here.\n\n"
         "## At a glance\n\n"
         "*(This section is generated — run `uv run python scripts/gen_tool_catalog.py`\n"
         "after adding or changing tools.)*\n\n" + "\n".join(blocks)
     )
+    return generated, total
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail if docs/tool-catalog.md is not generated from the current tools.",
+    )
+    args = parser.parse_args()
+
+    generated, total = rendered_catalog()
 
     text = CATALOG.read_text(encoding="utf-8")
-    text = re.sub(
+    updated = re.sub(
         r"<!-- BEGIN GENERATED -->.*<!-- END GENERATED -->",
         f"<!-- BEGIN GENERATED -->\n{generated}\n<!-- END GENERATED -->",
         text,
         flags=re.DOTALL,
     )
-    CATALOG.write_text(text, encoding="utf-8")
-    print(f"tool-catalog.md regenerated: {total} tools")
+    if args.check:
+        if updated != text:
+            print(
+                "docs/tool-catalog.md is stale; run `uv run python scripts/gen_tool_catalog.py`.",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        print(f"tool-catalog.md is current: {total} primary tools")
+        return
+
+    CATALOG.write_text(updated, encoding="utf-8")
+    print(f"tool-catalog.md regenerated: {total} primary tools")
 
 
 if __name__ == "__main__":

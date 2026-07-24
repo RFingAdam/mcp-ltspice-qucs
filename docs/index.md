@@ -23,9 +23,9 @@ human engineer in the loop for judgment calls.
 
 | Server | Purpose | Tools |
 |---|---|---|
-| [`mcp-ltspice`](tools/ltspice.md) | LTspice (Wine) + ngspice fallback for filter synthesis, S-parameter extraction, vendor model substitution, optimization, Monte Carlo | 11 |
-| [`mcp-qucs-s`](tools/qucs-s.md) | Qucs-S for native S-parameter sims, harmonic balance, microstrip + distributed-element synthesis | 10 |
-| [`mcp-rf-analysis`](tools/rf-analysis.md) | Simulator-agnostic skrf wrappers, LTE/5G NR/GNSS/ISM/HaLow band databases, FCC/ETSI/3GPP spec evaluation, multi-radio coex matrix | 19 |
+| [`mcp-ltspice`](tools/ltspice.md) | LTspice (Wine) + ngspice fallback, CircuitDocument import/export, durable jobs/artifacts, model-aware generic optimization, filter synthesis, S-parameter extraction, Monte Carlo | 76 |
+| [`mcp-qucs-s`](tools/qucs-s.md) | Qucs schematic/netlist import/export, durable simulation jobs, native S-parameters/noise, Xyce harmonic balance, microstrip + distributed-element synthesis | 29 |
+| [`mcp-rf-analysis`](tools/rf-analysis.md) | Simulator-agnostic skrf wrappers/readiness probing, LTE/5G NR/GNSS/ISM/HaLow band databases, FCC/ETSI/3GPP spec evaluation, multi-radio coex matrix | 35 |
 
 All three speak **Touchstone** (`.s2p` / `.snp`) as the cross-tool
 exchange format and return a uniform [response envelope](reference/envelope.md).
@@ -33,10 +33,10 @@ exchange format and return a uniform [response envelope](reference/envelope.md).
 ## Headline demo
 
 The [basic LPF example](examples/basic-lpf.md) synthesizes a 5th-order
-Butterworth low-pass filter at 1 GHz, substitutes Coilcraft 0402HP +
-Murata GJM C0G real parts, and runs a 1000-trial Monte Carlo at 5%
-component tolerance — entirely through MCP tool calls. **All 5 spec
-criteria pass with 99% yield.**
+Butterworth low-pass filter at 1 GHz, snaps values to Coilcraft 0402HP +
+Murata GJM C0G catalogs, and runs a 1000-trial analytical Monte Carlo at
+5% component tolerance. **The analytical preview passes all 5 criteria
+with 99% yield**; vendor parasitics are not applied in that calculation.
 
 ![Basic LPF response](assets/basic-lpf-response.png){ loading=lazy }
 
@@ -46,7 +46,7 @@ criteria pass with 99% yield.**
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs
 cd mcp-ltspice-qucs
 uv sync --all-packages
-uv run python examples/halow_lpf/design.py
+uv run python examples/basic_lpf/design.py
 ```
 
 See [Installation](installation.md) for ngspice / LTspice / Qucs-S
@@ -54,4 +54,4 @@ setup.
 
 ## License
 
-Apache-2.0. See [LICENSE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/LICENSE).
+AGPL-3.0-or-later. See [LICENSE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/LICENSE).

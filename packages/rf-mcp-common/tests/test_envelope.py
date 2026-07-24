@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from importlib.metadata import version
 
 from rf_mcp_common.envelope import Envelope, error, ok
 
@@ -12,7 +13,7 @@ def test_ok_envelope_contains_status_and_data() -> None:
     assert env.status == "ok"
     assert env.data == {"value": 42}
     assert env.metadata["foo"] == "bar"
-    assert env.metadata["tool_version"] == "0.1.0"
+    assert env.metadata["tool_version"] == version("rf-mcp-common")
     assert env.error is None
     assert env.warnings == []
 

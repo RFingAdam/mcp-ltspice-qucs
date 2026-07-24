@@ -201,7 +201,11 @@ def _simulate(tmp_path, asc):
     from mcp_ltspice.runner import Simulator, run_simulation
 
     result = run_simulation(asc, prefer=Simulator.NGSPICE, timeout=240.0)
-    return extract_sparams_from_raw(result.raw_path, port_map={1: "p1", 2: "p2"})
+    return extract_sparams_from_raw(
+        result.raw_path,
+        port_map={1: "p1", 2: "p2"},
+        assume_reciprocal_symmetric=True,
+    )
 
 
 @requires_ngspice
@@ -240,7 +244,12 @@ def test_75_ohm_design_simulates_at_75_ohm(tmp_path) -> None:
     assert parsed_z0 == pytest.approx(75.0)
 
     result = run_simulation(asc, prefer=Simulator.NGSPICE, timeout=240.0)
-    net = extract_sparams_from_raw(result.raw_path, port_map={1: "p1", 2: "p2"}, z0=parsed_z0)
+    net = extract_sparams_from_raw(
+        result.raw_path,
+        port_map={1: "p1", 2: "p2"},
+        z0=parsed_z0,
+        assume_reciprocal_symmetric=True,
+    )
     s11_db = 20.0 * np.log10(np.abs(net.s[:, 0, 0]))
     assert s11_db[0] < -30.0, (
         f"75 ohm design should be well matched at 75 ohm; got {s11_db[0]:.1f} dB. "

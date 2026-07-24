@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import tempfile
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -33,9 +37,15 @@ from mcp_ltspice.analog import (
 )
 from mcp_ltspice.asc_io import (
     generate_lpf_asc,
+    generate_port2_excitation_asc,
     read_components,
     update_component,
 )
+from mcp_ltspice.capabilities import (
+    probe_spice_backend as _probe_spice_backend,
+)
+from mcp_ltspice.capabilities import spice_capabilities as _spice_capabilities
+from mcp_ltspice.circuit_io import export_ltspice_asc, import_ltspice_asc
 from mcp_ltspice.coex_loop import (
     synthesize_for_coex_target as _synthesize_for_coex_target,
 )
@@ -59,10 +69,11 @@ from mcp_ltspice.digital import (
 from mcp_ltspice.eval import FilterSpec, evaluate_filter_spec
 from mcp_ltspice.extract import (
     components_dict_to_elements,
-    extract_sparams_from_raw,
+    extract_two_sweep_sparams,
     ladder_sparams_from_components,
 )
 from mcp_ltspice.find_zeros import find_transmission_zeros as _find_zeros
+from mcp_ltspice.ir_optimize import SpiceDatasetEvaluator, TraceMetric
 from mcp_ltspice.montecarlo import monte_carlo_analysis as _monte_carlo
 from mcp_ltspice.optimize import optimize_filter as _optimize
 from mcp_ltspice.power import (
@@ -96,12 +107,13 @@ from mcp_ltspice.power.emc import (
     predict_conducted_emissions as _predict_conducted_emissions,
 )
 from mcp_ltspice.power.ldo import required_psrr_for_ripple_target as _required_psrr
+from mcp_ltspice.realized_netlist import generate_realized_filter_netlist
 from mcp_ltspice.render import render_response as _render_response
 from mcp_ltspice.report_pdf import build_design_report_pdf as _build_design_report_pdf
-from mcp_ltspice.runner import RunResult, Simulator
+from mcp_ltspice.runner import Simulator
 from mcp_ltspice.runner import run_simulation as _run_simulation
 from mcp_ltspice.schematic_render import (
-    render_asc_as_schematic as _render_asc_schematic,
+    render_generated_lc_ladder_asc as _render_generated_lc_ladder_asc,
 )
 from mcp_ltspice.schematic_render import (
     render_lc_ladder_schematic as _render_lc_schematic,
@@ -127,11 +139,22 @@ from mcp_ltspice.synthesis import (
 from mcp_ltspice.synthesis import (
     place_transmission_zero as _place_transmission_zero,
 )
+from mcp_ltspice.validate import build_two_sweep_spice_network as _build_two_sweep_spice_network
 from mcp_ltspice.validate import result_to_payload as _validation_payload
 from mcp_ltspice.validate import validate_against_spice as _validate_against_spice
 from mcp_ltspice.vendor_fetch import register_user_vendor_dir as _register_user_vendor_dir
 from mcp_ltspice.vendor_models import (
+    ComponentModel,
+    ComponentSearchQuery,
+)
+from mcp_ltspice.vendor_models import (
+    attach_component_models as _attach_component_models,
+)
+from mcp_ltspice.vendor_models import (
     list_vendor_parts as _list_vendor_parts,
+)
+from mcp_ltspice.vendor_models import (
+    search_component_models as _search_component_models,
 )
 from mcp_ltspice.vendor_models import (
     substitute_real_components as _substitute_real,
@@ -172,15 +195,684 @@ from mcp_ltspice.vendors import (
 from mcp_ltspice.vendors import (
     lookup_reference as _lookup_ref,
 )
+from rf_mcp_common.circuit_ir import CircuitAnalysis, CircuitDocument
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
+from rf_mcp_common.jobs import DurableJobManager, JobContext, WorkspaceStore
 from rf_mcp_common.logging import get_logger
+from rf_mcp_common.optimization import (
+    OptimizationProblem,
+    render_design_change_report,
+)
+from rf_mcp_common.optimization import (
+    optimize_circuit as _optimize_circuit_ir,
+)
+from rf_mcp_common.protocol import prepare_protocol_tools, run_stdio_server
+from rf_mcp_common.simulation_workspace import SimulationWorkspace
+from rf_mcp_common.spice_io import export_spice_file, parse_spice_file
+from rf_mcp_common.tool_annotations import DEFAULT_TOOL_ANNOTATIONS
+from rf_mcp_common.tool_errors import EnvelopeErrorMiddleware
 from rf_mcp_common.touchstone import network_to_touchstone, write_touchstone
 
 mcp = FastMCP(
     name="mcp-ltspice",
     version=__version__,
 )
+mcp.add_middleware(EnvelopeErrorMiddleware())
 log = get_logger("mcp_ltspice.server")
+_WORKSPACES = WorkspaceStore()
+_JOBS = DurableJobManager(_WORKSPACES, max_workers=4)
+
+
+def _simulation_job_handler(
+    context: JobContext,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    workspace_id = str(payload["workspace_id"])
+    artifact = _WORKSPACES.artifact(workspace_id, str(payload["artifact_id"]))
+    source = Path(artifact["path"])
+    run_workspace = SimulationWorkspace.create(
+        "spice-job",
+        parent=_JOBS.job_root(context.job_id) / "runs",
+    )
+    snapshot = run_workspace.snapshot_simulation_tree(
+        source,
+        allowed_root=source.parent,
+    )
+    prefer = payload.get("prefer")
+    run_workspace.start(
+        ["spice-backend", str(snapshot)],
+        cwd=run_workspace.root,
+        environment={},
+        executable="auto-selected-spice-backend",
+        backend_version=None,
+    )
+    try:
+        result = _run_simulation(
+            snapshot,
+            prefer=Simulator(prefer) if prefer else None,
+            timeout=float(payload.get("timeout_sec", 120.0)),
+            sandbox=not bool(payload.get("trusted_local", False)),
+            cancel_requested=context.cancelled,
+        )
+        run_workspace.record_artifact(result.raw_path, role="simulator_raw")
+        run_workspace.record_artifact(result.log_path, role="simulator_log")
+        run_workspace.complete(returncode=result.returncode)
+    except Exception as exc:
+        run_workspace.fail(str(exc))
+        raise
+    raw = _WORKSPACES.add_generated(
+        workspace_id,
+        result.raw_path,
+        media_type="application/x-spice-raw",
+    )
+    log_artifact = _WORKSPACES.add_generated(
+        workspace_id,
+        result.log_path,
+        media_type="text/plain",
+    )
+    return {
+        "simulator": result.simulator.value,
+        "returncode": result.returncode,
+        "sandboxed": result.sandboxed,
+        "raw_artifact_id": raw["artifact_id"],
+        "log_artifact_id": log_artifact["artifact_id"],
+        "run_manifest": str(run_workspace.manifest_path),
+    }
+
+
+def _analysis_job_handler(
+    context: JobContext,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    operation = str(payload["analysis"])
+    arguments = dict(payload["arguments"])
+
+    def progress(completed: int, total: int) -> None:
+        context.update_progress(completed, total, operation)
+
+    if operation == "optimize_filter":
+        runner: Callable[..., Any] = _optimize
+    elif operation == "monte_carlo_analysis":
+        runner = _monte_carlo
+    elif operation == "parameter_sweep":
+        runner = _parameter_sweep
+    else:
+        raise ValueError(f"unsupported analysis job: {operation}")
+    result = runner(
+        **arguments,
+        cancel_requested=context.cancelled,
+        progress=progress,
+    )
+    output = asdict(result)
+    workspace_id = payload.get("workspace_id")
+    if workspace_id:
+        for key in ("trace_path", "points_artifact"):
+            path = output.get(key)
+            if path:
+                record = _WORKSPACES.add_generated(
+                    str(workspace_id),
+                    path,
+                    media_type="application/x-ndjson",
+                )
+                output[f"{key}_artifact_id"] = record["artifact_id"]
+    return output
+
+
+def _circuit_optimization_job_handler(
+    context: JobContext,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    problem = OptimizationProblem.model_validate(payload["problem"])
+    analysis = CircuitAnalysis.model_validate(payload["analysis"])
+    metrics = [TraceMetric.model_validate(item) for item in payload["metrics"]]
+    trusted_local = bool(payload.get("trusted_local", False))
+    timeout_sec = float(payload.get("timeout_sec", 120.0))
+    job_root = _JOBS.job_root(context.job_id)
+    screening = SpiceDatasetEvaluator(
+        backend=str(payload["screening_backend"]),  # type: ignore[arg-type]
+        analysis=analysis,
+        metrics=metrics,
+        workspace_root=job_root / "screening",
+        timeout_sec=timeout_sec,
+        sandbox=not trusted_local,
+    )
+    validation_backend = payload.get("validation_backend")
+    validation = (
+        SpiceDatasetEvaluator(
+            backend=str(validation_backend),  # type: ignore[arg-type]
+            analysis=analysis,
+            metrics=metrics,
+            workspace_root=job_root / "validation",
+            timeout_sec=timeout_sec,
+            sandbox=not trusted_local,
+        )
+        if validation_backend is not None
+        else None
+    )
+
+    def progress(completed: int, total: int) -> None:
+        context.update_progress(completed, total, "circuit optimization")
+
+    result = _optimize_circuit_ir(
+        problem,
+        screening,
+        validation_evaluator=validation,
+        cancel_requested=context.cancelled,
+        progress=progress,
+    )
+    result_path = job_root / "optimization-result.json"
+    result_path.write_text(
+        json.dumps(result.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    report_path = job_root / "design-change-report.md"
+    report_path.write_text(render_design_change_report(result), encoding="utf-8")
+    output: dict[str, Any] = {
+        "best_values": result.best_values,
+        "report": result.report.model_dump(mode="json"),
+    }
+    workspace_id = payload.get("workspace_id")
+    if workspace_id:
+        result_artifact = _WORKSPACES.add_generated(
+            str(workspace_id),
+            result_path,
+            media_type="application/json",
+        )
+        report_artifact = _WORKSPACES.add_generated(
+            str(workspace_id),
+            report_path,
+            media_type="text/markdown",
+        )
+        output.update(
+            {
+                "result_artifact_id": result_artifact["artifact_id"],
+                "result_resource_uri": (
+                    f"artifact://{workspace_id}/{result_artifact['artifact_id']}"
+                ),
+                "report_artifact_id": report_artifact["artifact_id"],
+                "report_resource_uri": (
+                    f"artifact://{workspace_id}/{report_artifact['artifact_id']}"
+                ),
+            }
+        )
+    return output
+
+
+_JOBS.register("simulation", _simulation_job_handler)
+_JOBS.register("analysis", _analysis_job_handler)
+_JOBS.register("circuit_optimization", _circuit_optimization_job_handler)
+
+
+def _circuit_from_payload(value: dict[str, Any]) -> CircuitDocument:
+    """Accept either a bare CircuitDocument or the enriched circuit_parse result."""
+    return CircuitDocument.model_validate(
+        {key: item for key, item in value.items() if key in CircuitDocument.model_fields}
+    )
+
+
+@mcp.resource("capabilities://mcp-ltspice")
+def capabilities_resource() -> dict[str, Any]:
+    """Current SPICE backend readiness, including last validation state."""
+    return _spice_capabilities()
+
+
+@mcp.resource("artifact://{workspace_id}/{artifact_id}")
+def artifact_resource(workspace_id: str, artifact_id: str) -> bytes:
+    """Read a checksum-verified, bounded workspace artifact."""
+    return _WORKSPACES.read(workspace_id, artifact_id)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Administrative readiness probe for LTspice or ngspice. Distinguishes "
+        "installed, launchable, and known-answer validated states."
+    ),
+)
+def probe_backend(
+    backend: Annotated[str, Field(description="'ltspice' or 'ngspice'")],
+    validate: bool = True,
+    timeout_sec: Annotated[float, Field(gt=0, le=120)] = 20.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _probe_spice_backend(
+                backend,
+                validate=validate,
+                timeout_sec=timeout_sec,
+            ),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"probe_backend failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Create a durable server-owned workspace and return its opaque ID.",
+)
+def workspace_create(label: str | None = None) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _WORKSPACES.create(label),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"workspace_create failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Import a local artifact into a durable workspace. SPICE inputs copy "
+        "and validate their complete static include graph by default."
+    ),
+)
+def artifact_import(
+    workspace_id: str,
+    source_path: str,
+    include_dependencies: bool = True,
+    media_type: str = "application/octet-stream",
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        source = Path(source_path)
+        spice_suffixes = {".asc", ".cir", ".net", ".sp", ".spice"}
+        record = (
+            _WORKSPACES.import_spice_tree(workspace_id, source)
+            if include_dependencies and source.suffix.lower() in spice_suffixes
+            else _WORKSPACES.import_file(
+                workspace_id,
+                source,
+                media_type=media_type,
+            )
+        )
+        return ok(
+            record | {"resource_uri": (f"artifact://{workspace_id}/{record['artifact_id']}")},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"artifact_import failed: {exc}", tool_version=__version__)
+
+
+def _parse_circuit_artifact(workspace_id: str, artifact_id: str) -> CircuitDocument:
+    record = _WORKSPACES.artifact(workspace_id, artifact_id)
+    path = Path(record["path"])
+    suffix = path.suffix.lower()
+    if suffix == ".asc":
+        return import_ltspice_asc(path)
+    if suffix not in {".cir", ".net", ".sp", ".spice", ".lib", ".mod"}:
+        raise ValueError(f"unsupported circuit artifact suffix: {suffix}")
+    return parse_spice_file(path, dialect="spice")
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Parse an imported LTspice ASC or SPICE artifact into versioned "
+        "CircuitDocument IR with explicit pin-to-net connectivity. Every "
+        "unsupported construct is returned with a source location."
+    ),
+)
+def circuit_parse(
+    workspace_id: str,
+    artifact_id: str,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        document = _parse_circuit_artifact(workspace_id, artifact_id)
+        payload = document.model_dump(mode="json")
+        payload.update(
+            {
+                "format": (
+                    "ltspice_asc" if document.source_format == "ltspice_asc" else "spice_netlist"
+                ),
+                "source_artifact_id": artifact_id,
+                "is_supported": document.is_supported,
+                "unsupported_constructs": [
+                    item.model_dump(mode="json") for item in document.unsupported
+                ],
+                "connectivity_signature": document.connectivity_signature(),
+                "electrical_fingerprint": document.electrical_fingerprint(),
+            }
+        )
+        return ok(
+            payload,
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_parse failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Validate an imported circuit graph and return all unsupported "
+        "construct diagnostics. require_lossless rejects any blocking diagnostic."
+    ),
+)
+def circuit_validate(
+    workspace_id: str,
+    artifact_id: str,
+    require_lossless: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        document = _parse_circuit_artifact(workspace_id, artifact_id)
+        blocking = [
+            item.model_dump(mode="json")
+            for item in document.unsupported
+            if item.severity == "error"
+        ]
+        valid = document.is_supported
+        return ok(
+            {
+                "valid": valid,
+                "accepted": valid or not require_lossless,
+                "require_lossless": require_lossless,
+                "diagnostics": [item.model_dump(mode="json") for item in document.unsupported],
+                "blocking_diagnostics": blocking,
+                "connectivity_signature": document.connectivity_signature(),
+                "electrical_fingerprint": document.electrical_fingerprint(),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_validate failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Export a supported CircuitDocument to normalized SPICE or back to its "
+        "preserved LTspice ASC drawing. The generated artifact is checksum-addressed."
+    ),
+)
+def circuit_export(
+    workspace_id: str,
+    circuit: dict[str, Any],
+    output_format: Annotated[str, Field(description="'spice' or 'ltspice_asc'")],
+    name: str | None = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        document = _circuit_from_payload(circuit)
+        document.require_supported()
+        if output_format not in {"spice", "ltspice_asc"}:
+            raise ValueError("output_format must be 'spice' or 'ltspice_asc'")
+        suffix = ".cir" if output_format == "spice" else ".asc"
+        safe_name = Path(name or f"{document.document_id}{suffix}").name
+        if Path(safe_name).suffix.lower() != suffix:
+            safe_name += suffix
+        with tempfile.TemporaryDirectory(prefix="rf-mcp-export-") as temporary:
+            target = Path(temporary) / safe_name
+            if output_format == "spice":
+                export_spice_file(document, target, preserve_source=False)
+            else:
+                export_ltspice_asc(document, target)
+            record = _WORKSPACES.add_generated(
+                workspace_id,
+                target,
+                name=safe_name,
+                media_type=(
+                    "application/x-spice-netlist"
+                    if output_format == "spice"
+                    else "application/x-ltspice-schematic"
+                ),
+            )
+        return ok(
+            record
+            | {
+                "resource_uri": (f"artifact://{workspace_id}/{record['artifact_id']}"),
+                "electrical_fingerprint": document.electrical_fingerprint(),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_export failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Submit a durable, cancellable SPICE simulation job. Safe mode uses "
+        "an immutable snapshot and verified OS sandbox; trusted_local opts out."
+    ),
+)
+def simulation_submit(
+    workspace_id: str,
+    artifact_id: str,
+    prefer: Annotated[str | None, Field(description="'ltspice' or 'ngspice'")] = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
+    trusted_local: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        _WORKSPACES.artifact(workspace_id, artifact_id)
+        job = _JOBS.submit(
+            "simulation",
+            {
+                "workspace_id": workspace_id,
+                "artifact_id": artifact_id,
+                "prefer": prefer,
+                "timeout_sec": timeout_sec,
+                "trusted_local": trusted_local,
+            },
+            workspace_id=workspace_id,
+        )
+        return ok(job, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as exc:
+        return error(f"simulation_submit failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Submit optimize_filter, monte_carlo_analysis, or parameter_sweep as "
+        "a durable bounded job. Arguments use the corresponding canonical tool schema."
+    ),
+)
+def analysis_submit(
+    analysis: Annotated[
+        str,
+        Field(description=("'optimize_filter', 'monte_carlo_analysis', or 'parameter_sweep'")),
+    ],
+    arguments: dict[str, Any],
+    workspace_id: str | None = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if analysis not in {
+            "optimize_filter",
+            "monte_carlo_analysis",
+            "parameter_sweep",
+        }:
+            raise ValueError("unsupported analysis job")
+        job = _JOBS.submit(
+            "analysis",
+            {
+                "analysis": analysis,
+                "arguments": arguments,
+                "workspace_id": workspace_id,
+            },
+            workspace_id=workspace_id,
+        )
+        return ok(job, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as exc:
+        return error(f"analysis_submit failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Submit generic topology-preserving CircuitDocument optimization as a "
+        "durable job. Variables address component values/parameters; objectives "
+        "and constraints address named simulator trace metrics; all corners and "
+        "yield samples are evaluated. A distinct validation backend produces a "
+        "simulator-validated design-change report with exact model hashes."
+    ),
+)
+def circuit_optimize_submit(
+    problem: dict[str, Any],
+    analysis: dict[str, Any],
+    metrics: list[dict[str, Any]],
+    screening_backend: Annotated[str, Field(description="'ngspice' or 'ltspice'")],
+    validation_backend: Annotated[
+        str | None,
+        Field(description="Independent 'ngspice' or 'ltspice' backend."),
+    ] = None,
+    workspace_id: str | None = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
+    trusted_local: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if screening_backend not in {"ngspice", "ltspice"}:
+            raise ValueError("screening_backend must be 'ngspice' or 'ltspice'")
+        if validation_backend not in {None, "ngspice", "ltspice"}:
+            raise ValueError("validation_backend must be null, 'ngspice', or 'ltspice'")
+        parsed_problem = OptimizationProblem.model_validate(problem)
+        CircuitAnalysis.model_validate(analysis)
+        if not metrics:
+            raise ValueError("metrics cannot be empty")
+        for metric in metrics:
+            TraceMetric.model_validate(metric)
+        if parsed_problem.require_independent_backend:
+            if validation_backend is None:
+                raise ValueError(
+                    "problem requires independent validation but validation_backend is null"
+                )
+            if validation_backend == screening_backend:
+                raise ValueError(
+                    "screening_backend and validation_backend must differ for "
+                    "independent validation"
+                )
+        job = _JOBS.submit(
+            "circuit_optimization",
+            {
+                "problem": parsed_problem.model_dump(mode="json"),
+                "analysis": analysis,
+                "metrics": metrics,
+                "screening_backend": screening_backend,
+                "validation_backend": validation_backend,
+                "workspace_id": workspace_id,
+                "timeout_sec": timeout_sec,
+                "trusted_local": trusted_local,
+            },
+            workspace_id=workspace_id,
+        )
+        return ok(job, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as exc:
+        return error(f"circuit_optimize_submit failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Get durable job state, progress, result, and retry diagnostics.",
+)
+def job_get(job_id: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _JOBS.get(job_id),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_get failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Request cancellation and terminate a running simulator process tree.",
+)
+def job_cancel(job_id: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _JOBS.cancel(job_id),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_cancel failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Retry a failed or cancelled durable job using its immutable payload.",
+)
+def job_retry(job_id: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _JOBS.retry(job_id),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_retry failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="List checksum-addressed artifacts in the workspace associated with a job.",
+)
+def job_list_artifacts(job_id: str) -> Envelope[list[dict[str, Any]]]:
+    timer = Timer()
+    try:
+        job = _JOBS.get(job_id)
+        workspace_id = job.get("workspace_id")
+        if workspace_id is None:
+            return ok([], runtime_sec=timer.elapsed(), tool_version=__version__)
+        manifest = _WORKSPACES.get(str(workspace_id))
+        artifacts = [
+            record | {"resource_uri": (f"artifact://{workspace_id}/{record['artifact_id']}")}
+            for record in manifest["artifacts"].values()
+        ]
+        return ok(
+            artifacts,
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_list_artifacts failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Read a small checksum-verified artifact by opaque ID. Binary content "
+        "is base64; larger artifacts must be consumed through their resource URI."
+    ),
+)
+def artifact_read(
+    workspace_id: str,
+    artifact_id: str,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        record = _WORKSPACES.artifact(workspace_id, artifact_id)
+        content = _WORKSPACES.read(workspace_id, artifact_id)
+        return ok(
+            {
+                "artifact": record,
+                "encoding": "base64",
+                "content": base64.b64encode(content).decode("ascii"),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"artifact_read failed: {exc}", tool_version=__version__)
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +881,7 @@ log = get_logger("mcp_ltspice.server")
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run an LTspice / ngspice simulation headlessly. Returns the path "
         "to the generated .raw file. Auto-selects LTspice (via Wine) when "
@@ -202,17 +895,54 @@ def run_simulation(
         Field(description="Force 'ltspice' or 'ngspice'. Default: auto."),
     ] = None,
     timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
+    trusted_in_place: Annotated[
+        bool,
+        Field(
+            description=(
+                "Opt out of immutable workspace snapshotting. Only use for trusted local files."
+            )
+        ),
+    ] = False,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
-        prefer_enum = Simulator(prefer) if prefer else None
-        result: RunResult = _run_simulation(asc_path, prefer=prefer_enum, timeout=timeout_sec)
+        workspace = _WORKSPACES.create("run_simulation")
+        workspace_id = str(workspace["workspace_id"])
+        source = _WORKSPACES.import_spice_tree(workspace_id, asc_path)
+        job = _JOBS.submit(
+            "simulation",
+            {
+                "workspace_id": workspace_id,
+                "artifact_id": source["artifact_id"],
+                "prefer": prefer,
+                "timeout_sec": timeout_sec,
+                "trusted_local": trusted_in_place,
+            },
+            workspace_id=workspace_id,
+        )
+        terminal = _JOBS.wait(str(job["job_id"]), timeout_sec=timeout_sec + 10.0)
+        if terminal["status"] != "completed":
+            raise RuntimeError(f"simulation job {terminal['status']}: {terminal.get('error')}")
+        result = terminal["result"]
+        raw = _WORKSPACES.artifact(workspace_id, result["raw_artifact_id"])
+        log_artifact = _WORKSPACES.artifact(
+            workspace_id,
+            result["log_artifact_id"],
+        )
         return ok(
             {
-                "raw_path": str(result.raw_path),
-                "log_path": str(result.log_path),
-                "simulator": result.simulator.value,
-                "returncode": result.returncode,
+                "raw_path": raw["path"],
+                "log_path": log_artifact["path"],
+                "raw_artifact_id": raw["artifact_id"],
+                "log_artifact_id": log_artifact["artifact_id"],
+                "simulator": result["simulator"],
+                "returncode": result["returncode"],
+                "workspace_id": workspace_id,
+                "job_id": terminal["job_id"],
+                "job_manifest_path": str(_JOBS.job_root(str(terminal["job_id"])) / "manifest.json"),
+                "input_artifact_id": source["artifact_id"],
+                "trusted_in_place": trusted_in_place,
+                "sandboxed": result["sandboxed"],
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -227,30 +957,82 @@ def run_simulation(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
-        "Parse a SPICE .raw AC analysis output and write 2-port S-parameters "
-        "to a Touchstone .s2p file."
+        "Run two matched-port AC excitations on an LTspice .asc and write the "
+        "measured S11/S21/S12/S22 matrix to Touchstone. The source schematic "
+        "must use V1 + Rs1 to drive p1 and RL1 to terminate p2. The tool "
+        "validates that fixture, constructs the port-2 excitation, uses the "
+        "same backend for both sweeps, and returns extraction provenance."
     ),
 )
 def extract_sparameters(
-    raw_path: Annotated[str, Field(description="Path to .raw file from a previous run.")],
+    asc_path: Annotated[str, Field(description="Path to the source .asc schematic.")],
     output_s2p: Annotated[str, Field(description="Path for the output .s2p file.")],
     port_map: Annotated[
-        dict[int, str],
-        Field(description="Map of port index → SPICE node name (e.g. {1: 'p1', 2: 'p2'})."),
-    ],
+        dict[int, str] | None,
+        Field(description="Map of port index to node name. Default: {1: 'p1', 2: 'p2'}."),
+    ] = None,
     z0: Annotated[float, Field(gt=0)] = 50.0,
+    prefer: Annotated[
+        str | None,
+        Field(description="Force 'ltspice' or 'ngspice'. Default: auto."),
+    ] = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
-        net = extract_sparams_from_raw(raw_path, port_map=port_map, z0=z0)
-        out = write_touchstone(net, output_s2p)
+        source = Path(asc_path).expanduser().resolve()
+        requested_output = Path(output_s2p).expanduser().resolve()
+        fixture = port_map or {1: "p1", 2: "p2"}
+        if fixture != {1: "p1", 2: "p2"}:
+            raise ValueError(
+                "Automatic two-sweep generation currently requires port_map={1: 'p1', 2: 'p2'}."
+            )
+
+        workspace = SimulationWorkspace.create("spice-two-port")
+        port1_asc = workspace.snapshot_simulation_tree(source)
+        port2_asc = generate_port2_excitation_asc(
+            port1_asc,
+            workspace.root / "inputs" / "port2.asc",
+            z0=z0,
+        )
+        workspace.record_artifact(port2_asc, role="generated_port2_excitation")
+
+        prefer_enum = Simulator(prefer) if prefer else None
+        first = _run_simulation(port1_asc, prefer=prefer_enum, timeout=timeout_sec)
+        second = _run_simulation(
+            port2_asc,
+            prefer=first.simulator,
+            timeout=timeout_sec,
+        )
+        net, provenance = extract_two_sweep_sparams(
+            first.raw_path,
+            second.raw_path,
+            port_map=fixture,
+            z0=z0,
+        )
+        out = write_touchstone(net, requested_output)
+        provenance["source_files"] |= {
+            "source_asc": str(source),
+            "port1_asc": str(port1_asc),
+            "port2_asc": str(port2_asc),
+            "port1_log": str(first.log_path),
+            "port2_log": str(second.log_path),
+        }
+        provenance["simulator"] = {
+            "backend": first.simulator.value,
+            "port1_returncode": first.returncode,
+            "port2_returncode": second.returncode,
+            "workspace": str(workspace.root),
+        }
         return ok(
             {
                 "s2p_path": str(out),
                 "n_freq_points": int(net.f.size),
                 "freq_range_hz": [float(net.f.min()), float(net.f.max())],
                 "z0": z0,
+                "provenance": provenance,
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -265,6 +1047,7 @@ def extract_sparameters(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize an LC ladder LPF (Butterworth / Chebyshev I / elliptic), "
         "write the .asc schematic, and return the component values plus a "
@@ -336,6 +1119,7 @@ def synthesize_lc_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a high-pass LC ladder via the LPF→HPF frequency transformation "
         "(Pozar §8.5). Series inductors become series capacitors; shunt capacitors "
@@ -386,6 +1170,7 @@ def synthesize_lc_hpf_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a band-pass LC ladder via the LPF→BPF frequency transformation "
         "(Pozar §8.5). Series inductors become series-LC tanks (resonant at f₀); "
@@ -445,6 +1230,7 @@ def synthesize_lc_bpf_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a band-stop LC ladder via the LPF→BSF frequency transformation "
         "(Pozar §8.5). Series inductors become parallel-LC anti-resonators (open at f₀); "
@@ -501,6 +1287,7 @@ def synthesize_lc_bsf_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Closed-loop coex-driven synthesis: iterate elliptic LPF order until "
         "the coexistence matrix meets a desense target. Each iteration places "
@@ -557,10 +1344,12 @@ def synthesize_for_coex_target(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Move the transmission zero of a shunt LC trap to a target frequency, "
         "preserving (by default) the L/C ratio for impedance match. Snaps to "
-        "E24 / E96 component series. Updates the .asc in-place."
+        "E24 / E96 component series. Writes a workspace copy by default; the "
+        "source schematic is not modified."
     ),
 )
 def place_transmission_zero(
@@ -569,10 +1358,28 @@ def place_transmission_zero(
     target_freq_hz: Annotated[float, Field(gt=0)],
     preserve_ratio: bool = True,
     snap_series: Annotated[str | None, Field(description="'E24' | 'E96' | 'E192' | None.")] = "E24",
+    output_asc: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional output copy. If omitted, a workspace copy is created; "
+                "the source is never modified."
+            )
+        ),
+    ] = None,
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
-        comps = read_components(asc_path)
+        source = Path(asc_path).expanduser().resolve()
+        if output_asc is None:
+            workspace = SimulationWorkspace.create("place-transmission-zero")
+            target = workspace.snapshot_simulation_tree(source)
+        else:
+            workspace = None
+            target = Path(output_asc).expanduser().resolve()
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+        comps = read_components(target)
         result = _place_transmission_zero(
             comps,
             trap_index=trap_index,
@@ -583,8 +1390,8 @@ def place_transmission_zero(
         new_comps = result["components"]
         l_key = f"L{trap_index}"
         c_key = f"C{trap_index}"
-        update_component(asc_path, l_key, new_comps[l_key])
-        update_component(asc_path, c_key, new_comps[c_key])
+        update_component(target, l_key, new_comps[l_key])
+        update_component(target, c_key, new_comps[c_key])
         return ok(
             {
                 "trap_index": trap_index,
@@ -593,7 +1400,9 @@ def place_transmission_zero(
                 "freq_error_pct": result["freq_error_pct"],
                 "previous": result["previous"],
                 "new": result["new"],
-                "asc_path": str(Path(asc_path).resolve()),
+                "source_asc_path": str(source),
+                "asc_path": str(target),
+                "workspace": str(workspace.root) if workspace is not None else None,
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -608,6 +1417,8 @@ def place_transmission_zero(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    name="evaluate_filter_spec",
     description=(
         "Evaluate a Touchstone .s2p file against a coex-aware spec. Returns "
         "pass/fail per criterion with margin in dB. Spec format: "
@@ -637,6 +1448,7 @@ def evaluate_filter_spec_tool(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Render an S₂ₚ Bode plot as PNG. Optional vertical marker lines for "
         "annotating frequencies of interest (band edges, 2nd / 3rd harmonics)."
@@ -689,6 +1501,7 @@ def render_response(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description="Locate notches (transmission zeros) in S21 by peak detection.",
 )
 def find_transmission_zeros(
@@ -719,9 +1532,13 @@ def find_transmission_zeros(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
-        "Replace ideal L/C values with vendor parts. Returns parasitic data "
-        "(Cp/Ls, ESR, SRF) so downstream sims include realistic loss behavior. "
+        "Snap ideal L/C values to vendor catalog parts and return first-order "
+        "parasitic metadata (Cp/Ls, ESR, SRF) plus immutable model provenance. "
+        "Pass the result as component_substitution to optimization, sweep, "
+        "sensitivity, or Monte Carlo, or use simulate_realized_filter for "
+        "model-backed SPICE validation. "
         "Vendors: 'coilcraft_0402hp', 'coilcraft_0603cs', 'murata_gjm_c0g', "
         "'johanson_l' (L-07W), 'tdk_mlg' (MLK1005S). Set srf_margin > 0 (e.g. 1.2) "
         "to auto-reject parts whose SRF < srf_margin × max_spec_freq_hz; "
@@ -756,7 +1573,196 @@ def substitute_real_components(
         return error(f"substitute_real_components failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="List the value catalogue for a vendor part series.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Search curated and registered local component providers using hard "
+        "constraints for value, package, orderability/stock, Q and SRF, "
+        "tolerance, ratings, bias, temperature, and model kind. Unknown record "
+        "fields fail requested constraints rather than matching silently."
+    ),
+)
+def search_component_models(
+    kind: Annotated[str | None, Field(description="'L', 'C', or null")] = None,
+    target_value: Annotated[float | None, Field(gt=0)] = None,
+    min_value: Annotated[float | None, Field(ge=0)] = None,
+    max_value: Annotated[float | None, Field(gt=0)] = None,
+    packages: list[str] | None = None,
+    availability: Annotated[
+        str,
+        Field(description="'any', 'in_stock', 'orderable', or 'generic'"),
+    ] = "any",
+    min_q: Annotated[float | None, Field(ge=0)] = None,
+    q_frequency_hz: Annotated[float | None, Field(gt=0)] = None,
+    min_srf_hz: Annotated[float | None, Field(gt=0)] = None,
+    max_tolerance_pct: Annotated[float | None, Field(ge=0)] = None,
+    min_ratings: dict[str, float] | None = None,
+    operating_bias: dict[str, float] | None = None,
+    operating_temperature_c: float | None = None,
+    model_kinds: list[str] | None = None,
+    vendors: list[str] | None = None,
+    limit: Annotated[int, Field(ge=1, le=1000)] = 50,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        query = ComponentSearchQuery(
+            kind=kind,  # type: ignore[arg-type]
+            target_value=target_value,
+            min_value=min_value,
+            max_value=max_value,
+            packages=tuple(packages or ()),
+            availability=availability,  # type: ignore[arg-type]
+            min_q=min_q,
+            q_frequency_hz=q_frequency_hz,
+            min_srf_hz=min_srf_hz,
+            max_tolerance_pct=max_tolerance_pct,
+            min_ratings=min_ratings,
+            operating_bias=operating_bias,
+            operating_temperature_c=operating_temperature_c,
+            model_kinds=tuple(model_kinds or ()),  # type: ignore[arg-type]
+            vendors=tuple(vendors or ()),
+            limit=limit,
+        )
+        return ok(
+            _search_component_models(query).to_dict(),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"search_component_models failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Attach exact provider model records to CircuitDocument components. "
+        "The returned IR records model checksums, pin maps, validity ranges, "
+        "license/provenance, and orderable-versus-generic status."
+    ),
+)
+def circuit_attach_models(
+    circuit: dict[str, Any],
+    selections: dict[str, dict[str, Any]],
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        document = _circuit_from_payload(circuit)
+        models = {refdes: ComponentModel(**record) for refdes, record in selections.items()}
+        attached = _attach_component_models(document, models)
+        return ok(
+            {
+                "circuit": attached.model_dump(mode="json"),
+                "electrical_fingerprint": attached.electrical_fingerprint(),
+                "model_hashes": {
+                    component.refdes: component.model.checksum_sha256
+                    for component in attached.components
+                    if component.model is not None
+                },
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_attach_models failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Select vendor L/C models, instantiate them into two simulator-ready "
+        "LPF/HPF/BPF/BSF ladder netlists, run both matched-port excitations, and "
+        "write a full measured .s2p. Curated parts use their explicit "
+        "first-order loss/SRF subcircuits; registered two-pin .lib parts are "
+        "included verbatim. Returns model checksums and simulation provenance."
+    ),
+)
+def simulate_realized_filter(
+    components: dict[str, float],
+    output_s2p: str,
+    inductor_vendor: str = "coilcraft_0402hp",
+    capacitor_vendor: str = "murata_gjm_c0g",
+    kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
+    topology: Annotated[str, Field(description="series_first or shunt_first")] = "series_first",
+    transmission_zeros: bool | None = None,
+    z0: Annotated[float, Field(gt=0)] = 50.0,
+    f_start_hz: Annotated[float, Field(gt=0)] = 1e6,
+    f_stop_hz: Annotated[float, Field(gt=0)] = 5e9,
+    points_per_decade: Annotated[int, Field(ge=1, le=10_000)] = 200,
+    prefer: Annotated[str | None, Field(description="'ltspice' | 'ngspice' | null.")] = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if f_stop_hz <= f_start_hz:
+            raise ValueError("f_stop_hz must be greater than f_start_hz")
+        substitution = _substitute_real(
+            components,
+            inductor_vendor,
+            capacitor_vendor,
+        )
+        workspace = SimulationWorkspace.create("realized-filter")
+        port1, manifest1 = generate_realized_filter_netlist(
+            substitution,
+            workspace.root / "inputs" / "realized_port1.cir",
+            kind=kind,
+            topology=topology,
+            transmission_zeros=transmission_zeros,
+            driven_port=1,
+            z0=z0,
+            f_start_hz=f_start_hz,
+            f_stop_hz=f_stop_hz,
+            points_per_decade=points_per_decade,
+        )
+        port2, manifest2 = generate_realized_filter_netlist(
+            substitution,
+            workspace.root / "inputs" / "realized_port2.cir",
+            kind=kind,
+            topology=topology,
+            transmission_zeros=transmission_zeros,
+            driven_port=2,
+            z0=z0,
+            f_start_hz=f_start_hz,
+            f_stop_hz=f_stop_hz,
+            points_per_decade=points_per_decade,
+        )
+        prefer_enum = Simulator(prefer) if prefer else None
+        first = _run_simulation(port1, prefer=prefer_enum, timeout=timeout_sec)
+        second = _run_simulation(port2, prefer=first.simulator, timeout=timeout_sec)
+        net, extraction = extract_two_sweep_sparams(
+            first.raw_path,
+            second.raw_path,
+            port_map={1: "p1", 2: "p2"},
+            z0=z0,
+        )
+        output = write_touchstone(net, output_s2p)
+        model_fidelity = {
+            refdes: selected["model"]["model_kind"] for refdes, selected in substitution.items()
+        }
+        return ok(
+            {
+                "s2p_path": str(output),
+                "evaluation_mode": "simulator_validated",
+                "kind": kind,
+                "topology": topology,
+                "model_fidelity": model_fidelity,
+                "substitution": substitution,
+                "model_manifest_paths": [str(manifest1), str(manifest2)],
+                "netlist_paths": [str(port1), str(port2)],
+                "extraction": extraction,
+                "simulator": first.simulator.value,
+                "workspace": str(workspace.root),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as e:
+        return error(f"simulate_realized_filter failed: {e}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="List the value catalogue for a vendor part series.",
+)
 def list_vendor_parts(vendor: str) -> Envelope[list[float]]:
     timer = Timer()
     try:
@@ -775,6 +1781,7 @@ def list_vendor_parts(vendor: str) -> Envelope[list[float]]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Iteratively tune component values against a spec via Nelder-Mead. "
         "Loss = sum of negative spec margins (failing criteria only). Final "
@@ -785,7 +1792,13 @@ def optimize_filter(
     initial_components: dict[str, float],
     spec: dict[str, Any],
     tune: list[str] | None = None,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
+    topology: Annotated[str, Field(description="series_first or shunt_first")] = "series_first",
+    component_substitution: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Field(description="Optional output of substitute_real_components; includes parasitics."),
+    ] = None,
     z0: Annotated[float, Field(gt=0)] = 50.0,
     method: str = "Nelder-Mead",
     max_iter: Annotated[int, Field(gt=0, le=5000)] = 500,
@@ -798,6 +1811,9 @@ def optimize_filter(
             spec,
             tune=tune,
             transmission_zeros=transmission_zeros,
+            kind=kind,
+            topology=topology,
+            component_substitution=component_substitution,
             z0=z0,
             method=method,  # type: ignore[arg-type]
             max_iter=max_iter,
@@ -814,6 +1830,9 @@ def optimize_filter(
                 "converged": result.converged,
                 "margins_initial": result.margins_initial,
                 "margins_final": result.margins_final,
+                "analysis_context": result.analysis_context,
+                "estimated_objective_evaluations": result.estimated_objective_evaluations,
+                "estimated_work_units": result.estimated_work_units,
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -828,6 +1847,7 @@ def optimize_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run Monte Carlo trials with Gaussian-distributed component tolerances. "
         "Reports yield (% passing the spec) and per-metric mean/std/percentiles. "
@@ -840,10 +1860,16 @@ def monte_carlo_analysis(
     components: dict[str, float],
     spec: dict[str, Any],
     tolerance_pct: dict[str, float] | float = 5.0,
-    n_runs: Annotated[int, Field(gt=0, le=100000)] = 1000,
+    n_runs: Annotated[int, Field(gt=0, le=10_000)] = 1000,
     z0: Annotated[float, Field(gt=0)] = 50.0,
-    transmission_zeros: bool = True,
-    n_jobs: int = -1,
+    transmission_zeros: bool | None = None,
+    kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
+    topology: Annotated[str, Field(description="series_first or shunt_first")] = "series_first",
+    component_substitution: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Field(description="Optional output of substitute_real_components; includes parasitics."),
+    ] = None,
+    n_jobs: Annotated[int, Field(ge=-1, le=8)] = 1,
     trace: bool = False,
     trace_path: str | None = None,
 ) -> Envelope[dict[str, Any]]:
@@ -856,6 +1882,9 @@ def monte_carlo_analysis(
             n_runs=n_runs,
             z0=z0,
             transmission_zeros=transmission_zeros,
+            kind=kind,
+            topology=topology,
+            component_substitution=component_substitution,
             n_jobs=n_jobs,
             trace=trace,
             trace_path=trace_path,
@@ -867,7 +1896,11 @@ def monte_carlo_analysis(
                 "yield_pct": result.yield_pct,
                 "per_metric_stats": result.per_metric_stats,
                 "failing_criteria_counts": result.failing_criteria_counts,
+                "analysis_context": result.analysis_context,
+                "estimated_work_units": result.estimated_work_units,
+                "effective_n_jobs": result.effective_n_jobs,
                 "trace_path": result.trace_path,
+                "trace_manifest": result.trace_manifest,
             },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
@@ -882,6 +1915,7 @@ def monte_carlo_analysis(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Compute Rollett K-factor, |Δ|, and Edwards-Sinsky μ-factor across "
         "frequency for a 2-port network. Use for amplifier/oscillator stability."
@@ -923,6 +1957,7 @@ def _wrap(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Envelope[Any]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Sweep one or more component values across a Cartesian product grid "
         "and report per-point spec margins + overall yield."
@@ -933,7 +1968,18 @@ def parameter_sweep(
     sweep: dict[str, list[float]],
     spec: dict[str, Any],
     z0: Annotated[float, Field(gt=0)] = 50.0,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
+    topology: Annotated[str, Field(description="series_first or shunt_first")] = "series_first",
+    component_substitution: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Field(description="Optional output of substitute_real_components; includes parasitics."),
+    ] = None,
+    max_points: Annotated[int, Field(ge=1, le=10_000)] = 5_000,
+    result_mode: Annotated[
+        str,
+        Field(description="'auto', 'inline', or 'artifact'. Large results default to JSONL."),
+    ] = "auto",
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -943,12 +1989,21 @@ def parameter_sweep(
             spec,
             z0=z0,
             transmission_zeros=transmission_zeros,
+            kind=kind,
+            topology=topology,
+            component_substitution=component_substitution,
+            max_points=max_points,
+            result_mode=result_mode,  # type: ignore[arg-type]
         )
         return ok(
             {
                 "n_points": result.n_points,
                 "n_passing": result.n_passing,
                 "yield_pct": result.yield_pct,
+                "analysis_context": result.analysis_context,
+                "estimated_work_units": result.estimated_work_units,
+                "points_artifact": result.points_artifact,
+                "artifact_manifest": result.artifact_manifest,
                 "points": [
                     {
                         "parameters": p.parameters,
@@ -966,6 +2021,7 @@ def parameter_sweep(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Evaluate a filter spec at named corners (e.g. TT/SS/FF or "
         "application-specific stress combinations). Each corner is a dict "
@@ -977,7 +2033,13 @@ def corner_analysis(
     corners: dict[str, dict[str, float]],
     spec: dict[str, Any],
     z0: Annotated[float, Field(gt=0)] = 50.0,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
+    topology: Annotated[str, Field(description="series_first or shunt_first")] = "series_first",
+    component_substitution: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Field(description="Optional output of substitute_real_components; includes parasitics."),
+    ] = None,
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
         _corner_analysis,
@@ -986,10 +2048,14 @@ def corner_analysis(
         spec,
         z0=z0,
         transmission_zeros=transmission_zeros,
+        kind=kind,
+        topology=topology,
+        component_substitution=component_substitution,
     )
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Perturb each component by +/-pct and report the dB/% sensitivity of "
         "every spec criterion. Ranks components by total influence so you "
@@ -1001,7 +2067,13 @@ def sensitivity_analysis(
     spec: dict[str, Any],
     perturbation_pct: Annotated[float, Field(gt=0, le=10)] = 1.0,
     z0: Annotated[float, Field(gt=0)] = 50.0,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
+    topology: Annotated[str, Field(description="series_first or shunt_first")] = "series_first",
+    component_substitution: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Field(description="Optional output of substitute_real_components; includes parasitics."),
+    ] = None,
 ) -> Envelope[dict[str, Any]]:
     return _wrap(
         _sensitivity,
@@ -1010,6 +2082,9 @@ def sensitivity_analysis(
         perturbation_pct=perturbation_pct,
         z0=z0,
         transmission_zeros=transmission_zeros,
+        kind=kind,
+        topology=topology,
+        component_substitution=component_substitution,
     )
 
 
@@ -1017,6 +2092,7 @@ def sensitivity_analysis(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Flag inductors / capacitors whose self-resonant frequency is within "
         "margin_pct of the highest spec target. Above SRF the analytical "
@@ -1043,7 +2119,10 @@ def srf_audit(
 # ----- Analog active filters ----------------------------------------------
 
 
-@mcp.tool(description="Synthesize a Sallen-Key 2nd-order LPF (op-amp + 2R + 2C).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Synthesize a Sallen-Key 2nd-order LPF (op-amp + 2R + 2C).",
+)
 def sallen_key_low_pass(
     fc_hz: Annotated[float, Field(gt=0)],
     q: Annotated[float, Field(gt=0)] = 0.7071,
@@ -1075,7 +2154,9 @@ def sallen_key_low_pass(
         return error(f"sallen_key_low_pass failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Synthesize a Sallen-Key 2nd-order HPF.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS, description="Synthesize a Sallen-Key 2nd-order HPF."
+)
 def sallen_key_high_pass(
     fc_hz: Annotated[float, Field(gt=0)],
     q: Annotated[float, Field(gt=0)] = 0.7071,
@@ -1103,7 +2184,10 @@ def sallen_key_high_pass(
         return error(f"sallen_key_high_pass failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Synthesize a Sallen-Key 2nd-order BPF (single op-amp).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Synthesize a Sallen-Key 2nd-order BPF (single op-amp).",
+)
 def sallen_key_band_pass(
     fc_hz: Annotated[float, Field(gt=0)],
     q: Annotated[float, Field(gt=0)] = 1.0,
@@ -1134,7 +2218,10 @@ def sallen_key_band_pass(
         return error(f"sallen_key_band_pass failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Synthesize a Multiple-Feedback (MFB) 2nd-order LPF.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Synthesize a Multiple-Feedback (MFB) 2nd-order LPF.",
+)
 def mfb_low_pass(
     fc_hz: Annotated[float, Field(gt=0)],
     q: Annotated[float, Field(gt=0)] = 0.7071,
@@ -1165,7 +2252,10 @@ def mfb_low_pass(
         return error(f"mfb_low_pass failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Synthesize a Multiple-Feedback (MFB) 2nd-order BPF.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Synthesize a Multiple-Feedback (MFB) 2nd-order BPF.",
+)
 def mfb_band_pass(
     fc_hz: Annotated[float, Field(gt=0)],
     q: Annotated[float, Field(gt=0)] = 5.0,
@@ -1197,6 +2287,7 @@ def mfb_band_pass(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Cascaded nth-order Butterworth or Bessel LPF as 2nd-order stages "
         "(Sallen-Key). Returns per-stage component values + required op-amp GBW."
@@ -1215,7 +2306,8 @@ def cascaded_lpf_design(
 
 
 @mcp.tool(
-    description="Analyze an LDO at one operating point: efficiency, dropout, dissipation, output ripple."
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Analyze an LDO at one operating point: efficiency, dropout, dissipation, output ripple.",
 )
 def analyze_ldo(
     v_in_v: Annotated[float, Field(gt=0)],
@@ -1253,7 +2345,10 @@ def analyze_ldo(
         return error(f"analyze_ldo failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Compute the PSRR (dB) an LDO needs to meet an output-ripple target.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Compute the PSRR (dB) an LDO needs to meet an output-ripple target.",
+)
 def required_psrr_for_ripple(
     v_ripple_in_mvpp: Annotated[float, Field(gt=0)],
     v_ripple_out_uvpp_max: Annotated[float, Field(gt=0)],
@@ -1273,7 +2368,10 @@ def required_psrr_for_ripple(
         return error(f"required_psrr_for_ripple failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Size a Buck (step-down) SMPS: L, Cout, ESR limit, peak/RMS currents.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Size a Buck (step-down) SMPS: L, Cout, ESR limit, peak/RMS currents.",
+)
 def design_buck(
     v_in_v: Annotated[float, Field(gt=0)],
     v_out_v: Annotated[float, Field(gt=0)],
@@ -1314,7 +2412,10 @@ def design_buck(
         return error(f"design_buck failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Size a Boost (step-up) SMPS: L, Cout, ESR limit, peak/RMS currents.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Size a Boost (step-up) SMPS: L, Cout, ESR limit, peak/RMS currents.",
+)
 def design_boost(
     v_in_v: Annotated[float, Field(gt=0)],
     v_out_v: Annotated[float, Field(gt=0)],
@@ -1354,7 +2455,10 @@ def design_boost(
         return error(f"design_boost failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Type-II compensator design (1 zero + 1 pole) for current-mode SMPS loops.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Type-II compensator design (1 zero + 1 pole) for current-mode SMPS loops.",
+)
 def type2_compensator(
     crossover_hz: Annotated[float, Field(gt=0)],
     plant_zero_hz: Annotated[float, Field(gt=0)],
@@ -1389,7 +2493,10 @@ def type2_compensator(
         return error(f"type2_compensator failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Compute crossover freq + phase margin from open-loop Bode arrays.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Compute crossover freq + phase margin from open-loop Bode arrays.",
+)
 def compute_phase_margin(
     open_loop_freq_hz: list[float],
     open_loop_mag_db: list[float],
@@ -1407,6 +2514,7 @@ def compute_phase_margin(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Size a Pi-section LC output filter (C-L-C) for additional SMPS "
         "ripple attenuation downstream of the converter's built-in Cout. "
@@ -1452,6 +2560,7 @@ def design_pi_output_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Size a 2nd-order LC differential-mode input EMI filter for "
         "conducted-emissions compliance, with the Middlebrook stability check "
@@ -1499,6 +2608,7 @@ def design_dm_input_filter(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Predict conducted-emission spectrum at the LISN port for an SMPS "
         "and compare to CISPR 22 / 32 limits (Class A / B, QP / AVG detector). "
@@ -1552,6 +2662,7 @@ def predict_conducted_emissions(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Design an RC snubber that damps switch-node ringing. Inputs: "
         "parasitic loop inductance, switch C_oss, peak switch voltage, "
@@ -1592,6 +2703,7 @@ def design_rc_snubber(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Pick a common-mode choke from a curated catalogue (Würth WE-CMB, "
         "TDK ZJYS / ACT, Murata DLW). Filters by DC current rating, target "
@@ -1650,7 +2762,10 @@ def design_cm_choke(
 # ----- Digital + mixed-signal ---------------------------------------------
 
 
-@mcp.tool(description="Setup/hold timing check on a synchronous digital path.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Setup/hold timing check on a synchronous digital path.",
+)
 def check_setup_hold(
     name: str,
     clk_period_ns: Annotated[float, Field(gt=0)],
@@ -1690,7 +2805,10 @@ def check_setup_hold(
         return error(f"check_setup_hold failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Estimate combinational propagation delay (gates + wires + fanout).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Estimate combinational propagation delay (gates + wires + fanout).",
+)
 def propagation_delay(
     n_gates: Annotated[int, Field(gt=0)],
     t_gate_avg_ns: Annotated[float, Field(gt=0)],
@@ -1710,7 +2828,10 @@ def propagation_delay(
     )
 
 
-@mcp.tool(description="Estimate digital-to-analog crosstalk via mutual capacitance.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Estimate digital-to-analog crosstalk via mutual capacitance.",
+)
 def estimate_digital_to_analog_crosstalk(
     aggressor_swing_v: Annotated[float, Field(gt=0)],
     aggressor_rise_time_ns: Annotated[float, Field(gt=0)],
@@ -1741,7 +2862,10 @@ def estimate_digital_to_analog_crosstalk(
         )
 
 
-@mcp.tool(description="Estimate supply-rail droop from digital switching activity.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Estimate supply-rail droop from digital switching activity.",
+)
 def estimate_supply_noise_injection(
     aggressor_swing_v: Annotated[float, Field(gt=0)],
     aggressor_rise_time_ns: Annotated[float, Field(gt=0)],
@@ -1788,12 +2912,18 @@ def _model_to_dict(m: Any) -> dict[str, Any]:
     return asdict(m)
 
 
-@mcp.tool(description="List all op-amp part numbers in the bundled catalog.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="List all op-amp part numbers in the bundled catalog.",
+)
 def list_opamps() -> Envelope[list[str]]:
     return _wrap(_list_opamps)
 
 
-@mcp.tool(description="Look up an op-amp by part number (returns full datasheet params).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Look up an op-amp by part number (returns full datasheet params).",
+)
 def lookup_opamp(part_number: str) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1807,6 +2937,7 @@ def lookup_opamp(part_number: str) -> Envelope[dict[str, Any]]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Filter the op-amp catalog by spec constraints (GBW, noise, offset, "
         "supply, RRIO flags, family) and return ranked candidates."
@@ -1843,12 +2974,15 @@ def find_opamp_for_application(
         return error(f"find_opamp_for_application failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="List all MOSFET part numbers in the bundled catalog.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="List all MOSFET part numbers in the bundled catalog.",
+)
 def list_mosfets() -> Envelope[list[str]]:
     return _wrap(_list_mosfets)
 
 
-@mcp.tool(description="Look up a MOSFET by part number.")
+@mcp.tool(annotations=DEFAULT_TOOL_ANNOTATIONS, description="Look up a MOSFET by part number.")
 def lookup_mosfet(part_number: str) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1861,7 +2995,10 @@ def lookup_mosfet(part_number: str) -> Envelope[dict[str, Any]]:
         return error(f"lookup_mosfet failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Filter the MOSFET catalog by polarity, Vds, Id, Rds_on, Vgs threshold.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Filter the MOSFET catalog by polarity, Vds, Id, Rds_on, Vgs threshold.",
+)
 def find_mosfet_for_application(
     polarity: str = "N",
     min_vds_v: Annotated[float, Field(ge=0)] = 0.0,
@@ -1889,12 +3026,12 @@ def find_mosfet_for_application(
         return error(f"find_mosfet_for_application failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="List all BJT part numbers.")
+@mcp.tool(annotations=DEFAULT_TOOL_ANNOTATIONS, description="List all BJT part numbers.")
 def list_bjts() -> Envelope[list[str]]:
     return _wrap(_list_bjts)
 
 
-@mcp.tool(description="Look up a BJT by part number.")
+@mcp.tool(annotations=DEFAULT_TOOL_ANNOTATIONS, description="Look up a BJT by part number.")
 def lookup_bjt(part_number: str) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1907,12 +3044,15 @@ def lookup_bjt(part_number: str) -> Envelope[dict[str, Any]]:
         return error(f"lookup_bjt failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="List all diode part numbers (signal / Schottky / TVS / zener / ESD).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="List all diode part numbers (signal / Schottky / TVS / zener / ESD).",
+)
 def list_diodes() -> Envelope[list[str]]:
     return _wrap(_list_diodes)
 
 
-@mcp.tool(description="Look up a diode by part number.")
+@mcp.tool(annotations=DEFAULT_TOOL_ANNOTATIONS, description="Look up a diode by part number.")
 def lookup_diode(part_number: str) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1925,12 +3065,16 @@ def lookup_diode(part_number: str) -> Envelope[dict[str, Any]]:
         return error(f"lookup_diode failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="List all voltage reference part numbers.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS, description="List all voltage reference part numbers."
+)
 def list_references() -> Envelope[list[str]]:
     return _wrap(_list_refs)
 
 
-@mcp.tool(description="Look up a voltage reference by part number.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS, description="Look up a voltage reference by part number."
+)
 def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1947,6 +3091,7 @@ def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run the synthesize -> place zeros -> vendor-snap -> optimize -> MC "
         "yield workflow for several filter orders side-by-side and return "
@@ -1955,7 +3100,7 @@ def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
     ),
 )
 def compare_filter_orders(
-    orders: list[int],
+    orders: Annotated[list[int], Field(min_length=1, max_length=5)],
     cutoff_hz: Annotated[float, Field(gt=0)],
     spec: dict[str, Any],
     zero_targets_hz: list[float],
@@ -1966,7 +3111,7 @@ def compare_filter_orders(
     capacitor_vendor: str = "murata_gjm_c0g",
     optimize_max_iter: Annotated[int, Field(gt=0, le=10000)] = 1500,
     passband_weight: Annotated[float, Field(gt=0)] = 30.0,
-    mc_n_runs: Annotated[int, Field(gt=0, le=10000)] = 1000,
+    mc_n_runs: Annotated[int, Field(gt=0, le=5_000)] = 1000,
     mc_tolerance_pct: Annotated[float, Field(gt=0, le=20)] = 2.0,
     s2p_dir: str | None = None,
     srf_margin: Annotated[float, Field(ge=0)] = 0.0,
@@ -2013,6 +3158,9 @@ def compare_filter_orders(
                         "transmission_zeros": r.transmission_zeros,
                         "score": r.score,
                         "rationale": r.rationale,
+                        "evaluation_mode": r.evaluation_mode,
+                        "model_fidelity": r.model_fidelity,
+                        "model_checksums": r.model_checksums,
                         "s2p_path": r.s2p_path,
                     }
                     for r in result.results
@@ -2029,6 +3177,7 @@ def compare_filter_orders(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Render a clean publication-quality schematic of an LC ladder "
         "filter. Output format chosen from extension (.svg or .png)."
@@ -2063,12 +3212,15 @@ def render_lc_ladder_schematic(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    name="render_generated_lc_ladder_asc",
     description=(
-        "Parse an existing LTspice .asc and re-render it as a clean "
-        "schemdraw SVG/PNG (the .asc only renders inside LTspice)."
+        "Read component values from an LTspice .asc generated by this package "
+        "and re-render its LC ladder as schemdraw SVG/PNG. Arbitrary LTspice "
+        "symbols, wiring, hierarchy, and directives are not reconstructed."
     ),
 )
-def render_asc_as_schematic(
+def render_generated_lc_ladder_asc(
     asc_path: str,
     output_path: str,
     transmission_zeros: bool = True,
@@ -2076,7 +3228,7 @@ def render_asc_as_schematic(
 ) -> Envelope[dict[str, str]]:
     timer = Timer()
     try:
-        out = _render_asc_schematic(
+        out = _render_generated_lc_ladder_asc(
             asc_path,
             output_path,
             transmission_zeros=transmission_zeros,
@@ -2089,12 +3241,17 @@ def render_asc_as_schematic(
         )
     except Exception as e:
         return error(
-            f"render_asc_as_schematic failed: {e}",
+            f"render_generated_lc_ladder_asc failed: {e}",
             tool_version=__version__,
         )
 
 
+# Direct-Python compatibility for 0.x callers; not registered as an MCP tool.
+render_asc_as_schematic = render_generated_lc_ladder_asc
+
+
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Bundle a design directory's artifacts (schematics, response plots, "
         "and report.md) into a single shareable PDF."
@@ -2121,6 +3278,7 @@ def build_design_report_pdf(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run a real SPICE simulation on a schematic and reconcile it against "
         "the closed-form analytical S2P for the same components. Reports the "
@@ -2128,7 +3286,10 @@ def build_design_report_pdf(
         "/ disagree). Use this before trusting a reported yield or margin that "
         "came only from the fast analytical preview. If no simulator is "
         "installed it returns verdict='spice_unavailable' with the analytical "
-        "response rather than failing."
+        "response rather than failing. If `output_spice_s2p` is set, a second "
+        "matched-port excitation is run to measure the full S-matrix honestly "
+        "(same two-sweep method as `extract_sparameters`); the fast |S21| "
+        "verdict above still comes from the single port-1 sweep."
     ),
 )
 def validate_against_spice(
@@ -2147,7 +3308,17 @@ def validate_against_spice(
     passband_threshold_db: Annotated[float, Field(gt=0)] = 0.5,
     stopband_threshold_db: Annotated[float, Field(gt=0)] = 3.0,
     prefer: Annotated[str | None, Field(description="'ltspice' | 'ngspice' | null (auto).")] = None,
-    output_spice_s2p: str | None = None,
+    output_spice_s2p: Annotated[
+        str | None,
+        Field(
+            description=(
+                "If set, run a second matched-port excitation and write the "
+                "measured S11/S21/S12/S22 two-port to this .s2p path (same "
+                "two-sweep method as `extract_sparameters`; requires the "
+                "V1+Rs1/RL1 port fixture)."
+            )
+        ),
+    ] = None,
     output_analytical_s2p: str | None = None,
     timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
 ) -> Envelope[dict[str, Any]]:
@@ -2167,14 +3338,20 @@ def validate_against_spice(
 
         if output_analytical_s2p and result.analytical_network is not None:
             write_touchstone(result.analytical_network, output_analytical_s2p)
+
+        spice_s2p_provenance: dict[str, Any] | None = None
         if output_spice_s2p and result.spice_network is not None:
-            write_touchstone(result.spice_network, output_spice_s2p)
+            honest_net, spice_s2p_provenance = _build_two_sweep_spice_network(
+                asc_path, result, z0=z0, timeout_sec=timeout_sec
+            )
+            write_touchstone(honest_net, output_spice_s2p)
 
         payload = _validation_payload(result, top_n_points=10)
         if output_analytical_s2p and result.analytical_network is not None:
             payload["analytical_s2p_path"] = str(output_analytical_s2p)
         if output_spice_s2p and result.spice_network is not None:
             payload["spice_s2p_path"] = str(output_spice_s2p)
+            payload["spice_s2p_provenance"] = spice_s2p_provenance
 
         env: Envelope[dict[str, Any]] = ok(
             payload, runtime_sec=timer.elapsed(), tool_version=__version__
@@ -2192,14 +3369,16 @@ def validate_against_spice(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Index a directory of user-supplied vendor models (.s2p / .lib) so "
         "they appear as substitution candidates under a namespace. After "
         "registering, substitute_real_components(inductor_vendor='<namespace>', "
-        "...) uses them like any curated series. Kind (L/C), value and SRF are "
-        "recovered from the measured reactance (series-through fixture) and the "
-        "filename shorthand (e.g. part_L_3n3.s2p). Re-registering a directory "
-        "refreshes the index. Per-file errors are reported, not fatal."
+        "...) uses their reduced lumped estimates like any curated series. For "
+        ".s2p files, kind, value, and SRF are recovered from a series-through "
+        "fixture. .lib files are indexed by filename and assigned conservative "
+        "default parasitics; their subcircuits are not instantiated. "
+        "Re-registering refreshes the index. Per-file errors are non-fatal."
     ),
 )
 def register_user_vendor_dir(
@@ -2237,9 +3416,10 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "synthesize_lc_bsf_filter": "filter.synthesize_lc_bsf",
     "place_transmission_zero": "filter.place_transmission_zero",
     "find_transmission_zeros": "filter.find_transmission_zeros",
-    "evaluate_filter_spec_tool": "filter.evaluate_spec",
+    "evaluate_filter_spec": "filter.evaluate_spec",
     "render_response": "filter.render_response",
     "substitute_real_components": "filter.substitute_real_components",
+    "simulate_realized_filter": "filter.simulate_realized",
     "list_vendor_parts": "filter.list_vendor_parts",
     "optimize_filter": "filter.optimize",
     "monte_carlo_analysis": "filter.monte_carlo",
@@ -2252,7 +3432,7 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "srf_audit": "filter.srf_audit",
     "compare_filter_orders": "filter.compare_orders",
     "render_lc_ladder_schematic": "filter.render_lc_schematic",
-    "render_asc_as_schematic": "filter.render_schematic",
+    "render_generated_lc_ladder_asc": "filter.render_schematic",
     "build_design_report_pdf": "filter.build_report_pdf",
     # analog.* — active-filter / op-amp synthesis
     "sallen_key_low_pass": "analog.sallen_key_lpf",
@@ -2298,28 +3478,36 @@ NAMESPACE_ALIASES: dict[str, str] = {
 
 
 def _register_namespaced_aliases() -> None:
-    """Iterate the alias map and register each namespaced name as a second
-    entry pointing to the same Python function as the flat name.
+    """Register dotted compatibility aliases for one deprecation window.
 
-    Skips silently if a flat name isn't actually defined in this module
-    (e.g. partial test-time imports), so the bookkeeping is robust to
-    minor module surface changes.
+    Underscore-separated names are canonical because they are portable across
+    MCP clients. Dotted aliases carry machine-readable removal metadata and
+    will be removed in 1.0.
     """
     for flat_name, namespaced_name in NAMESPACE_ALIASES.items():
-        func = globals().get(flat_name)
+        implementation_name = (
+            "evaluate_filter_spec_tool" if flat_name == "evaluate_filter_spec" else flat_name
+        )
+        func = globals().get(implementation_name)
         if func is None or not callable(func):
             continue
         mcp.tool(
             name=namespaced_name,
+            annotations=DEFAULT_TOOL_ANNOTATIONS,
             description=(
-                f"Namespaced alias of `{flat_name}`. Prefer the namespaced "
-                "name; the flat alias will be deprecated in a future major "
-                "release. See CHANGELOG."
+                f"DEPRECATED compatibility alias of `{flat_name}`. Use "
+                f"`{flat_name}`; this dotted alias will be removed in 1.0."
             ),
+            meta={
+                "deprecated": True,
+                "canonical_name": flat_name,
+                "remove_in": "1.0.0",
+            },
         )(func)
 
 
 _register_namespaced_aliases()
+prepare_protocol_tools(mcp)
 
 
 # ---------------------------------------------------------------------------
@@ -2330,7 +3518,7 @@ _register_namespaced_aliases()
 def main() -> None:
     """Run the MCP server on stdio."""
     log.info("starting mcp-ltspice", extra={"version": __version__})
-    mcp.run()
+    run_stdio_server(mcp)
 
 
 if __name__ == "__main__":

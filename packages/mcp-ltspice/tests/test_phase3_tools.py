@@ -67,6 +67,14 @@ def test_substitute_real_components_emits_parasitic_data() -> None:
     assert out["L1"]["Cp"] > 0  # parasitic shunt cap is present
     assert out["C2"]["Ls"] > 0  # parasitic ESL is present
     assert out["L1"]["srf_hz"] > 0
+    model = out["L1"]["model"]
+    assert model["record_kind"] == "technology_model"
+    assert model["orderable"] is False
+    assert model["manufacturer_part_number"] is None
+    assert model["source_document"].startswith("https://")
+    assert model["retrieved_at"]
+    assert model["checksum_sha256"]
+    assert "not an orderable" in model["provenance_warning"]
 
 
 # --------------------------------------------------------------------------

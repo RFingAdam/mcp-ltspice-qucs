@@ -208,7 +208,12 @@ def _run_and_compare(tmp_path: Path, simulator) -> None:
     design = synthesize_lc_lpf("butterworth", order=order, cutoff_hz=fc)
     asc = generate_lpf_asc(design.components, tmp_path / "lpf.asc")
     result = run_simulation(asc, prefer=simulator, timeout=240.0)
-    net = extract_sparams_from_raw(result.raw_path, port_map={1: "p1", 2: "p2"}, z0=50.0)
+    net = extract_sparams_from_raw(
+        result.raw_path,
+        port_map={1: "p1", 2: "p2"},
+        z0=50.0,
+        assume_reciprocal_symmetric=True,
+    )
 
     assert net.f.size > 100, f"expected a populated AC sweep, got {net.f.size} points"
 

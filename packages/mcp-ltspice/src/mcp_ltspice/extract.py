@@ -15,6 +15,7 @@ Two paths:
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -70,13 +71,36 @@ def _chain(a: NDArray[np.complex128], b: NDArray[np.complex128]) -> NDArray[np.c
     return cast(NDArray[np.complex128], np.einsum("nij,njk->nik", a, b))
 
 
+def _inductor_impedance(
+    s_axis: NDArray[np.complex128], params: dict[str, float], role: str = "L"
+) -> NDArray[np.complex128]:
+    """First-order inductor model: ``(Rs + sL) || Cp`` when metadata exists."""
+    z_series = params.get(f"{role}_Rs", 0.0) + s_axis * params[role]
+    cp = params.get(f"{role}_Cp", 0.0)
+    if cp <= 0:
+        return z_series
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return 1.0 / (1.0 / z_series + s_axis * cp)
+
+
+def _capacitor_impedance(
+    s_axis: NDArray[np.complex128], params: dict[str, float], role: str = "C"
+) -> NDArray[np.complex128]:
+    """First-order capacitor model: ``Rs + sLs + 1/(sC)``."""
+    return (
+        params.get(f"{role}_Rs", 0.0)
+        + s_axis * params.get(f"{role}_Ls", 0.0)
+        + 1.0 / (s_axis * params[role])
+    )
+
+
 def ladder_sparams_from_components(
     elements: list[tuple[ElementType, dict[str, float]]],
     freq_hz: NDArray[np.float64],
     *,
     z0: float = 50.0,
 ) -> NDArray[np.complex128]:
-    """Compute S-parameters for a lossless LC ladder.
+    """Compute S-parameters for an ideal or first-order-realized LC ladder.
 
     ``elements`` is an ordered source-to-load list of element tuples:
 
@@ -92,30 +116,28 @@ def ladder_sparams_from_components(
 
     Returns S of shape (npoints, 2, 2).
     """
-    s_axis = 1j * 2.0 * np.pi * freq_hz
+    s_axis = np.asarray(1j * 2.0 * np.pi * freq_hz, dtype=np.complex128)
     abcd = np.broadcast_to(np.eye(2, dtype=np.complex128), (s_axis.size, 2, 2)).copy()
 
     for kind, params in elements:
         if kind == "series_l":
-            z = s_axis * params["L"]
+            z = _inductor_impedance(s_axis, params)
             mat = _abcd_series_z(z)
         elif kind == "series_c":
-            z = 1.0 / (s_axis * params["C"])
+            z = _capacitor_impedance(s_axis, params)
             mat = _abcd_series_z(z)
         elif kind == "shunt_c":
-            y = s_axis * params["C"]
+            y = 1.0 / _capacitor_impedance(s_axis, params)
             mat = _abcd_shunt_y(y)
         elif kind == "shunt_l":
-            y = 1.0 / (s_axis * params["L"])
+            y = 1.0 / _inductor_impedance(s_axis, params)
             mat = _abcd_shunt_y(y)
         elif kind == "shunt_lc_trap":
-            l_t = params["L"]
-            c_t = params["C"]
             # Series LC to ground: Z = sL + 1/(sC); Y = 1/Z
             # At resonance Z → 0 and Y → ∞; clamp |Z| to a small floor so
             # the limit (perfect short to ground) evaluates as finite-precision
             # huge admittance instead of NaN.
-            z_trap: ComplexArray = s_axis * l_t + 1.0 / (s_axis * c_t)
+            z_trap = _inductor_impedance(s_axis, params) + _capacitor_impedance(s_axis, params)
             z_floor = 1e-30
             with np.errstate(divide="ignore", invalid="ignore"):
                 z_trap = np.where(np.abs(z_trap) < z_floor, z_floor + 0j, z_trap)
@@ -123,36 +145,34 @@ def ladder_sparams_from_components(
             mat = _abcd_shunt_y(y)
         elif kind == "series_lc_series":
             # Series LC in main signal path: Z = sL + 1/(sC). Dips to 0 at ω₀.
-            l_t = params["L"]
-            c_t = params["C"]
-            z = s_axis * l_t + 1.0 / (s_axis * c_t)
+            z = _inductor_impedance(s_axis, params) + _capacitor_impedance(s_axis, params)
             mat = _abcd_series_z(z)
         elif kind == "shunt_lc_parallel":
             # Parallel LC to ground: Y = sC + 1/(sL). Dips to 0 at ω₀,
             # peaks toward inf at DC and ∞. The branch acts as a shunt
             # short to ground at low and high frequencies (blocking) and
             # opens up in-band, letting signal pass through the main path.
-            l_t = params["L"]
-            c_t = params["C"]
-            y = s_axis * c_t + 1.0 / (s_axis * l_t)
+            y = 1.0 / _capacitor_impedance(s_axis, params) + 1.0 / _inductor_impedance(
+                s_axis, params
+            )
             mat = _abcd_shunt_y(y)
         elif kind == "series_lc_parallel":
             # Parallel LC in main signal path: Z = sL/(s²LC+1). Peaks to
             # ∞ at ω₀ (anti-resonant — blocks in-band), goes to ~sL at DC
             # and ~1/(sC) at high frequency.
-            l_t = params["L"]
-            c_t = params["C"]
             # Floor the denominator *before* dividing, mirroring the
             # shunt_lc_trap branch above. Clamping the quotient afterwards
             # (|z| > ceiling) cannot catch the anti-resonant bin: there
             # s²LC+1 → 0 with numerator → 0 too, so the quotient is NaN,
             # and `abs(NaN) > ceiling` is False — the clamp silently misses
             # and the NaN propagates into the S-matrix.
-            den = s_axis**2 * l_t * c_t + 1.0
+            y_parallel = 1.0 / _inductor_impedance(s_axis, params) + 1.0 / _capacitor_impedance(
+                s_axis, params
+            )
             den_floor = 1e-30
             with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-                den = np.where(np.abs(den) < den_floor, den_floor + 0j, den)
-                z_par = s_axis * l_t / den
+                y_parallel = np.where(np.abs(y_parallel) < den_floor, den_floor + 0j, y_parallel)
+                z_par = 1.0 / y_parallel
             mat = _abcd_series_z(z_par)
         elif kind == "shunt_composite_trap":
             # Series-LC in series with a parallel-LC tank, to ground. Two
@@ -160,13 +180,17 @@ def ladder_sparams_from_components(
             # the branch impedance — benign, Y → 0) and |Z| itself (the two
             # branch resonances are shorts to ground, Y → ∞), mirroring the
             # shunt_lc_trap / series_lc_parallel handling above.
-            l_s, c_s = params["L_s"], params["C_s"]
-            l_p, c_p = params["L_p"], params["C_p"]
-            den = s_axis**2 * l_p * c_p + 1.0
             floor = 1e-30
             with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-                den = np.where(np.abs(den) < floor, floor + 0j, den)
-                z_branch: ComplexArray = s_axis * l_s + 1.0 / (s_axis * c_s) + s_axis * l_p / den
+                y_parallel = 1.0 / _inductor_impedance(
+                    s_axis, params, "L_p"
+                ) + 1.0 / _capacitor_impedance(s_axis, params, "C_p")
+                y_parallel = np.where(np.abs(y_parallel) < floor, floor + 0j, y_parallel)
+                z_branch = (
+                    _inductor_impedance(s_axis, params, "L_s")
+                    + _capacitor_impedance(s_axis, params, "C_s")
+                    + 1.0 / y_parallel
+                )
                 z_branch = np.where(np.abs(z_branch) < floor, floor + 0j, z_branch)
                 y = 1.0 / z_branch
             mat = _abcd_shunt_y(y)
@@ -476,6 +500,78 @@ def components_dict_to_elements(
     return elements
 
 
+def associate_element_refdes(
+    elements: list[tuple[ElementType, dict[str, float]]],
+    components: dict[str, float],
+) -> list[dict[str, str]]:
+    """Associate each element's L/C roles with the source component refdes."""
+    used: set[str] = set()
+    associations: list[dict[str, str]] = []
+    roles = ("L_s", "C_s", "L_p", "C_p", "L", "C")
+    for _element_kind, original in elements:
+        association: dict[str, str] = {}
+        for role in roles:
+            if role not in original:
+                continue
+            prefix = role[0]
+            wants_suffix = role.endswith("_s")
+            candidates = [
+                refdes
+                for refdes, value in components.items()
+                if refdes.startswith(prefix)
+                and refdes not in used
+                and np.isclose(value, original[role], rtol=1e-12, atol=0.0)
+            ]
+            preferred = [refdes for refdes in candidates if refdes.endswith("_s") == wants_suffix]
+            refdes = sorted(preferred or candidates)[0] if (preferred or candidates) else None
+            if refdes is None:
+                raise ValueError(
+                    f"cannot associate element role {role!r}={original[role]:.12g} "
+                    "with a component refdes"
+                )
+            association[role] = refdes
+            used.add(refdes)
+        associations.append(association)
+
+    if used != set(components):
+        unused = sorted(set(components) - used)
+        raise ValueError(f"component mapping contains unassociated refdes: {unused}")
+    return associations
+
+
+def attach_component_parasitics(
+    elements: list[tuple[ElementType, dict[str, float]]],
+    components: dict[str, float],
+    substitution: dict[str, dict[str, Any]],
+) -> list[tuple[ElementType, dict[str, float]]]:
+    """Attach per-refdes first-order parasitics to reconstructed elements.
+
+    The returned tuples retain the existing public element representation.
+    Extra ``<role>_Rs``, ``<role>_Cp``, and ``<role>_Ls`` values are consumed
+    by :func:`ladder_sparams_from_components`. Every component must have a
+    selected model record; partial realization is rejected.
+    """
+    missing = sorted(set(components) - set(substitution))
+    if missing:
+        raise ValueError(f"component substitution is missing refdes: {missing}")
+
+    associations = associate_element_refdes(elements, components)
+    realized: list[tuple[ElementType, dict[str, float]]] = []
+    for (element_kind, original), association in zip(elements, associations, strict=True):
+        params = dict(original)
+        for role, refdes in association.items():
+            selected = substitution[refdes]
+            if "model" not in selected:
+                raise ValueError(f"{refdes}: substitution lacks a ComponentModel record")
+            params[f"{role}_Rs"] = float(selected.get("Rs", 0.0))
+            if role.startswith("L"):
+                params[f"{role}_Cp"] = float(selected.get("Cp", 0.0))
+            else:
+                params[f"{role}_Ls"] = float(selected.get("Ls", 0.0))
+        realized.append((element_kind, params))
+    return realized
+
+
 def write_sparams_touchstone(
     components: dict[str, float],
     freq_hz: NDArray[np.float64],
@@ -543,139 +639,201 @@ def _open_raw(raw_path: str | Path, dialect: str | None = None) -> Any:
         ) from auto_failed
 
 
-def extract_sparams_from_raw(
+@dataclass(frozen=True)
+class ExcitationResult:
+    """One measured column of a two-port scattering matrix."""
+
+    freq_hz: NDArray[np.float64]
+    driven_port: int
+    column: NDArray[np.complex128]
+    current_magnitude_residual: float | None
+
+
+def _extract_excitation_column(
     raw_path: str | Path,
     *,
     port_map: dict[int, str],
+    driven_port: Literal[1, 2],
     z0: float = 50.0,
-    assume_reciprocal_symmetric: bool = True,
+    source_resistor: str,
     dialect: str | None = None,
-) -> rf.Network:
-    """Extract 2-port S-parameters from an LTspice/ngspice ``.raw`` file.
+) -> ExcitationResult:
+    """Recover one S-matrix column from one matched-port AC excitation."""
+    if set(port_map) != {1, 2}:
+        raise ValueError(f"port_map must contain exactly ports 1 and 2; got {sorted(port_map)}")
+    if z0 <= 0:
+        raise ValueError(f"z0 must be > 0; got {z0}")
 
-    ``port_map`` maps port index (1, 2, ...) to the SPICE node name at
-    that port. Convention written by :mod:`mcp_ltspice.asc_io`:
-
-    - Port 1 is driven by ``V1 AC 1 0`` through series resistor ``Rs1 = z0``,
-      landing on node ``port_map[1]``.
-    - Port 2 is the network output node ``port_map[2]``, terminated in
-      ``RL1 = z0`` to ground (no separate source).
-
-    From a single AC sweep we recover column 1 of the scattering matrix
-    exactly:
-
-    - ``a₁ = (V₁_src) / (2 √Z₀) = 1 / (2√Z₀)`` (since ``V₁_src = AC 1``)
-    - ``b₁ = (V_p1 − Z₀·I_Rs1) / (2 √Z₀)``  →  ``S11 = b₁ / a₁``
-    - ``b₂ = V_p2 / √Z₀``  (port 2 terminated in Z₀, so ``a₂ = 0``)
-      →  ``S21 = b₂ / a₁``
-
-    To populate column 2 we'd need a second AC sweep with the source
-    moved to port 2 (the runner does not orchestrate this today). When
-    ``assume_reciprocal_symmetric=True`` (the default) we fill column 2
-    by reciprocity (``S12 = S21``) and symmetry (``S22 = S11``). This is
-    exact for the lumped passive ladder filters this package synthesises;
-    for asymmetric or active networks, set ``assume_reciprocal_symmetric=False``
-    and run two sweeps.
-
-    ``dialect`` pins the ``.raw`` format (``ngspice``, ``ltspice``, ``xyce``,
-    ``qspice``) for the rare file whose header defeats spicelib's
-    auto-detection. Leave it ``None`` to auto-detect and fall back through
-    the known dialects.
-    """
     raw = _open_raw(raw_path, dialect)
     freq_trace = raw.get_trace("frequency")
     if freq_trace is None:
         raise ValueError("No 'frequency' trace in raw file (expected AC analysis)")
-    freq_hz = np.asarray(freq_trace.get_wave(), dtype=np.complex128).real
-
-    nports = len(port_map)
-    if nports != 2:
-        raise NotImplementedError(
-            f"extract_sparams_from_raw currently supports 2-port networks; got nports={nports}"
-        )
-
-    p1_node = port_map[1]
-    p2_node = port_map[2]
+    freq_hz = np.asarray(freq_trace.get_wave(), dtype=np.complex128).real.astype(np.float64)
+    if freq_hz.size == 0 or not np.all(np.isfinite(freq_hz)) or np.any(np.diff(freq_hz) <= 0):
+        raise ValueError(f"{raw_path} has an empty, non-finite, or non-increasing frequency grid")
 
     def _trace(name: str) -> Any:
-        """``get_trace`` raises rather than returning ``None`` for an unknown
-        trace, so the old ``is None`` guards below were unreachable."""
         try:
             return raw.get_trace(name)
         except (IndexError, KeyError):
             return None
 
-    v1_trace = _trace(f"V({p1_node})")
-    v2_trace = _trace(f"V({p2_node})")
-    i1_trace = _trace("I(Rs1)")
-    if v1_trace is None or v2_trace is None:
-        missing = [
-            name
-            for name, t in [(f"V({p1_node})", v1_trace), (f"V({p2_node})", v2_trace)]
-            if t is None
-        ]
+    traces = {port: _trace(f"V({node})") for port, node in port_map.items()}
+    missing = [f"V({port_map[port]})" for port, trace in traces.items() if trace is None]
+    if missing:
         available = [t.name for t in getattr(raw, "_trace_info", [])]
-        raise ValueError(f"Missing required traces in .raw file: {missing}. Available: {available}")
+        raise ValueError(
+            f"Missing required traces in {raw_path}: {missing}. Available: {available}"
+        )
 
-    v_p1 = np.asarray(v1_trace.get_wave(), dtype=np.complex128)
-    v_p2 = np.asarray(v2_trace.get_wave(), dtype=np.complex128)
+    voltages = {
+        port: np.asarray(trace.get_wave(), dtype=np.complex128) for port, trace in traces.items()
+    }
+    if any(wave.shape != freq_hz.shape for wave in voltages.values()):
+        raise ValueError(f"{raw_path} voltage traces do not match its frequency grid")
 
-    # Port-1 current, by Ohm's law rather than from the I(Rs1) trace.
-    #
-    # This is exact under the port convention already assumed a few lines
-    # below (V1 = AC 1 driving through Rs1 = z0 into p1): the current into
-    # port 1 is (V_src - V_p1)/z0 with V_src = 1. Deriving it buys two
-    # things over reading the trace:
-    #
-    # - ngspice does not record resistor currents at all, so the trace is
-    #   simply absent there and extraction used to die with an IndexError.
-    # - SPICE defines a two-terminal device's current as flowing from its
-    #   first node to its second, and which pin LTspice emits first depends
-    #   on the symbol's orientation in the schematic. LTspice netlists our
-    #   generated schematic as `Rs1 p1 N001`, so its I(Rs1) runs *out* of
-    #   port 1 — the opposite sign to the one this code assumed, which put
-    #   S11 at 0 dB (fully reflective) for a well-matched filter.
-    i_rs1 = (1.0 - v_p1) / z0
+    driven_voltage = voltages[driven_port]
+    other_port = 2 if driven_port == 1 else 1
+    # Fixture contract: a 1 V AC source drives the selected port through Z0;
+    # the other port is terminated directly in Z0. Thus a_i=1/(2√Z0).
+    source_current = (1.0 - driven_voltage) / z0
+    sqrt_z0 = np.sqrt(z0)
+    incident = 1.0 / (2.0 * sqrt_z0)
+    reflected = (driven_voltage - z0 * source_current) / (2.0 * sqrt_z0)
+    transmitted = voltages[other_port] / sqrt_z0
 
-    if i1_trace is not None:
-        # The trace is still useful as a consistency check: magnitudes must
-        # agree even though the sign is orientation-dependent. A mismatch
-        # means the schematic does not follow the documented port-1
-        # convention, so every S-parameter below is suspect.
-        measured = np.asarray(i1_trace.get_wave(), dtype=np.complex128)
-        scale = float(np.max(np.abs(i_rs1))) or 1.0
-        deviation = float(np.max(np.abs(np.abs(measured) - np.abs(i_rs1)))) / scale
-        if deviation > 1e-3:
-            log.warning(
-                "I(Rs1) in %s disagrees with the current implied by V(%s) "
-                "(max relative deviation %.3g). The schematic may not follow the "
-                "expected port-1 convention (V1 = AC 1 through Rs1 = z0 into %s); "
-                "S-parameters may be wrong.",
-                raw_path,
-                p1_node,
-                deviation,
-                p1_node,
+    column = np.empty((freq_hz.size, 2), dtype=np.complex128)
+    column[:, driven_port - 1] = reflected / incident
+    column[:, other_port - 1] = transmitted / incident
+
+    current_trace = _trace(f"I({source_resistor})")
+    residual: float | None = None
+    if current_trace is not None:
+        measured = np.asarray(current_trace.get_wave(), dtype=np.complex128)
+        if measured.shape != freq_hz.shape:
+            raise ValueError(f"I({source_resistor}) does not match the frequency grid")
+        scale = float(np.max(np.abs(source_current))) or 1.0
+        residual = float(np.max(np.abs(np.abs(measured) - np.abs(source_current)))) / scale
+        if residual > 1e-3:
+            raise ValueError(
+                f"{raw_path} violates the declared port-{driven_port} fixture: "
+                f"|I({source_resistor})| differs from (1-V({port_map[driven_port]}))/{z0:g} "
+                f"by {residual:.3g} relative"
             )
 
-    sqrt_z0 = np.sqrt(z0)
-    a1 = 1.0 / (2.0 * sqrt_z0)  # V1_src = AC 1, scalar (broadcast)
-    b1 = (v_p1 - z0 * i_rs1) / (2.0 * sqrt_z0)
-    b2 = v_p2 / sqrt_z0  # a2 = 0 (port 2 terminated in z0)
+    return ExcitationResult(
+        freq_hz=freq_hz,
+        driven_port=driven_port,
+        column=column,
+        current_magnitude_residual=residual,
+    )
 
-    s11 = b1 / a1
-    s21 = b2 / a1
 
-    s = np.zeros((freq_hz.size, 2, 2), dtype=np.complex128)
-    s[:, 0, 0] = s11
-    s[:, 1, 0] = s21
+def extract_two_sweep_sparams(
+    port1_raw_path: str | Path,
+    port2_raw_path: str | Path,
+    *,
+    port_map: dict[int, str],
+    z0: float = 50.0,
+    port1_source_resistor: str = "Rs1",
+    port2_source_resistor: str = "RL1",
+    dialect: str | None = None,
+) -> tuple[rf.Network, dict[str, Any]]:
+    """Merge two matched-port AC sweeps into a measured two-port matrix."""
+    first = _extract_excitation_column(
+        port1_raw_path,
+        port_map=port_map,
+        driven_port=1,
+        z0=z0,
+        source_resistor=port1_source_resistor,
+        dialect=dialect,
+    )
+    second = _extract_excitation_column(
+        port2_raw_path,
+        port_map=port_map,
+        driven_port=2,
+        z0=z0,
+        source_resistor=port2_source_resistor,
+        dialect=dialect,
+    )
+    if first.freq_hz.shape != second.freq_hz.shape or not np.allclose(
+        first.freq_hz, second.freq_hz, rtol=1e-10, atol=0.0
+    ):
+        raise ValueError(
+            "Port-1 and port-2 sweeps use different frequency grids; "
+            "refusing to interpolate independent simulations"
+        )
 
-    if assume_reciprocal_symmetric:
-        s[:, 0, 1] = s21  # reciprocity
-        s[:, 1, 1] = s11  # symmetry
-    # else: leave column 2 zero; caller is expected to merge with a port-2 sweep
+    s = np.empty((first.freq_hz.size, 2, 2), dtype=np.complex128)
+    s[:, :, 0] = first.column
+    s[:, :, 1] = second.column
+    net = rf.Network(
+        frequency=rf.Frequency.from_f(first.freq_hz, unit="Hz"),
+        s=s,
+        z0=z0,
+        name=f"{Path(port1_raw_path).stem}_two_sweep",
+    )
+    provenance = {
+        "extraction_method": "two_excitation_power_waves",
+        "source_files": {
+            "port1_raw": str(Path(port1_raw_path).resolve()),
+            "port2_raw": str(Path(port2_raw_path).resolve()),
+        },
+        "port_fixture": {
+            "port_map": port_map,
+            "z0_ohm": z0,
+            "source_voltage_ac_v": 1.0,
+            "port1_source_resistor": port1_source_resistor,
+            "port2_source_resistor": port2_source_resistor,
+            "unexcited_port_termination_ohm": z0,
+        },
+        "assumptions": [
+            "Each driven port uses a 1 V AC Thevenin source with series impedance Z0.",
+            "The unexcited port is terminated directly in Z0.",
+            "Both sweeps describe the same circuit and frequency grid.",
+        ],
+        "validation": {
+            "frequency_grid_exact_match": True,
+            "port1_current_magnitude_residual": first.current_magnitude_residual,
+            "port2_current_magnitude_residual": second.current_magnitude_residual,
+        },
+    }
+    return net, provenance
 
+
+def extract_sparams_from_raw(
+    raw_path: str | Path,
+    *,
+    port_map: dict[int, str],
+    assume_reciprocal_symmetric: bool,
+    z0: float = 50.0,
+    dialect: str | None = None,
+) -> rf.Network:
+    """Explicit opt-in single-sweep extraction for symmetric reciprocal DUTs.
+
+    This compatibility path measures S11/S21 and copies them to S22/S12.
+    It refuses to run unless ``assume_reciprocal_symmetric=True`` is passed.
+    General two-ports must use :func:`extract_two_sweep_sparams`.
+    """
+    if not assume_reciprocal_symmetric:
+        raise ValueError(
+            "A single sweep cannot produce a general two-port matrix. "
+            "Use extract_two_sweep_sparams with port-1 and port-2 results."
+        )
+    first = _extract_excitation_column(
+        raw_path,
+        port_map=port_map,
+        driven_port=1,
+        z0=z0,
+        source_resistor="Rs1",
+        dialect=dialect,
+    )
+    s = np.empty((first.freq_hz.size, 2, 2), dtype=np.complex128)
+    s[:, :, 0] = first.column
+    s[:, 0, 1] = first.column[:, 1]
+    s[:, 1, 1] = first.column[:, 0]
     return rf.Network(
-        frequency=rf.Frequency.from_f(freq_hz, unit="Hz"),
+        frequency=rf.Frequency.from_f(first.freq_hz, unit="Hz"),
         s=s,
         z0=z0,
         name=Path(raw_path).stem,

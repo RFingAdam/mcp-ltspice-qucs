@@ -1,6 +1,6 @@
 [project]
 name = "mcp-qucs-s"
-version = "0.5.0"
+version = "0.6.0"
 description = "MCP server exposing Qucs-S (with Ngspice/Xyce backends) for native S-parameter sims, harmonic balance, microstrip / distributed-element synthesis, and lumped-to-distributed conversion"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,19 +9,19 @@ authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }
 keywords = ["mcp", "qucs", "qucs-s", "harmonic-balance", "microstrip", "rf-engineering"]
 
 dependencies = [
-    "rf-mcp-common",
-    "fastmcp>=2.0.0",
-    "scikit-rf>=1.2.0",
-    "scipy>=1.11",
-    "numpy>=1.26",
-    "lxml>=5.0",
+    "rf-mcp-common>=0.6,<0.7",
+    "fastmcp>=3.4.4,<3.5",
+    "scikit-rf>=1.2.0,<2",
+    "scipy>=1.11,<2",
+    "numpy>=1.26,<3",
+    "lxml>=5.0,<7",
 ]
 
 [project.scripts]
 mcp-qucs-s = "mcp_qucs_s.server:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.25,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

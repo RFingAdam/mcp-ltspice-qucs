@@ -69,11 +69,12 @@ def test_hard_target_escalates_order() -> None:
     assert [i["order"] for i in its] == list(range(5, 5 + 2 * len(its), 2))
     assert all("worst_desense_db" in i and "worst_entry" in i for i in its)
     if not result["converged"]:
-        assert result["chosen_order"] == its[-1]["order"], "best-so-far must be returned"
+        best_iteration = min(its, key=lambda item: item["worst_desense_db"])
+        assert result["chosen_order"] == best_iteration["order"]
 
 
-def test_monotone_improvement_with_order() -> None:
-    """Higher order should not make the worst-case desense worse."""
+def test_order_sweep_returns_best_realized_candidate() -> None:
+    """Real-part loss/SRF can be non-monotone, so retain the measured best."""
     result = synthesize_for_coex_target(
         PASSBAND,
         pa_power_dbm=36.0,
@@ -86,7 +87,9 @@ def test_monotone_improvement_with_order() -> None:
     assert result["converged"] is False
     worst = [i["worst_desense_db"] for i in result["iterations"]]
     assert len(worst) == 3
-    assert worst[-1] <= worst[0] + 0.5, f"order sweep should not degrade: {worst}"
+    best_iteration = min(result["iterations"], key=lambda item: item["worst_desense_db"])
+    assert result["chosen_order"] == best_iteration["order"]
+    assert result["evaluation_mode"] == "approximate_model"
 
 
 def test_gnss_victim_flows_through_with_cn0_metric() -> None:

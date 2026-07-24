@@ -16,12 +16,14 @@ import pytest
 import skrf as rf
 
 from mcp_ltspice.vendor_fetch import (
+    LocalDirectoryProvider,
     index_directory,
     parse_value_from_name,
     register_user_vendor_dir,
 )
 from mcp_ltspice.vendor_models import (
     _USER_VENDOR_TABLES,
+    ComponentProvider,
     lookup_part,
     substitute_real_components,
 )
@@ -132,6 +134,22 @@ def test_registration_exposes_parts_to_lookup(vendor_dir):
     assert result["n_indexed"] == 2
     assert lookup_part("user", 3.3e-9, kind="L").L_h == pytest.approx(3.3e-9, rel=1e-3)
     assert lookup_part("user", 2.2e-12, kind="C").C_f == pytest.approx(2.2e-12, rel=1e-3)
+
+
+def test_local_provider_returns_checksum_addressed_immutable_records(vendor_dir) -> None:
+    provider = LocalDirectoryProvider(vendor_dir, provider_id="lab")
+    records = provider.list_models()
+
+    assert isinstance(provider, ComponentProvider)
+    assert records
+    record = records[0]
+    assert provider.get_model(record.checksum_sha256) is record
+    assert record.checksum_scope == "source_file_bytes"
+    assert record.source_document
+    assert record.model_license
+    assert record.record_kind == "technology_model"
+    assert record.orderable is False
+    assert record.manufacturer_part_number is None
 
 
 def test_mixed_directory_lookup_filters_by_kind(vendor_dir):

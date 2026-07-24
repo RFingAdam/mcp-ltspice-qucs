@@ -14,8 +14,12 @@ its I-V is exponential, not cubic, so its intermodulation does not follow a
 
 from __future__ import annotations
 
+import hashlib
 import itertools
+import json
 import math
+import subprocess
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -26,6 +30,7 @@ from mcp_qucs_s.harmonic_balance import (
     build_hb_netlist,
     dbm_to_source_amplitude,
     parse_hb_fd,
+    run_xyce,
     sweep_compression,
     volts_to_dbm,
 )
@@ -117,6 +122,116 @@ def test_spectrum_lookup_picks_the_nearest_bin() -> None:
     )
     assert spec.at(1.01e9)[1] == pytest.approx(10.0)
     assert spec.at(1.9e9)[1] == pytest.approx(-10.0)
+
+
+def test_failed_xyce_run_does_not_accept_or_overwrite_stale_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stale_path = tmp_path / "hb.cir.HB.FD.prn"
+    stale = "old HB data\n"
+    stale_path.write_text(stale, encoding="utf-8")
+
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.find_xyce", lambda: Path("/fake/Xyce"))
+    monkeypatch.setattr(
+        "mcp_qucs_s.harmonic_balance.probe_executable_version", lambda *a, **k: "fake"
+    )
+
+    def fail_run(command, **kwargs):
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="intentional failure")
+
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.run_process_tree", fail_run)
+
+    with pytest.raises(RuntimeError, match="returncode=1"):
+        run_xyce("* test\n.END\n", workdir=tmp_path)
+
+    assert stale_path.read_text(encoding="utf-8") == stale
+    manifest = json.loads((tmp_path / "hb.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["returncode"] == 1
+    assert not any(item["role"] == "published_output" for item in manifest["artifacts"])
+
+
+def test_successful_xyce_run_publishes_validated_output_and_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.find_xyce", lambda: Path("/fake/Xyce"))
+    monkeypatch.setattr(
+        "mcp_qucs_s.harmonic_balance.probe_executable_version",
+        lambda *a, **k: "Xyce fake 1.0",
+    )
+
+    def successful_run(command, **kwargs):
+        Path(command[1]).with_suffix(".cir.HB.FD.prn").write_text(
+            "Index FREQ Re(V(OUT)) Im(V(OUT))\n0 0.0 0.0 0.0\n1 1.0e9 0.5 0.0\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="complete", stderr="")
+
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.run_process_tree", successful_run)
+    result = run_xyce("* test\n.END\n", workdir=tmp_path)
+
+    assert result.name == "hb.cir.HB.FD.prn"
+    assert result.parent.name == "inputs"
+    assert (tmp_path / "hb.cir.HB.FD.prn").is_file()
+    assert result.is_file()
+    manifest = json.loads((tmp_path / "hb.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "completed"
+    assert manifest["backend"]["version"] == "Xyce fake 1.0"
+    assert any(item["role"] == "published_output" for item in manifest["artifacts"])
+
+
+def test_xyce_run_stages_and_records_checksum_verified_model_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = tmp_path / "device.lib"
+    model.write_text(".model DTEST D\n", encoding="utf-8")
+    checksum = hashlib.sha256(model.read_bytes()).hexdigest()
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.find_xyce", lambda: Path("/fake/Xyce"))
+    monkeypatch.setattr(
+        "mcp_qucs_s.harmonic_balance.probe_executable_version",
+        lambda *a, **k: "Xyce fake 1.0",
+    )
+
+    def successful_run(command, **kwargs):
+        netlist = Path(command[1])
+        staged_name = f"{checksum[:12]}-device.lib"
+        assert f'.include "{staged_name}"' in netlist.read_text(encoding="utf-8")
+        assert (netlist.parent / staged_name).is_file()
+        netlist.with_suffix(".cir.HB.FD.prn").write_text(
+            "Index FREQ Re(V(OUT)) Im(V(OUT))\n0 0.0 0.0 0.0\n1 1.0e9 0.5 0.0\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="complete", stderr="")
+
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.run_process_tree", successful_run)
+    run_xyce(
+        f'.include "{model}"\n.HB 1e9\n.END\n',
+        workdir=tmp_path / "run",
+        model_sources=[(model, checksum)],
+    )
+
+    manifest = json.loads((tmp_path / "run" / "hb.manifest.json").read_text(encoding="utf-8"))
+    assert {item["sha256"] for item in manifest["inputs"]} >= {checksum}
+
+
+def test_xyce_rejects_fresh_but_invalid_hb_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.find_xyce", lambda: Path("/fake/Xyce"))
+    monkeypatch.setattr(
+        "mcp_qucs_s.harmonic_balance.probe_executable_version", lambda *a, **k: "fake"
+    )
+
+    def invalid_run(command, **kwargs):
+        Path(command[1]).with_suffix(".cir.HB.FD.prn").write_text(
+            "Index FREQ Re(V(OUT)) Im(V(OUT))\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("mcp_qucs_s.harmonic_balance.run_process_tree", invalid_run)
+    with pytest.raises(RuntimeError, match="No harmonic-balance data"):
+        run_xyce("* test\n.END\n", workdir=tmp_path)
 
 
 # ---------------------------------------------------------------------------

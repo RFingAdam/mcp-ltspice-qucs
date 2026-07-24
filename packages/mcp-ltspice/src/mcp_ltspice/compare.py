@@ -13,13 +13,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import numpy as np
-
-from mcp_ltspice.eval import FilterSpec, evaluate_filter_spec
-from mcp_ltspice.extract import (
-    components_dict_to_elements,
-    ladder_sparams_from_components,
+from mcp_ltspice.analysis_context import (
+    FilterAnalysisContext,
+    build_spec_frequency_grid,
 )
+from mcp_ltspice.eval import FilterSpec, evaluate_filter_spec
+from mcp_ltspice.extract import ladder_sparams_from_components
 from mcp_ltspice.find_zeros import find_transmission_zeros
 from mcp_ltspice.montecarlo import monte_carlo_analysis
 from mcp_ltspice.optimize import optimize_filter
@@ -52,6 +51,9 @@ class OrderResult:
     transmission_zeros: list[dict[str, float]]
     score: int
     rationale: str
+    evaluation_mode: str
+    model_fidelity: str
+    model_checksums: dict[str, str]
     s2p_path: str | None = None
 
 
@@ -127,6 +129,7 @@ def _design_one(
     max_value_drift_pct: float | None = None,
 ) -> OrderResult:
     """Synthesize → place zeros → vendor-substitute → optimize → audit."""
+    validated_spec = FilterSpec.model_validate(spec) if isinstance(spec, dict) else spec
     design = synthesize_lc_lpf(
         "elliptic",
         order=order,
@@ -177,8 +180,37 @@ def _design_one(
         inductor_vendor=inductor_vendor,
         capacitor_vendor=capacitor_vendor,
         passband_weight=passband_weight,
+        kind="lowpass",
+        topology=Topology.SERIES_FIRST,
+        component_substitution=parts,
+        transmission_zeros_hz=targets_used,
     )
-    final_comps = opt.snapped_components
+    final_parts = substitute_real_components(
+        opt.snapped_components,
+        inductor_vendor=inductor_vendor,
+        capacitor_vendor=capacitor_vendor,
+        srf_margin=srf_margin,
+        max_value_drift_pct=max_value_drift_pct,
+        spec=validated_spec.model_dump(),
+    )
+    final_comps = {
+        refdes: float(selected["snapped_value"]) for refdes, selected in final_parts.items()
+    }
+    analysis_context = FilterAnalysisContext.create(
+        kind="lowpass",
+        topology=Topology.SERIES_FIRST,
+        z0=z0,
+        transmission_zeros=True,
+        component_substitution=final_parts,
+        provenance={"workflow": "compare_filter_orders", "order": order},
+    )
+    f_grid = build_spec_frequency_grid(
+        validated_spec,
+        npoints=1001,
+        transmission_zeros_hz=targets_used,
+    )
+    elements = analysis_context.elements(final_comps)
+    s = ladder_sparams_from_components(elements, f_grid, z0=z0)
 
     # Write Touchstone if requested
     s2p_path: str | None = None
@@ -187,11 +219,6 @@ def _design_one(
 
         out_dir = Path(s2p_dir).expanduser().resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
-        f_grid = np.geomspace(10e6, max(20e9, cutoff_hz * 50), 1001)
-        elements = components_dict_to_elements(
-            final_comps, transmission_zeros=True, topology="series_first"
-        )
-        s = ladder_sparams_from_components(elements, f_grid, z0=z0)
         s2p_target = out_dir / f"order{order}_final.s2p"
         s2p_path = str(network_to_touchstone(f_grid, s, s2p_target, z0=z0))
 
@@ -201,11 +228,6 @@ def _design_one(
         import tempfile
         from pathlib import Path
 
-        f_grid = np.geomspace(10e6, max(20e9, cutoff_hz * 50), 1001)
-        elements = components_dict_to_elements(
-            final_comps, transmission_zeros=True, topology="series_first"
-        )
-        s = ladder_sparams_from_components(elements, f_grid, z0=z0)
         with tempfile.NamedTemporaryFile(
             suffix=".s2p", delete=False, dir=tempfile.gettempdir()
         ) as f:
@@ -223,6 +245,10 @@ def _design_one(
         spec,
         perturbation_pct=2.0,
         transmission_zeros=True,
+        kind="lowpass",
+        topology=Topology.SERIES_FIRST,
+        component_substitution=final_parts,
+        transmission_zeros_hz=targets_used,
     )
     mc = monte_carlo_analysis(
         final_comps,
@@ -230,6 +256,10 @@ def _design_one(
         tolerance_pct=mc_tolerance_pct,
         n_runs=mc_n_runs,
         transmission_zeros=True,
+        kind="lowpass",
+        topology=Topology.SERIES_FIRST,
+        component_substitution=final_parts,
+        transmission_zeros_hz=targets_used,
         n_jobs=-1,
     )
     found_zeros = find_transmission_zeros(s2p_eval_path, min_depth_db=15)
@@ -270,6 +300,12 @@ def _design_one(
         ],
         score=score,
         rationale=rationale,
+        evaluation_mode=analysis_context.evaluation_mode,
+        model_fidelity=analysis_context.model_fidelity,
+        model_checksums={
+            refdes: str(selected["model"]["checksum_sha256"])
+            for refdes, selected in final_parts.items()
+        },
         s2p_path=s2p_path,
     )
 
@@ -314,6 +350,10 @@ def compare_filter_orders(
         spec = FilterSpec.model_validate(spec)
     if not orders:
         raise ValueError("Need at least one order to compare")
+    if len(orders) > 5:
+        raise ValueError("At most five filter orders may be compared per call")
+    if mc_n_runs > 5_000:
+        raise ValueError("mc_n_runs exceeds the safe comparison limit of 5,000")
 
     results: list[OrderResult] = []
     for order in orders:

@@ -25,7 +25,7 @@ mcp-ltspice-qucs/
                         │       (Claude, etc.)       │
                         └─────┬──────┬──────┬────────┘
                               │      │      │
-              MCP stdio/HTTP  │      │      │
+                 MCP stdio    │      │      │
                 ┌─────────────┘      │      └──────────────┐
                 │                    │                     │
                 ▼                    ▼                     ▼
@@ -34,7 +34,7 @@ mcp-ltspice-qucs/
        │ ───────────────│  │ ─────────────────│  │ ─────────────────│
        │ synthesize_*   │  │ cascade_networks │  │ run_sp_analysis  │
        │ place_zero     │  │ deembed          │  │ harmonic_balance │
-       │ substitute_real│  │ list_lte_bands   │  │ microstrip_synth │
+       │ substitute_real│  │ list_lte_bands   │  │ synthesize_line  │
        │ optimize       │  │ check_coex_matrix│  │ richards_kuroda  │
        │ monte_carlo    │  │ compute_desense  │  │ noise_params     │
        │ evaluate_spec  │  │ evaluate_template│  │ export_touchstone│
@@ -49,20 +49,28 @@ mcp-ltspice-qucs/
                             │ rf-mcp-common  │
                             │ ───────────────│
                             │ Envelope       │
+                            │ CircuitDocument│
+                            │ Backend/results│
+                            │ Optimization   │
                             │ Touchstone I/O │
                             │ ESeries snap   │
+                            │ Jobs/artifacts │
+                            │ Sandboxed runs │
                             │ JSON logger    │
                             └────────────────┘
 ```
 
 ## Interop contract
 
-The three servers don't import each other. They communicate exclusively
-through:
+`mcp-ltspice` has a one-way package dependency on `mcp-rf-analysis` for
+the closed-loop coexistence workflow; there is no reverse dependency or
+cycle. Otherwise the servers exchange simulation data through:
 
-- **Touchstone files** on disk (`.s2p` / `.snp`). All servers read and
-  write via `rf_mcp_common.touchstone`, which wraps `skrf.Network` with
-  Hz-strict frequency handling.
+- **Touchstone artifacts** (`.s2p` / `.snp`). All servers read and write via
+  `rf_mcp_common.touchstone`, which wraps `skrf.Network` with Hz-strict
+  frequency handling. Durable workflows expose opaque workspace/artifact IDs
+  and bounded `artifact://` reads; synchronous compatibility tools may also
+  return a local path.
 - **The `Envelope` response model** (`rf_mcp_common.envelope`):
 
   ```python
@@ -74,13 +82,19 @@ through:
       error: str | None
   ```
 
-  Every tool in every server returns this shape. Tools never raise to
-  the MCP transport — they catch their own errors and convert them to
-  `error()` envelopes.
+  Library-level functions and successful MCP calls use this shape. At the MCP
+  boundary, `EnvelopeErrorMiddleware` converts an error envelope into a
+  structured `ToolError` with a stable coarse code, so clients do not mistake
+  a failed simulation for a successful tool call.
 
 - **Hz-only frequency conventions on the wire.** Display units (MHz,
   GHz) appear in human-readable messages and tool descriptions but
   never in tool arguments or stored data.
+
+- **`CircuitDocument` 1.0 and backend-neutral results.** Supported LTspice
+  ASC, SPICE, Qucs schematic, and Qucsator netlist subsets become an explicit
+  pin-to-net graph. Backend adapters compile that graph and normalize output
+  without extrapolation; unsupported syntax remains a blocking diagnostic.
 
 This contract means a fourth MCP — say, one wrapping CST Studio or a VNA
 — can drop in without modifying the existing servers, as long as it
@@ -96,21 +110,25 @@ honors the same Touchstone + Envelope conventions.
        │
        ├──► place_transmission_zero ──► (updates .asc, recompute .s2p)
        │
-       ├──► substitute_real_components ──► swaps ideal L/C → vendor parts
-       │                                   with parasitic R/L/C tables
+       ├──► substitute_real_components ──► snaps ideal L/C to catalog values
+       │                                   and returns parasitic metadata
+       ├──► simulate_realized_filter ──► model netlists + two sweeps + .s2p
        │
        ├──► run_simulation ──► invokes LTspice (Wine) or ngspice
        │           │
        │           ▼
-       │    extract_sparameters ──► .raw → .s2p
+       │    extract_sparameters ──► two matched-port sweeps → full .s2p
        │
-       ├──► evaluate_filter_spec ──► pass/fail per criterion
+       ├──► evaluate_filter_spec ──► pass/fail per exact criterion grid
        │
        ├──► optimize_filter ──► scipy.optimize.minimize over analytical
        │                       S-params; loss = sum of negative margins
        │
-       ├──► monte_carlo_analysis ──► joblib parallel, Gaussian tolerance,
-       │                             yield% + per-metric histograms
+       ├──► monte_carlo_analysis ──► bounded parallel Gaussian tolerance,
+       │                             summary metrics + optional JSONL artifact
+       │
+       ├──► simulation_submit / analysis_submit
+       │        └──► durable job state, progress, cancel/retry, artifacts
        │
        └──► render_response ──► S21/S11 Bode PNG with marker lines
 ```
@@ -123,16 +141,33 @@ Two reasons:
    evaluations. Analytical ABCD-chain math (in `extract.py`) handles
    this in milliseconds; spawning a SPICE process per evaluation would
    be too slow by 4-6 orders of magnitude.
-2. **CI portability** — the analytical path has no external
-   dependencies, so the test suite (and the CI matrix) runs without
-   needing LTspice or ngspice installed. Real-simulator integration
-   tests are gated by pytest markers (`@pytest.mark.ltspice` /
-   `@pytest.mark.ngspice`) and skip cleanly when the simulator is
-   absent.
+2. **CI portability** — the analytical path has no external simulator
+   dependency. Required Linux CI installs ngspice. A weekly capability-labelled
+   self-hosted matrix runs LTspice, qucsator-RF, and Xyce integrations; local
+   tests skip only when their backend is absent.
 
-The real simulator is used for the final design verification once the
-optimizer has converged, where parasitic effects, modulation transients,
-and vendor SPICE subcircuits matter.
+A real simulator verifies generated supported circuits after analytical
+screening. `simulate_realized_filter` instantiates registered two-pin `.lib`
+models or explicit approximate passive subcircuits and returns hashes and
+pin mappings. General multi-pin/arbitrary schematic realization remains
+unsupported and is rejected rather than approximated silently.
+
+The generic IR optimizer is the slower simulator-backed path for arbitrary
+supported graphs. It uses seeded bounded/discrete screening, hard constraints,
+named corners, exact model-hash attestation, yield sampling, and optional
+independent-backend validation. Fixed subcircuit/model/Touchstone values cannot
+be tuned as though they were parameterized; generic lumped models and explicit
+instance parameters can be.
+
+## Execution and trust boundary
+
+Simulator inputs are imported into immutable, checksum-addressed workspaces.
+SPICE include trees are resolved and copied before execution; traversal,
+symlink escapes, missing dependencies, and mutation are rejected. External
+processes run in their own process group with timeout/cancellation tree cleanup.
+ngspice uses a no-network bubblewrap profile by default when available;
+unsandboxed execution requires an explicit trusted-input opt-in. Remote
+transport is not enabled by the console entry points.
 
 ## Resource bundling
 
@@ -146,12 +181,12 @@ incantation is needed.
 
 Each package has its own `pyproject.toml` and version, bumping
 independently per [Semver](https://semver.org/). The current minor
-release is `0.2.0`. `rf-mcp-common` is the contract layer; breaking
+release is `0.6.0`. Runtime package and FastMCP server versions are derived
+from installed distribution metadata rather than duplicated in source.
+`rf-mcp-common` is the contract layer; breaking
 changes there cascade to every server and warrant a major bump for
 all four.
 
-Some tools in `mcp-qucs-s` ship as scaffolds — they detect the required
-simulator (Xyce for `run_harmonic_balance`, Qucs-S for
-`extract_noise_parameters`) but return an `error("not yet implemented")`
-envelope instead of placeholder data. This is deliberate: a scaffold
-that returns `ok()` with fake numbers is worse than no tool at all.
+`mcp-qucs-s` implements Qucsator S-parameter and noise analysis plus Xyce
+harmonic balance. Simulator-dependent tools report a clear error when their
+backend is unavailable.

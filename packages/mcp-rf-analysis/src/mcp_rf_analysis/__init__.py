@@ -1,3 +1,5 @@
 """Simulator-agnostic RF analysis MCP server."""
 
-__version__ = "0.1.0"
+from rf_mcp_common.version import distribution_version
+
+__version__ = distribution_version("mcp-rf-analysis")

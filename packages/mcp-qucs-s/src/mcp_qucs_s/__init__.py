@@ -1,8 +1,9 @@
 """MCP server exposing Qucs-S for distributed-element / harmonic balance sims.
 
-Status: scaffold only — full tool implementation is upcoming. The package
-exposes only ``__version__`` and a placeholder ``main`` so its workspace
-membership doesn't break dependency resolution.
+The package includes distributed synthesis, Qucsator S-parameter and noise
+analysis, and Xyce harmonic-balance workflows.
 """
 
-__version__ = "0.1.0"
+from rf_mcp_common.version import distribution_version
+
+__version__ = distribution_version("mcp-qucs-s")

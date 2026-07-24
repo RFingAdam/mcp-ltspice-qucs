@@ -30,10 +30,8 @@ from typing import Any
 
 import numpy as np
 
-from mcp_ltspice.extract import (
-    components_dict_to_elements,
-    ladder_sparams_from_components,
-)
+from mcp_ltspice.analysis_context import FilterAnalysisContext
+from mcp_ltspice.extract import ladder_sparams_from_components
 from mcp_ltspice.synthesis.lc_filter import synthesize_lc_lpf
 from mcp_ltspice.synthesis.zeros import place_transmission_zero
 from mcp_ltspice.vendor_models import substitute_real_components
@@ -43,9 +41,22 @@ from mcp_ltspice.vendor_models import substitute_real_components
 _RAW_PA_DBC = {2: -30.0, 3: -40.0, 4: -50.0, 5: -55.0}
 
 
-def _rejection_db(components: dict[str, float], freqs_hz: list[float]) -> list[float]:
+def _rejection_db(
+    components: dict[str, float],
+    freqs_hz: list[float],
+    *,
+    substitution: dict[str, dict[str, Any]],
+) -> list[float]:
     """|S21| rejection (positive dB) of the realized lowpass ladder."""
-    elements = components_dict_to_elements(components, topology="series_first", kind="lowpass")
+    context = FilterAnalysisContext.create(
+        kind="lowpass",
+        topology="series_first",
+        z0=50.0,
+        transmission_zeros=True,
+        component_substitution=substitution,
+        provenance={"workflow": "synthesize_for_coex_target"},
+    )
+    elements = context.elements(components)
     s = ladder_sparams_from_components(elements, np.asarray(freqs_hz, dtype=float), z0=50.0)
     return [-20.0 * float(np.log10(max(abs(s21), 1e-12))) for s21 in s[:, 1, 0]]
 
@@ -160,7 +171,11 @@ def synthesize_for_coex_target(
         realized = {ref: info["snapped_value"] for ref, info in substitution.items()}
 
         harmonic_freqs = [n * f_center for n in orders_h]
-        rej = _rejection_db(realized, [f_center, *harmonic_freqs])
+        rej = _rejection_db(
+            realized,
+            [f_center, *harmonic_freqs],
+            substitution=substitution,
+        )
         rej_f0, rej_harm = rej[0], dict(zip(orders_h, rej[1:], strict=True))
 
         tx = {
@@ -176,7 +191,11 @@ def synthesize_for_coex_target(
         for v in victim_bands:
             v = dict(v)
             if v.get("victim_type") == "gnss" and "filter_rejection_db" not in v:
-                v["filter_rejection_db"] = _rejection_db(realized, [v["f_center_hz"]])[0]
+                v["filter_rejection_db"] = _rejection_db(
+                    realized,
+                    [v["f_center_hz"]],
+                    substitution=substitution,
+                )[0]
             rx_list.append(v)
 
         matrix = check_coex_matrix([tx], rx_list, antenna_iso_db=antenna_iso_db)["matrix"]
@@ -204,6 +223,12 @@ def synthesize_for_coex_target(
             "components": realized,
             "ideal_components": components,
             "substitution": substitution,
+            "evaluation_mode": "approximate_model",
+            "model_fidelity": "first_order_parasitic_reduction",
+            "model_checksums": {
+                refdes: selected["model"]["checksum_sha256"]
+                for refdes, selected in substitution.items()
+            },
             "zeros_plan": plan,
             "coex_matrix": matrix,
             "iterations": iterations,

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,11 +12,23 @@ from typing import Any
 import numpy as np
 from joblib import Parallel, delayed
 
-from mcp_ltspice.eval import FilterSpec
-from mcp_ltspice.extract import (
-    components_dict_to_elements,
-    ladder_sparams_from_components,
+from mcp_ltspice.analysis_context import (
+    EvaluationMode,
+    FilterAnalysisContext,
+    FilterKind,
+    build_spec_frequency_grid,
+    evaluate_component_margins,
 )
+from mcp_ltspice.eval import FilterSpec
+from mcp_ltspice.resource_budget import (
+    MAX_COMPONENTS,
+    MAX_CONCURRENCY,
+    MAX_FREQUENCY_POINTS,
+    MAX_MONTE_CARLO_RUNS,
+    require_work_budget,
+)
+from mcp_ltspice.synthesis import Topology
+from rf_mcp_common.simulation_workspace import ProcessCancelledError, SimulationWorkspace
 
 
 @dataclass
@@ -24,7 +38,11 @@ class MonteCarloResult:
     yield_pct: float
     per_metric_stats: dict[str, dict[str, float]]
     failing_criteria_counts: dict[str, int]
+    analysis_context: dict[str, Any]
+    estimated_work_units: int
+    effective_n_jobs: int
     trace_path: str | None = None  # set when trace=True; JSONL file with per-trial records
+    trace_manifest: str | None = None
 
 
 def _single_run(
@@ -32,9 +50,8 @@ def _single_run(
     components: dict[str, float],
     tolerance_pct: dict[str, float] | float,
     spec: FilterSpec,
-    transmission_zeros: bool | None,
+    context: FilterAnalysisContext,
     f_grid: np.ndarray,
-    z0: float,
 ) -> dict[str, Any]:
     rng = np.random.default_rng(seed)
     sampled = {}
@@ -44,34 +61,20 @@ def _single_run(
         sigma = nominal * (tol / 100.0) / 3.0
         sampled[refdes] = max(rng.normal(nominal, sigma), nominal * 0.01)
 
-    elements = components_dict_to_elements(
-        sampled, transmission_zeros=transmission_zeros, topology="series_first"
+    evaluation = evaluate_component_margins(
+        sampled,
+        spec,
+        context=context,
+        f_grid=f_grid,
     )
-    s = ladder_sparams_from_components(elements, f_grid, z0=z0)
-    s21_db = 20 * np.log10(np.maximum(np.abs(s[:, 1, 0]), 1e-12))
-    s11_db = 20 * np.log10(np.maximum(np.abs(s[:, 0, 0]), 1e-12))
-
     metrics: dict[str, float] = {}
     failures: list[str] = []
 
-    pb = spec.passband
-    pb_mask = (f_grid >= pb.f_start) & (f_grid <= pb.f_stop)
-    if pb_mask.any():
-        worst_il = float(-s21_db[pb_mask].min())
-        worst_rl = float(-s11_db[pb_mask].max())
-        metrics["passband_il_db"] = worst_il
-        metrics["passband_rl_db"] = worst_rl
-        if worst_il > pb.il_max_db:
-            failures.append("Passband IL")
-        if worst_rl < pb.rl_min_db:
-            failures.append("Passband RL")
-
-    for tgt in spec.stopband_targets:
-        s21_at = float(np.interp(tgt.freq, f_grid, s21_db))
-        rejection = -s21_at
-        metrics[f"rejection@{tgt.label}"] = rejection
-        if rejection < tgt.rejection_min_db:
-            failures.append(tgt.label)
+    metrics["passband_il_db"] = evaluation.measured["Passband IL"]
+    metrics["passband_rl_db"] = evaluation.measured["Passband RL"]
+    for target in spec.stopband_targets:
+        metrics[f"rejection@{target.label}"] = evaluation.measured[target.label]
+    failures.extend(label for label, margin in evaluation.margins.items() if margin < 0)
 
     return {
         "passed": len(failures) == 0,
@@ -89,11 +92,20 @@ def monte_carlo_analysis(
     n_runs: int = 1000,
     z0: float = 50.0,
     transmission_zeros: bool | None = None,
+    kind: FilterKind | str = "lowpass",
+    topology: Topology | str = Topology.SERIES_FIRST,
+    evaluation_mode: EvaluationMode = "analytical",
+    model_fidelity: str = "ideal_lumped",
+    provenance: dict[str, Any] | None = None,
+    component_substitution: dict[str, dict[str, Any]] | None = None,
+    transmission_zeros_hz: list[float] | None = None,
     f_grid_npoints: int = 401,
-    n_jobs: int = -1,
+    n_jobs: int = 1,
     base_seed: int = 0,
     trace: bool = False,
     trace_path: str | Path | None = None,
+    cancel_requested: Callable[[], bool] | None = None,
+    progress: Callable[[int, int], None] | None = None,
 ) -> MonteCarloResult:
     """Sample components with Gaussian tolerance and report yield + per-metric stats.
 
@@ -111,38 +123,123 @@ def monte_carlo_analysis(
     """
     if isinstance(spec, dict):
         spec = FilterSpec.model_validate(spec)
-
-    pb = spec.passband
-    span = max(
-        pb.f_stop * 5, max((t.freq for t in spec.stopband_targets), default=pb.f_stop * 5) * 1.5
+    if n_runs <= 0:
+        raise ValueError(f"n_runs must be > 0, got {n_runs}")
+    if not components or len(components) > MAX_COMPONENTS:
+        raise ValueError(f"components must contain between 1 and {MAX_COMPONENTS} entries")
+    if n_runs > MAX_MONTE_CARLO_RUNS:
+        raise ValueError("n_runs exceeds the safe per-call limit of 10,000")
+    if n_jobs == 0 or n_jobs < -1 or n_jobs > MAX_CONCURRENCY:
+        raise ValueError("n_jobs must be -1 or an integer in [1, 8]")
+    if not 8 <= f_grid_npoints <= MAX_FREQUENCY_POINTS:
+        raise ValueError("f_grid_npoints exceeds the safe limit of 10,000")
+    estimated_work_units = require_work_budget(
+        evaluations=n_runs,
+        frequency_points=f_grid_npoints,
+        label="Monte Carlo",
     )
-    f_grid = np.geomspace(max(pb.f_start, 1e3), span, f_grid_npoints)
+    effective_n_jobs = min(os.cpu_count() or 1, MAX_CONCURRENCY) if n_jobs == -1 else n_jobs
+    context = FilterAnalysisContext.create(
+        kind=kind,
+        topology=topology,
+        z0=z0,
+        transmission_zeros=transmission_zeros,
+        evaluation_mode=evaluation_mode,
+        model_fidelity=model_fidelity,
+        provenance=provenance,
+        component_substitution=component_substitution,
+    )
 
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(_single_run)(
-            base_seed + i,
-            components,
-            tolerance_pct,
-            spec,
-            transmission_zeros,
-            f_grid,
-            z0,
+    f_grid = build_spec_frequency_grid(
+        spec,
+        npoints=f_grid_npoints,
+        transmission_zeros_hz=transmission_zeros_hz or (),
+    )
+
+    trace_path_str: str | None = None
+    trace_target: Path | None = None
+    trace_staging: Path | None = None
+    trace_handle = None
+    trace_workspace: SimulationWorkspace | None = None
+    if trace:
+        estimated_trace_bytes = n_runs * (
+            256 + 64 * len(components) + 64 * (2 + len(spec.stopband_targets))
         )
-        for i in range(n_runs)
-    )
+        if estimated_trace_bytes > 64 * 1024 * 1024:
+            raise ValueError(
+                f"estimated Monte Carlo trace size {estimated_trace_bytes:,} bytes "
+                "exceeds the 64 MiB artifact limit"
+            )
+        if trace_path is None:
+            trace_workspace = SimulationWorkspace.create("monte-carlo")
+            trace_target = trace_workspace.output_path(f"mc_trace_{base_seed}.jsonl")
+        else:
+            trace_target = Path(trace_path).resolve()
+        trace_target.parent.mkdir(parents=True, exist_ok=True)
+        trace_staging = trace_target.with_name(f".{trace_target.name}.{base_seed}.tmp")
+        trace_handle = trace_staging.open("w", encoding="utf-8")
 
-    n_pass = sum(1 for r in results if r["passed"])
+    n_pass = 0
     fail_counts: dict[str, int] = {}
-    for r in results:
-        for f in r["failures"]:
-            fail_counts[f] = fail_counts.get(f, 0) + 1
+    metric_values: dict[str, list[float]] = {}
+    try:
+        batch_size = min(256, n_runs)
+        for batch_start in range(0, n_runs, batch_size):
+            if cancel_requested is not None and cancel_requested():
+                raise ProcessCancelledError("Monte Carlo analysis was cancelled")
+            batch_stop = min(batch_start + batch_size, n_runs)
+            batch = Parallel(n_jobs=effective_n_jobs)(
+                delayed(_single_run)(
+                    base_seed + i,
+                    components,
+                    tolerance_pct,
+                    spec,
+                    context,
+                    f_grid,
+                )
+                for i in range(batch_start, batch_stop)
+            )
+            for i, result in zip(range(batch_start, batch_stop), batch, strict=True):
+                n_pass += int(result["passed"])
+                for failure in result["failures"]:
+                    fail_counts[failure] = fail_counts.get(failure, 0) + 1
+                for key, value in result["metrics"].items():
+                    metric_values.setdefault(key, []).append(float(value))
+                if trace_handle is not None:
+                    trace_handle.write(
+                        json.dumps(
+                            {
+                                "trial": i,
+                                "seed": base_seed + i,
+                                "passed": result["passed"],
+                                "failures": result["failures"],
+                                "components": result["components"],
+                                "metrics": result["metrics"],
+                                "analysis_context": context.as_dict(),
+                            }
+                        )
+                        + "\n"
+                    )
+            if progress is not None:
+                progress(batch_stop, n_runs)
+        if trace_handle is not None and trace_target is not None and trace_staging is not None:
+            trace_handle.close()
+            trace_handle = None
+            os.replace(trace_staging, trace_target)
+            trace_path_str = str(trace_target)
+            if trace_workspace is not None:
+                trace_workspace.record_artifact(trace_target, role="monte_carlo_trace")
+                trace_workspace.complete(returncode=0)
+    finally:
+        if trace_handle is not None:
+            trace_handle.close()
+        if trace_staging is not None and trace_staging.exists():
+            trace_staging.unlink()
 
-    # Per-metric stats
-    metric_keys = list(results[0]["metrics"].keys())
     stats: dict[str, dict[str, float]] = {}
-    for k in metric_keys:
-        values = np.asarray([r["metrics"][k] for r in results])
-        stats[k] = {
+    for key, samples in metric_values.items():
+        values = np.asarray(samples)
+        stats[key] = {
             "mean": float(np.mean(values)),
             "std": float(np.std(values)),
             "p05": float(np.percentile(values, 5)),
@@ -150,30 +247,17 @@ def monte_carlo_analysis(
             "p95": float(np.percentile(values, 95)),
         }
 
-    trace_path_str: str | None = None
-    if trace:
-        if trace_path is None:
-            trace_path = Path(f"mc_trace_{base_seed}.jsonl")
-        trace_path = Path(trace_path)
-        trace_path.parent.mkdir(parents=True, exist_ok=True)
-        with trace_path.open("w", encoding="utf-8") as fh:
-            for i, r in enumerate(results):
-                rec = {
-                    "trial": i,
-                    "seed": base_seed + i,
-                    "passed": r["passed"],
-                    "failures": r["failures"],
-                    "components": r["components"],
-                    "metrics": r["metrics"],
-                }
-                fh.write(json.dumps(rec) + "\n")
-        trace_path_str = str(trace_path.resolve())
-
     return MonteCarloResult(
         n_runs=n_runs,
         n_passing=n_pass,
         yield_pct=100.0 * n_pass / n_runs,
         per_metric_stats=stats,
         failing_criteria_counts=fail_counts,
+        analysis_context=context.as_dict(),
+        estimated_work_units=estimated_work_units,
+        effective_n_jobs=effective_n_jobs,
         trace_path=trace_path_str,
+        trace_manifest=(
+            str(trace_workspace.manifest_path) if trace_workspace is not None else None
+        ),
     )

@@ -17,8 +17,8 @@ uv sync --all-packages
 uv run pytest -q
 ```
 
-You should see ~180 tests pass. The two simulator-integration tests
-skip until you install ngspice or LTspice (below).
+Simulator-specific tests skip until their LTspice, ngspice, Qucs-S, or
+Xyce backend is installed.
 
 If you don't want the dev tools (ruff / mypy / pytest / mkdocs), pass
 `--no-dev` to `uv sync`.
@@ -119,8 +119,9 @@ runner therefore treats the presence of the `.raw` output as the success
 condition, not the return code; a nonzero code is logged as a warning
 and reported in the envelope's `returncode` field. Any stale `.raw` is
 deleted before each run, so a leftover file from a previous invocation
-can't be mistaken for a fresh result. The same policy applies to ngspice
-and matches `mcp-qucs-s`, which has always keyed on artifact presence.
+can't be mistaken for a fresh result. ngspice, Qucsator, and Xyce require
+a zero exit and a fresh, non-empty, parseable output artifact; Qucsator
+and Xyce runs also use isolated per-run workspaces and manifests.
 
 If you see `did not produce <file>.raw`, that is a genuine failure — the
 error carries the exact command, the return code, and the path to the

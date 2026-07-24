@@ -82,6 +82,32 @@ def test_render_asc_round_trip(tmp_path) -> None:
         assert name in text
 
 
+def test_generated_ladder_renderer_rejects_arbitrary_schematic(tmp_path) -> None:
+    asc = tmp_path / "arbitrary.asc"
+    asc.write_text(
+        "Version 4\n"
+        "SHEET 1 880 680\n"
+        "SYMBOL opamps\\UniversalOpamp2 100 100 R0\n"
+        "SYMATTR InstName U1\n"
+        "TEXT 100 200 Left 2 !.tran 1m\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="incomplete-render"):
+        render_asc_as_schematic(asc, tmp_path / "wrong.svg")
+
+
+def test_generated_ladder_renderer_rejects_unpreserved_directive(tmp_path) -> None:
+    from mcp_ltspice.asc_io import generate_lpf_asc
+
+    asc = generate_lpf_asc(BUTTER, tmp_path / "lpf.asc")
+    asc.write_text(
+        asc.read_text(encoding="utf-8") + "TEXT 0 0 Left 2 !.tran 1m\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="non-AC directives"):
+        render_asc_as_schematic(asc, tmp_path / "wrong.svg")
+
+
 def test_server_tools_ok_and_error(tmp_path) -> None:
     from mcp_ltspice import server
 

@@ -10,6 +10,7 @@ sensitivity / root-cause analysis script to find the culprit.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -104,8 +105,8 @@ class TestMcTrace:
         for rec in records:
             assert set(rec["components"].keys()) == set(LPF.components.keys())
 
-    def test_default_path_used_when_omitted(self, tmp_path, monkeypatch):
-        """If trace=True but no path given, defaults to mc_trace_<seed>.jsonl in cwd."""
+    def test_default_path_uses_isolated_workspace(self, tmp_path, monkeypatch):
+        """Omitted trace paths use a server-owned workspace, not the caller's cwd."""
         monkeypatch.chdir(tmp_path)
         result = monte_carlo_analysis(
             LPF.components,
@@ -116,9 +117,11 @@ class TestMcTrace:
             base_seed=99,
             trace=True,
         )
-        expected = tmp_path / "mc_trace_99.jsonl"
-        assert expected.is_file()
-        assert result.trace_path == str(expected.resolve())
+        assert not (tmp_path / "mc_trace_99.jsonl").exists()
+        assert result.trace_path is not None
+        assert Path(result.trace_path).is_file()
+        assert result.trace_manifest is not None
+        assert Path(result.trace_manifest).is_file()
 
     def test_failing_trials_carry_failures_list(self, tmp_path):
         """If we set a tight tolerance to force some failures, the trace records
@@ -142,3 +145,22 @@ class TestMcTrace:
             assert all(len(r["failures"]) >= 1 for r in failing)
         # Sanity: declared yield matches the trace
         assert result.yield_pct == pytest.approx(100.0 * len(passing) / 200, rel=1e-6)
+
+    def test_combined_work_budget_is_rejected(self):
+        with pytest.raises(ValueError, match="estimated cost"):
+            monte_carlo_analysis(
+                LPF.components,
+                SPEC,
+                n_runs=10_000,
+                f_grid_npoints=10_000,
+            )
+
+    def test_all_cores_request_is_capped(self, monkeypatch):
+        monkeypatch.setattr("mcp_ltspice.montecarlo.os.cpu_count", lambda: 64)
+        result = monte_carlo_analysis(
+            LPF.components,
+            SPEC,
+            n_runs=2,
+            n_jobs=-1,
+        )
+        assert result.effective_n_jobs == 8

@@ -18,7 +18,7 @@ antenna port and at the schematic-to-layout boundary.
 
 ```
         ┌───────────────────────────────────────────────┐
-        │   AI agent (Claude Code / Desktop)            │
+        │   MCP client (Codex, Claude, IDE, etc.)       │
         └──────┬──────────────┬───────────────┬─────────┘
                │              │ via MCP       │
        ┌───────▼──────────┐  ┌▼──────────┐  ┌─▼─────────────────┐
@@ -35,12 +35,13 @@ antenna port and at the schematic-to-layout boundary.
 
 ### Feeds (this MCP produces output that)…
 
-- **mcp-pcb-emcopilot** — finalized filter schematic + Touchstone
-  `.s2p` for layout-aware insertion-loss budgeting.
+- **mcp-pcb-emcopilot** — candidate filter schematic + Touchstone
+  `.s2p` for layout-aware insertion-loss budgeting and review.
 - **mcp-emc-regulations** — predicted conducted-emission spectrum from
   SMPS designs for margin-check against CISPR 22 / CISPR 32.
-- **mcp-rf-analysis** (internal) — every `mcp-ltspice` filter result is
-  consumable by the cascade / de-embed tools without re-touching disk.
+- **mcp-rf-analysis** (internal) — Touchstone output from `mcp-ltspice`
+  is consumable by cascade / de-embed tools through the shared file
+  contract.
 
 ### Consumes (this MCP accepts input from)…
 
@@ -66,11 +67,18 @@ for full bundle definitions.
 
 - **Three servers, one workspace.** `mcp-ltspice`, `mcp-qucs-s`, and
   `mcp-rf-analysis` share `rf-mcp-common` for the `Envelope[T]`
-  response model and Touchstone I/O. This lets an agent compose
-  cross-server calls without serialization gymnastics.
-- **Touchstone as the wire format.** Every solver consumes and
-  produces Touchstone (Hz-strict). This is the same format the rest
-  of eng-mcp-suite expects, so cross-MCP composition is free.
-- **External simulators, not embedded.** LTspice and Qucs-S are
-  invoked as subprocesses. Keeps licensing clean and lets users
-  point at their existing install.
+  response model, versioned `CircuitDocument`, backend/result contracts,
+  optimization contracts, and Touchstone I/O. This lets an agent compose
+  cross-server calls without reconstructing topology.
+- **Circuit IR before backend syntax.** Supported LTspice ASC, SPICE, Qucs
+  schematic, and Qucsator netlist inputs become an explicit pin-to-net graph.
+  Unsupported constructs are blocking diagnostics, never guessed topology.
+- **Model-aware optimization.** Component selection attaches immutable model
+  identities to the IR. Final simulator validation and yield runs must attest
+  the exact selected hashes before the result can be labelled validated.
+- **Touchstone as the simulation exchange format.** Tools that exchange
+  frequency-domain network data use Hz-strict Touchstone. Synthesis,
+  catalog, EMC, and device-query tools return structured envelopes instead.
+- **External simulators, not embedded.** LTspice/ngspice, qucsator-RF,
+  and Xyce are invoked as subprocesses. This keeps licensing boundaries
+  clear and lets users point at existing installations.

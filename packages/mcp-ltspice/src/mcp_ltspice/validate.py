@@ -21,6 +21,7 @@ divergence that matters is judged against the appropriate threshold for each.
 
 from __future__ import annotations
 
+import tempfile
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -30,9 +31,11 @@ import numpy as np
 import skrf as rf
 from numpy.typing import NDArray
 
+from mcp_ltspice.asc_io import generate_port2_excitation_asc
 from mcp_ltspice.extract import (
     components_dict_to_elements,
     extract_sparams_from_raw,
+    extract_two_sweep_sparams,
     ladder_sparams_from_components,
 )
 from mcp_ltspice.runner import Simulator, detect_simulator, run_simulation
@@ -61,6 +64,15 @@ class ValidationResult:
     flagged_regions: list[dict[str, float]] = field(default_factory=list)
     simulator: str | None = None
     note: str | None = None
+    raw_path: Path | None = None
+    """Port-1 raw output from the successful run, if any.
+
+    ``spice_network`` mirrors that single sweep's S11/S21 into S22/S12 (see
+    :func:`mcp_ltspice.extract.extract_sparams_from_raw`) and must never be
+    published as a general two-port measurement. Use ``raw_path`` with
+    :func:`build_two_sweep_spice_network` to run the missing port-2
+    excitation and recover an honest matrix instead.
+    """
 
 
 def _phase_deg(s: NDArray[np.complex128]) -> NDArray[np.float64]:
@@ -168,7 +180,12 @@ def validate_against_spice(
             note=f"SPICE run failed ({e}); returning the analytical response only.",
         )
 
-    spice = extract_sparams_from_raw(run.raw_path, port_map=port_map, z0=z0)
+    spice = extract_sparams_from_raw(
+        run.raw_path,
+        port_map=port_map,
+        z0=z0,
+        assume_reciprocal_symmetric=True,
+    )
     freq = np.asarray(spice.f, dtype=np.float64)
     analytical = analytical_network(components, freq, topology=topology, kind=kind, z0=z0)
 
@@ -214,6 +231,41 @@ def validate_against_spice(
         max_delta_stopband_db=max_stop,
         flagged_regions=flagged,
         simulator=run.simulator.value,
+        raw_path=run.raw_path,
+    )
+
+
+def build_two_sweep_spice_network(
+    asc_path: str | Path,
+    result: ValidationResult,
+    *,
+    z0: float = 50.0,
+    port_map: dict[int, str] | None = None,
+    timeout_sec: float = 120.0,
+) -> tuple[rf.Network, dict[str, Any]]:
+    """Run the missing port-2 excitation and merge an honest two-port matrix.
+
+    ``result`` must come from a successful :func:`validate_against_spice` call
+    (``result.raw_path`` and ``result.simulator`` set). ``result.spice_network``
+    mirrors the single port-1 sweep's S11/S21 into S22/S12, which is only
+    valid for a reciprocal, symmetric network; it must never be published as
+    a general two-port measurement. This reruns the missing port-2 excitation
+    on ``asc_path`` instead of fabricating it, matching the two-sweep path
+    used by the public ``extract_sparameters`` tool.
+    """
+    if result.raw_path is None or result.simulator is None:
+        raise ValueError(
+            "No successful SPICE run on ValidationResult to build a two-port network from"
+        )
+    port_map = port_map or {1: "p1", 2: "p2"}
+    workdir = Path(tempfile.mkdtemp(prefix="mcp-ltspice-validate-two-port-"))
+    port2_asc = generate_port2_excitation_asc(asc_path, workdir / "port2.asc", z0=z0)
+    second = run_simulation(port2_asc, prefer=Simulator(result.simulator), timeout=timeout_sec)
+    return extract_two_sweep_sparams(
+        result.raw_path,
+        second.raw_path,
+        port_map=port_map,
+        z0=z0,
     )
 
 

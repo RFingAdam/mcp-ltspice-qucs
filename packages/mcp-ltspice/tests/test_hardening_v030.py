@@ -200,17 +200,20 @@ def test_extract_sparams_from_raw_fills_full_matrix(monkeypatch, tmp_path):
         "V(p2)": v_p2,
         "I(Rs1)": i_rs1,
     }
-    monkeypatch.setattr(extract_mod, "RawRead", lambda path: _MockRawRead(traces), raising=False)
-    # spicelib import inside extract_sparams_from_raw — patch sys.modules
-    import sys
-    import types
-
-    fake_spicelib = types.SimpleNamespace(RawRead=lambda path: _MockRawRead(traces))
-    monkeypatch.setitem(sys.modules, "spicelib", fake_spicelib)
+    monkeypatch.setattr(
+        extract_mod,
+        "_open_raw",
+        lambda path, dialect=None: _MockRawRead(traces),
+    )
 
     raw_path = tmp_path / "test.raw"
     raw_path.touch()
-    net = extract_mod.extract_sparams_from_raw(raw_path, port_map={1: "p1", 2: "p2"}, z0=z0)
+    net = extract_mod.extract_sparams_from_raw(
+        raw_path,
+        port_map={1: "p1", 2: "p2"},
+        z0=z0,
+        assume_reciprocal_symmetric=True,
+    )
     s = net.s
 
     # Column 1 (from the actual sim)
@@ -221,7 +224,7 @@ def test_extract_sparams_from_raw_fills_full_matrix(monkeypatch, tmp_path):
     assert np.allclose(s[:, 1, 1], s[:, 0, 0]), "S22 must equal S11 by symmetry"
 
 
-def test_extract_sparams_from_raw_skips_symmetry_when_disabled(monkeypatch, tmp_path):
+def test_extract_sparams_from_raw_rejects_missing_second_sweep(monkeypatch, tmp_path):
     from mcp_ltspice import extract as extract_mod
 
     n = 3
@@ -240,12 +243,10 @@ def test_extract_sparams_from_raw_skips_symmetry_when_disabled(monkeypatch, tmp_
 
     raw_path = tmp_path / "test.raw"
     raw_path.touch()
-    net = extract_mod.extract_sparams_from_raw(
-        raw_path,
-        port_map={1: "p1", 2: "p2"},
-        z0=z0,
-        assume_reciprocal_symmetric=False,
-    )
-    # Column 2 left as zero when reciprocity / symmetry isn't assumed
-    assert np.all(net.s[:, 0, 1] == 0)
-    assert np.all(net.s[:, 1, 1] == 0)
+    with pytest.raises(ValueError, match="single sweep cannot produce"):
+        extract_mod.extract_sparams_from_raw(
+            raw_path,
+            port_map={1: "p1", 2: "p2"},
+            z0=z0,
+            assume_reciprocal_symmetric=False,
+        )

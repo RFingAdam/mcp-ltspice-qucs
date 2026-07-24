@@ -51,11 +51,25 @@ def check_passband_compliance(
 ) -> dict[str, Any]:
     """Check passband insertion loss + return loss across [f_start, f_stop]."""
     net = read_touchstone(s2p_path)
-    mask = (net.f >= f_start) & (net.f <= f_stop)
-    if not mask.any():
+    if f_stop <= f_start:
+        raise ValueError("f_stop must be greater than f_start")
+    frequency = np.asarray(net.f, dtype=float)
+    if f_start < frequency[0] or f_stop > frequency[-1]:
         return {"status": "out_of_sweep"}
-    s21_db = 20 * np.log10(np.maximum(np.abs(net.s[mask, 1, 0]), 1e-12))
-    s11_db = 20 * np.log10(np.maximum(np.abs(net.s[mask, 0, 0]), 1e-12))
+    interior = frequency[(frequency > f_start) & (frequency < f_stop)]
+    evaluation_frequency = np.unique(np.concatenate(([f_start], interior, [f_stop])))
+
+    def interpolate(values: np.ndarray) -> np.ndarray:
+        return np.asarray(
+            np.interp(evaluation_frequency, frequency, values.real)
+            + 1j * np.interp(evaluation_frequency, frequency, values.imag),
+            dtype=np.complex128,
+        )
+
+    s21 = interpolate(np.asarray(net.s[:, 1, 0]))
+    s11 = interpolate(np.asarray(net.s[:, 0, 0]))
+    s21_db = 20 * np.log10(np.maximum(np.abs(s21), 1e-12))
+    s11_db = 20 * np.log10(np.maximum(np.abs(s11), 1e-12))
     worst_il = float(-s21_db.min())
     worst_rl = float(-s11_db.max())
     return {
@@ -67,6 +81,8 @@ def check_passband_compliance(
         "measured_worst_rl_db": worst_rl,
         "il_margin_db": il_max_db - worst_il,
         "rl_margin_db": worst_rl - rl_min_db,
+        "evaluation_frequency_hz": evaluation_frequency.tolist(),
+        "method": "complex_linear_interpolation_with_exact_band_edges",
         "status": ("pass" if worst_il <= il_max_db and worst_rl >= rl_min_db else "fail"),
     }
 

@@ -1,0 +1,1205 @@
+{
+  "schema_version": 1,
+  "servers": {
+    "mcp-ltspice": [
+      {
+        "canonical_name": "cascaded_lpf_design",
+        "deprecated": true,
+        "name": "analog.cascaded_lpf",
+        "sha256": "d24cf2aa38795658d5634cc8458680387cb04cb0c85fbf5401387283c8e472e4"
+      },
+      {
+        "canonical_name": "mfb_band_pass",
+        "deprecated": true,
+        "name": "analog.mfb_bpf",
+        "sha256": "566c711880a1c718a4533d1f055075921937de75c65f1815fab37ded473ef801"
+      },
+      {
+        "canonical_name": "mfb_low_pass",
+        "deprecated": true,
+        "name": "analog.mfb_lpf",
+        "sha256": "476cef4a45432cc36aa0debc4a2e23eaa063a408b1d5f5c3a0704f25cae6f2cd"
+      },
+      {
+        "canonical_name": "sallen_key_band_pass",
+        "deprecated": true,
+        "name": "analog.sallen_key_bpf",
+        "sha256": "f9a115e373d9df79ebb948ea2f4ba9a046f0be0860e01cb654499bf1a0937ca5"
+      },
+      {
+        "canonical_name": "sallen_key_high_pass",
+        "deprecated": true,
+        "name": "analog.sallen_key_hpf",
+        "sha256": "55a49df0d65124da88c6d835b4ed8a292e1886fb0085b01936b4fc6d0d1c1437"
+      },
+      {
+        "canonical_name": "sallen_key_low_pass",
+        "deprecated": true,
+        "name": "analog.sallen_key_lpf",
+        "sha256": "e306ade1f46f3e617e5ca6f6322c6369553a21cf07e334bf9734bde1a48db019"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "analysis_submit",
+        "sha256": "887740af871a9fbd1d1a825af1ac2e8d880b68f37d5805dcebfbd77b7c42e3e4"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "analyze_ldo",
+        "sha256": "fef76cf6d6bcf162bdcdf1c0bbd2718bdbf6278b61f51ca30d5f12088de7091b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "artifact_import",
+        "sha256": "f68e700d5194c86ec8abe20ed8d9efea85f064a2edc60e0f6d1f16ff42686957"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "artifact_read",
+        "sha256": "60e6c25cff9a0010a39e18fe90690b338dbba7eb6df7fe135842ea1ed4444ffc"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "build_design_report_pdf",
+        "sha256": "5ab48b6c7f46a53756344f300f448c22092958d076f2f76b2c01847dd68b3c4a"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "cascaded_lpf_design",
+        "sha256": "18d58d3bcd17a8def2ba729a4338ed7834342a99457f94cc0bbb119d13fbb8ef"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "check_setup_hold",
+        "sha256": "485c4e9899c520936ab1ef54f14ba729a99d1a45a80dc1ac14316f204d418617"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_attach_models",
+        "sha256": "4fb879e1b45ce16941dfee7ad166a65e91593106e12ac34c19dea13c578b52c5"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_export",
+        "sha256": "e4c49b038751b1488ad1bc32d80315bc4c4953084a555d35b3b1334bfd448ab8"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_optimize_submit",
+        "sha256": "40e60a27b1ff14102a7afeeea783b621e7514f597fb4da94897bccbea459bd1f"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_parse",
+        "sha256": "dce2a501028333bf971f4f4c6af2c805b3a98c553538f1dad66688635497d04e"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_validate",
+        "sha256": "10123671ef65f41974cff9e34f5d712e749a3e4dfa574ad58629baa21d05ad9d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compare_filter_orders",
+        "sha256": "4b880327335ad3ba1a5dfad16e8c77e5b1198439aa143327747d94b17f477dfa"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compute_phase_margin",
+        "sha256": "3439904c8f7d6c6a142f01408925adb36e76b854a7aa9d88247be4aeb6c4a4aa"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "corner_analysis",
+        "sha256": "3799dfc992f9a1507709640773faa4b80d9ea54c2276ef5faa6cf620437fa747"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "design_boost",
+        "sha256": "4d65ca310007eb2a201e26832abda275d3d39d785572b45296bee9b8cd421741"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "design_buck",
+        "sha256": "d0cb18aa09b85cc18f535f7e85566dca2f46406cc051f58e8f3bf43b8ae36e4c"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "design_cm_choke",
+        "sha256": "14da9cb4946a1bd376ae02ad476c1168edfdf16dcca88e1cb47101930c4e39db"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "design_dm_input_filter",
+        "sha256": "600267b26e98ad767745290d1c2e708b61f679fdedf1cbf0954dbac5f35b762e"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "design_pi_output_filter",
+        "sha256": "2b38faa5d6e3ed2efe97d0dcc3d2b403b1be5c0e746b5cc312ab8462a724585b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "design_rc_snubber",
+        "sha256": "56199ae69e46bef3ea8e946b6c9b0e93570410cb1c9c5ddcce0d2394a252ed02"
+      },
+      {
+        "canonical_name": "check_setup_hold",
+        "deprecated": true,
+        "name": "digital.check_setup_hold",
+        "sha256": "559926e1729220e03673400d6b6589c0104ab59befaae42f37c5eaa6de189f67"
+      },
+      {
+        "canonical_name": "estimate_digital_to_analog_crosstalk",
+        "deprecated": true,
+        "name": "digital.digital_to_analog_xtalk",
+        "sha256": "805cdf5c19c9d2ea16d5bd0a4a3dfc662619f558af4de1975931c1666ac6e3d8"
+      },
+      {
+        "canonical_name": "propagation_delay",
+        "deprecated": true,
+        "name": "digital.propagation_delay",
+        "sha256": "2543d1db0112625664c9f34647755f81ec6f5dfa2e5afa14d985bc6c29a5b925"
+      },
+      {
+        "canonical_name": "estimate_supply_noise_injection",
+        "deprecated": true,
+        "name": "digital.supply_noise_injection",
+        "sha256": "070c76d27f18db9de38241bda8a99cde6f2dfd7ce3620d69eb9eac01d16a0fe8"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "estimate_digital_to_analog_crosstalk",
+        "sha256": "565d940768fc6cb6f79fddc74d4b11a6a1aa9cb2d11f23fc464cbd861f3c0bdc"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "estimate_supply_noise_injection",
+        "sha256": "b56d1f03b39c4a5f34b54221a33b1ced3bb7258484c9c7d12671581b6a2c31a6"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "evaluate_filter_spec",
+        "sha256": "f5f16f3812ca623d4d8700c4804501dccd62389d2b17844b9dc8caa285f9bc0b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "extract_sparameters",
+        "sha256": "5ac59a11aea265779c9448d7bd0ee61865ddb6b65c48f8fe0161190387c1aec0"
+      },
+      {
+        "canonical_name": "build_design_report_pdf",
+        "deprecated": true,
+        "name": "filter.build_report_pdf",
+        "sha256": "b6fb3ce396d84e14c44053f363b1e182337cb240cde8803a5f8502dc7eb2b3aa"
+      },
+      {
+        "canonical_name": "compare_filter_orders",
+        "deprecated": true,
+        "name": "filter.compare_orders",
+        "sha256": "c9dcbacb0d7ff00084dd3f0ec426fbdf11b4cd8e2987fb146fc864be95d1e7b3"
+      },
+      {
+        "canonical_name": "corner_analysis",
+        "deprecated": true,
+        "name": "filter.corner_analysis",
+        "sha256": "06f2dcacde9ee1dc6aa8b298c05c0b9b92c445fedb794a3583806f7be806426d"
+      },
+      {
+        "canonical_name": "evaluate_filter_spec",
+        "deprecated": true,
+        "name": "filter.evaluate_spec",
+        "sha256": "568eaaf4e6117fe6b055f9fe03e7caad25ad87b5a37e0d224aad71e07489125f"
+      },
+      {
+        "canonical_name": "find_transmission_zeros",
+        "deprecated": true,
+        "name": "filter.find_transmission_zeros",
+        "sha256": "543e9e242b1c1dda9f5ffa650e499fc2a8509d14b07e56fce595831bd4468ed1"
+      },
+      {
+        "canonical_name": "list_vendor_parts",
+        "deprecated": true,
+        "name": "filter.list_vendor_parts",
+        "sha256": "87bd43f3c81dc8c0ff04c31d3ae2e0ac402bbf12d3466b653d4c16795c74e0ea"
+      },
+      {
+        "canonical_name": "monte_carlo_analysis",
+        "deprecated": true,
+        "name": "filter.monte_carlo",
+        "sha256": "ebb3aadb94b5b27c206314ff5e69e7cfc02013d34860782f789fadebe233f865"
+      },
+      {
+        "canonical_name": "optimize_filter",
+        "deprecated": true,
+        "name": "filter.optimize",
+        "sha256": "4cfc90b4377ba540af78df1e6b6f6e52b8236bd91e6646b5e4c2825164f4a6a8"
+      },
+      {
+        "canonical_name": "parameter_sweep",
+        "deprecated": true,
+        "name": "filter.parameter_sweep",
+        "sha256": "ec3de1a4a1b15687c2673fce3c0db76b55cb05792a033fea622be7bdde26c471"
+      },
+      {
+        "canonical_name": "place_transmission_zero",
+        "deprecated": true,
+        "name": "filter.place_transmission_zero",
+        "sha256": "d08b9de4296eddf04d760d8be5e68b7dbcaf483b7ef468806b92bfcaa836fb26"
+      },
+      {
+        "canonical_name": "register_user_vendor_dir",
+        "deprecated": true,
+        "name": "filter.register_user_vendor_dir",
+        "sha256": "28dc30b6c8823d9d6cb37281aa6ac86fa0fd95d330d7fc61ba9fbb3dcdb18624"
+      },
+      {
+        "canonical_name": "render_lc_ladder_schematic",
+        "deprecated": true,
+        "name": "filter.render_lc_schematic",
+        "sha256": "e0cf9e19dad39deff7d87995dc34ac3bd433dc1bc9b06cba55d8045336e19dd2"
+      },
+      {
+        "canonical_name": "render_response",
+        "deprecated": true,
+        "name": "filter.render_response",
+        "sha256": "927973937cb835a6b9d5b01e66a7affea6a45695e8a07660fa2048d4f075c535"
+      },
+      {
+        "canonical_name": "render_generated_lc_ladder_asc",
+        "deprecated": true,
+        "name": "filter.render_schematic",
+        "sha256": "ce4e958e4f898a594fc2941e1576f1b23204b16de91268efb4f6132a98774152"
+      },
+      {
+        "canonical_name": "sensitivity_analysis",
+        "deprecated": true,
+        "name": "filter.sensitivity",
+        "sha256": "990785b5fc5867edcdcc5622b57cb974e66d7e804ebd1f50d03608c0210eea7f"
+      },
+      {
+        "canonical_name": "simulate_realized_filter",
+        "deprecated": true,
+        "name": "filter.simulate_realized",
+        "sha256": "f001c02ebdf8f147e9f0ebddd0782cc3ac46f4876b707108b6a94013ce0f4654"
+      },
+      {
+        "canonical_name": "srf_audit",
+        "deprecated": true,
+        "name": "filter.srf_audit",
+        "sha256": "935796ddb8744dbf4e94b6a129ba326de4eae9c73dbf535948db9b00937ed773"
+      },
+      {
+        "canonical_name": "stability_check",
+        "deprecated": true,
+        "name": "filter.stability_check",
+        "sha256": "1878251b8c12b34dd4cbd5468fa81b6af9c982f936557e3e14820573c66455dc"
+      },
+      {
+        "canonical_name": "substitute_real_components",
+        "deprecated": true,
+        "name": "filter.substitute_real_components",
+        "sha256": "110a433b834d82ca6a3f4694075491dbd0b12eb852dcc76effd9765638c31d4a"
+      },
+      {
+        "canonical_name": "synthesize_lc_filter",
+        "deprecated": true,
+        "name": "filter.synthesize_lc",
+        "sha256": "0602c90b8e3db86629071d40e3cde9db4a2acc9680e22e7065dde2453a6d2520"
+      },
+      {
+        "canonical_name": "synthesize_lc_bpf_filter",
+        "deprecated": true,
+        "name": "filter.synthesize_lc_bpf",
+        "sha256": "96ca24dbe11d8756ea264c31594937cfdd5f00f3a6b161cb32be4a26f3e97477"
+      },
+      {
+        "canonical_name": "synthesize_lc_bsf_filter",
+        "deprecated": true,
+        "name": "filter.synthesize_lc_bsf",
+        "sha256": "d2f048b63524871567d8424d8a602e7b42466d19de60ea22862dc6a8b96bc45d"
+      },
+      {
+        "canonical_name": "synthesize_lc_hpf_filter",
+        "deprecated": true,
+        "name": "filter.synthesize_lc_hpf",
+        "sha256": "bb0ff0a0bea7d9fcdbdbf273ed57b0b5f4525e0bdb44ed61b27821358e01b599"
+      },
+      {
+        "canonical_name": "validate_against_spice",
+        "deprecated": true,
+        "name": "filter.validate_against_spice",
+        "sha256": "6963536c04cc1ccf6547a4ca815c9a4c8f21843b6e639343cb50138e0235daab"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "find_mosfet_for_application",
+        "sha256": "95eac9723db9420b01726fdced7ef39f4e8b490601ca07e821da7ddc7b3e7123"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "find_opamp_for_application",
+        "sha256": "8464fd50d2fb02cc0f2787fe291e0b339981994108914bcfeaee6313392a89ef"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "find_transmission_zeros",
+        "sha256": "cd2b10194b2c2da55c888026270bff0467bfee597361f60b79b8d263d747cc97"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_cancel",
+        "sha256": "a4ff46163ad0ae41e8bad654735c05390a3c611ec99df662c2793480184fd7ac"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_get",
+        "sha256": "eda13397a42db502d19a409254cbea3d9f5a01c8a8048197fb14fdc55a6d6c4d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_list_artifacts",
+        "sha256": "bb637ae1ade63faf4cd5af03069cc2199542f5db2d4d83ec9167cc6b643c674a"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_retry",
+        "sha256": "1bbc6f894ed45180881ad37c71fb8b6cade405f3cb144a4fb158d6d1f9cb93d4"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_bjts",
+        "sha256": "af4cd03e37d355bd421413bf856ebee001fc639be0d40c7d95b3339b054b02b3"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_diodes",
+        "sha256": "68619794295a6c559ca005aa800060a56505ee83237e4dcce1ea3ac5e7b73db1"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_mosfets",
+        "sha256": "44feedd780e9d7df3ec4d5d519a29b8eb3f584aa92b635eec2712f134aa844f1"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_opamps",
+        "sha256": "1f8bedc3e980cd65327ee20e0fbf09055674e978887595374247a3698f9b6d99"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_references",
+        "sha256": "45cb991062714917c822bb1bc67bb716adeba5cf60caccb81dba36c959675e89"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_vendor_parts",
+        "sha256": "05bcfb3b3be720c0b2b9ac97adbd7d8b4e052578b617531eea09d8f8f52f090b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_bjt",
+        "sha256": "b785cbce65a54fbdfb5bae4bae8be866100df63649d904d7b0a78811e70ab9d9"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_diode",
+        "sha256": "889934a4c60b057e57bd89209ef1a672a9021ae43e78fc2ec0af5344887278a2"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_mosfet",
+        "sha256": "992da79f50a1338f91f123052dac3af2fd63170daf91611aa9ea2f6a1a638aba"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_opamp",
+        "sha256": "089ec4b6649f5e8339d869779324ca776c5b4486cd0674663b4e54b41a2fcfde"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_reference",
+        "sha256": "31228c964d013a33038ce12ee30c1bd9c07fd587493d8b1d2573076d7fa4c90d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "mfb_band_pass",
+        "sha256": "143439140cd8448a71e993a83a94af24c4954677185222f7bbe1b28802431144"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "mfb_low_pass",
+        "sha256": "0a1fd5007527b1ace570e4bcff58f92823dd9001a7bc749f1de8052e87f1f04a"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "monte_carlo_analysis",
+        "sha256": "0e1014a8431a80217d98f900f723cb86062fdee29917206fe2e5b3dc736b44a8"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "optimize_filter",
+        "sha256": "3d4133edb0e6e437819f34ba2f0108f421f3bf5fd6ea90334a2938e7a91c0750"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "parameter_sweep",
+        "sha256": "5f8d3306f6b01e02dc6bf5c8e9c9a65d79ec403b7494a1639bf9387961c9bc08"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "place_transmission_zero",
+        "sha256": "50aa214cb25e57a7ff5bd561eda9f518922df972b25fd18e7543083673d3d1a4"
+      },
+      {
+        "canonical_name": "analyze_ldo",
+        "deprecated": true,
+        "name": "power.analyze_ldo",
+        "sha256": "3bb614e860891d0dd60b31861f3a90685c9b733618b297bf316d1e89b722dc9c"
+      },
+      {
+        "canonical_name": "compute_phase_margin",
+        "deprecated": true,
+        "name": "power.compute_phase_margin",
+        "sha256": "40cedfc696684ca49f10ae88e662f02d705a350e0baac70eb4c76e69689e045b"
+      },
+      {
+        "canonical_name": "design_boost",
+        "deprecated": true,
+        "name": "power.design_boost",
+        "sha256": "80ca41d8f1e7255b2b83a6146c568bce282c8d0cfc7a13f34a8fc9232938250f"
+      },
+      {
+        "canonical_name": "design_buck",
+        "deprecated": true,
+        "name": "power.design_buck",
+        "sha256": "72522ea26e9097d6a5405940e725065398f4d0d43b5fdeae7725979b752911d0"
+      },
+      {
+        "canonical_name": "design_cm_choke",
+        "deprecated": true,
+        "name": "power.design_cm_choke",
+        "sha256": "aae791cc33e78c6e22de5cb8c4bc615dae523180e033acaa1b81115a61e6904d"
+      },
+      {
+        "canonical_name": "design_dm_input_filter",
+        "deprecated": true,
+        "name": "power.design_dm_input_filter",
+        "sha256": "108a4d693e8e8eadbb32a370e821bfcc49367e04c367011466de35d5100b79a8"
+      },
+      {
+        "canonical_name": "design_pi_output_filter",
+        "deprecated": true,
+        "name": "power.design_pi_output_filter",
+        "sha256": "123ebb99b70891130083b95f46b2af8102c84e2f9cf702c75d0b483c1e317152"
+      },
+      {
+        "canonical_name": "design_rc_snubber",
+        "deprecated": true,
+        "name": "power.design_rc_snubber",
+        "sha256": "8efc92d4b8e74ade4c382dc9e5cc7cbd62a815b587c10e67c6dd679f1ad9ee79"
+      },
+      {
+        "canonical_name": "predict_conducted_emissions",
+        "deprecated": true,
+        "name": "power.predict_conducted_emissions",
+        "sha256": "971f897fae8eccb589ada5b23c7a595b7489d48b0489bcd33391f0a1ad169677"
+      },
+      {
+        "canonical_name": "required_psrr_for_ripple",
+        "deprecated": true,
+        "name": "power.required_psrr",
+        "sha256": "6caa8b0c81fe1d6cc65cd23ba3eafedbc375dc4587095e1f4a12af568b357e15"
+      },
+      {
+        "canonical_name": "type2_compensator",
+        "deprecated": true,
+        "name": "power.type2_compensator",
+        "sha256": "091a6017e4371ed5f2c15fdea0ad4f312f31dbde889ca85518f633350818e9d3"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "predict_conducted_emissions",
+        "sha256": "2406df2de3a6c968b09297ec513e150ddd0b01da6553376e7a419a01b431a923"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "probe_backend",
+        "sha256": "eb6ab8f09b6886b2136233dcd61dbe0421356a4c0643810649073d9a119af40d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "propagation_delay",
+        "sha256": "d3e7bb6b1ee7012f3d4ea173a2fc971dd5f6201bd9f68af7767252dbcf6e1219"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "register_user_vendor_dir",
+        "sha256": "41cc389d93a8f408ff8a7f2677abb770039e7e0d05f538989ff952be3dc07947"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "render_generated_lc_ladder_asc",
+        "sha256": "407103bb1454dfb0a2a8f3f1b047a7cc658cf8c5b27c6cf5dd302f0948ceffed"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "render_lc_ladder_schematic",
+        "sha256": "3a62440ff315fa0e8ed29c7468db917395547e5b2522c7d8813e48404c07078c"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "render_response",
+        "sha256": "027b0b69c8f71e6c3f82539fae0c0f4e369063df3abb26366c28319e13885485"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "required_psrr_for_ripple",
+        "sha256": "6e31f9a6a21b87d403f94e78dd33bae0d91e9b1067494eb176b707fe1d77cbb8"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "run_simulation",
+        "sha256": "42c385f18045c0c29ab145ee82fc3f389c7c31bc9b101bbed575b9bfaf5dd68f"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "sallen_key_band_pass",
+        "sha256": "a91d971478b188851f77a6af0639cf71e2d115cea9ec32ab9b26f7e4607ec3eb"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "sallen_key_high_pass",
+        "sha256": "1b085838abd83eb2925ec24b835e32774fa5834bbd11bc42769bf06a5f8efa41"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "sallen_key_low_pass",
+        "sha256": "031f03778c99aa0abaec75faa5b33a2f2034b62dffd3c02cea1773c8eece1f34"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "search_component_models",
+        "sha256": "94b4d5b2e439e0f1d3241718953ba661d94d11501c37f7bbd988b310f602f87b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "sensitivity_analysis",
+        "sha256": "e3ef73d30aae1434843ec3cbaee86862630a2052135a207d98f9dae59c63ccfc"
+      },
+      {
+        "canonical_name": "extract_sparameters",
+        "deprecated": true,
+        "name": "sim.extract_sparameters",
+        "sha256": "16e3ceb2f9684ffe79ca845c4daead566c5f86b268f347aaf4b444d5b0d6431a"
+      },
+      {
+        "canonical_name": "run_simulation",
+        "deprecated": true,
+        "name": "sim.run",
+        "sha256": "23b1b003a72540f230d221cc376d6635eb4e3dd93fb8d61fef51fc2a09b774c2"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "simulate_realized_filter",
+        "sha256": "42d468cd58ad5cf37040bb17dff45867160b3a7cb0d0a19d70b53acc891a4deb"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "simulation_submit",
+        "sha256": "1bc1a1f0434b36bd1ebd20ae5e607bc32c11c96af80b6df601dca5f944747fac"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "srf_audit",
+        "sha256": "c625de6f3aa8b479e1d3f24501149b7e16082728cb6bb124e2ebdc949dbfe350"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "stability_check",
+        "sha256": "d0ec0885225f7a4796b1d93e118c6f5fb52b9417f90b5295418e93890de3e648"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "substitute_real_components",
+        "sha256": "c63a1aaaced3c5f76e564b86e54d70e9c522b48441e8abba6f81b06d2be3e505"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_for_coex_target",
+        "sha256": "43699d8c3ebb4b36b967edf00a3c57ce7284ffdafdfbe6e70527671986c1f5c0"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_lc_bpf_filter",
+        "sha256": "f99c125883b58237e449bce9e540161144d38b8e3ac070044db005053cf8c645"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_lc_bsf_filter",
+        "sha256": "cf917488aca683bbac29cca4f287268be7978ec786569652e8968b43e11994db"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_lc_filter",
+        "sha256": "c281b44b66457db632ef26ccae2a8a8a2bf3d344cf62c9a62ba08d2752c27a90"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_lc_hpf_filter",
+        "sha256": "3fccacb554ddd455218aff536d5b79e5ebc1f266b2b3c93e69fbc79ac8996eb9"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "type2_compensator",
+        "sha256": "1ec36f8b4b878aae5e330eb90d71318721eb7924a877508a5cd378dbb81a39bf"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "validate_against_spice",
+        "sha256": "f58867a61145f4b3a40aad8c9da80f3f5e1b8ccecf0818f62be685a75a7825b8"
+      },
+      {
+        "canonical_name": "find_mosfet_for_application",
+        "deprecated": true,
+        "name": "vendor.find_mosfet",
+        "sha256": "31f9cabf871ed6703f407c7194ce3aab9b52b1925a58cd1796585f78573cbfd9"
+      },
+      {
+        "canonical_name": "find_opamp_for_application",
+        "deprecated": true,
+        "name": "vendor.find_opamp",
+        "sha256": "1abde77d8a21b2c3d20115361d009e4b0d7313c0d47128dc91016f8625f56112"
+      },
+      {
+        "canonical_name": "list_bjts",
+        "deprecated": true,
+        "name": "vendor.list_bjts",
+        "sha256": "386b2930e5e308361af53e0360b2822adfd12e865f0b7b7e85eea6ffde6d333c"
+      },
+      {
+        "canonical_name": "list_diodes",
+        "deprecated": true,
+        "name": "vendor.list_diodes",
+        "sha256": "77e3abc305faa17237f19273806cfe09aa997712267cc01b468ada696d0c1d7c"
+      },
+      {
+        "canonical_name": "list_mosfets",
+        "deprecated": true,
+        "name": "vendor.list_mosfets",
+        "sha256": "fcdc5c21b6d9e4c9a2f275ca1723faf15ca9b3476454e7f342c1f9ca00342bef"
+      },
+      {
+        "canonical_name": "list_opamps",
+        "deprecated": true,
+        "name": "vendor.list_opamps",
+        "sha256": "27d02c544b3b3a8aaaaf4224684f1683b5796bc9b186771a5fe1f2447e09a23a"
+      },
+      {
+        "canonical_name": "list_references",
+        "deprecated": true,
+        "name": "vendor.list_references",
+        "sha256": "364bd51b2a234cc943e92b644484face44b2c78d1ef50d3d74c31fbf2ef06606"
+      },
+      {
+        "canonical_name": "lookup_bjt",
+        "deprecated": true,
+        "name": "vendor.lookup_bjt",
+        "sha256": "98341cdff8b1caa56a7d458b2df597b7320cda9a4a06a2ea2fa89d57789dcaf2"
+      },
+      {
+        "canonical_name": "lookup_diode",
+        "deprecated": true,
+        "name": "vendor.lookup_diode",
+        "sha256": "be22be7042017490e5ad3979b0ae03ea0dae0382f7ac85a15e2b398e4ad26a17"
+      },
+      {
+        "canonical_name": "lookup_mosfet",
+        "deprecated": true,
+        "name": "vendor.lookup_mosfet",
+        "sha256": "659c40b0dcd9533885e791e3a1ae78aa530e74b1b73fda53ac6abadd863f47a0"
+      },
+      {
+        "canonical_name": "lookup_opamp",
+        "deprecated": true,
+        "name": "vendor.lookup_opamp",
+        "sha256": "968e86f46232060eaae3c7ef7debfe217981293bf78989aede72b0f8389b3381"
+      },
+      {
+        "canonical_name": "lookup_reference",
+        "deprecated": true,
+        "name": "vendor.lookup_reference",
+        "sha256": "37512608e2c32ab939a588c4a4427e0213e1d9aea4c1ecc6a1216df316868163"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "workspace_create",
+        "sha256": "5543fd4ade0100de5e4be79e976738ed5dca491a144df87a9e5ec51129372a39"
+      }
+    ],
+    "mcp-qucs-s": [
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "analyze_microstrip_tool",
+        "sha256": "bdb66aa1985f4d48f2db28e4cf782f12bac40c7ba9012a17bb7f48e07b3aa3b7"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "artifact_import",
+        "sha256": "c3fbdbc0ede5b7ca8cca01b2b331fe74eff5b276dffcc141572c7524145e8277"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "artifact_read",
+        "sha256": "60e6c25cff9a0010a39e18fe90690b338dbba7eb6df7fe135842ea1ed4444ffc"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_export",
+        "sha256": "47861185c07fbacda9b0b71f5fed67bf5b953f5128221f8114c885d4453edff9"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_parse",
+        "sha256": "495efd5dd5d1a05c67e0cc984a073cefbfbf4c761b7652cd5b00b31de601c9f5"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "circuit_validate",
+        "sha256": "10123671ef65f41974cff9e34f5d712e749a3e4dfa574ad58629baa21d05ad9d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "export_touchstone",
+        "sha256": "0cb7a4e56ec15548be45412a098fdaafae29da6576728c5dabca0d05fe1e583b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "extract_noise_parameters",
+        "sha256": "02858056f1a58f3a6caddadf644008dfb3c5436605d9fb15a17bb11ec11e8883"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_cancel",
+        "sha256": "a4ff46163ad0ae41e8bad654735c05390a3c611ec99df662c2793480184fd7ac"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_get",
+        "sha256": "eda13397a42db502d19a409254cbea3d9f5a01c8a8048197fb14fdc55a6d6c4d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_list_artifacts",
+        "sha256": "bb637ae1ade63faf4cd5af03069cc2199542f5db2d4d83ec9167cc6b643c674a"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "job_retry",
+        "sha256": "1bbc6f894ed45180881ad37c71fb8b6cade405f3cb144a4fb158d6d1f9cb93d4"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_substrate_presets_tool",
+        "sha256": "9e342be800fa392499c47245f6cdc0a53f6d1f8a54264df91f4f0c88a055cc8c"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lumped_to_distributed",
+        "sha256": "d95c61e9df5e6c8a6574376e82772b0d374409e09ecfb70655c5ec7ab922c698"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "probe_backend",
+        "sha256": "4710a87b888e540588605652b212d70e4f1f2bda9b4a7f4ff55b389803b9f16a"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "run_harmonic_balance",
+        "sha256": "3aaa1a81a30ebb1b218d45ce4dd76ec2baffc09257629d14e0b4774c3cdb3405"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "run_sp_analysis",
+        "sha256": "f49c1488278b1ad5e934c3ba1a5f44be7ce422f7452feaaa169bf26f3b24129d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "simulate_lc_ladder",
+        "sha256": "b05273701bbc3f657f3c6d3aa6a8cde3746400f23939ec6e98364bfebde7feb9"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "simulation_submit",
+        "sha256": "2c56e3ff9c4c4eee8d72edc5d4a08666871614e3349dee0d4a4f05bc13df0f43"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "status",
+        "sha256": "67b65eca4db0130b412c5798bac1b36bfae93b07c7db5be9de06fd2ecc4a7b70"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "sweep_compression_point",
+        "sha256": "6ee0d770d112cc8b83bf2c1359f3dd4c7288f34e57174b6ff1d2db2d46237ff2"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_combline_bpf",
+        "sha256": "982cd716febeeeb18813142422f0ac65814f714241fe5c4dc2ebf4dfe3a56cb5"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_coupled_line_bpf",
+        "sha256": "69b4aad15beb3646515dc6d280c473fe2e71bcf3611527751502ec081ec3fe5b"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_coupler",
+        "sha256": "25a5a714a65341cfe5529e91d7e815b10eff8123657822ccef8dba7a8388c640"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_hairpin_bpf",
+        "sha256": "ce500ed888fb9c709f89dedd65a6bac4bdb799152495b568fac3753a487f47ac"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_interdigital_bpf",
+        "sha256": "fcbc4b8f735081043bb7e256246ff5f4a5789b17f9a4954342cceff753d87ffc"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_microstrip_line",
+        "sha256": "7c3866dac61385056ee0c67c2d41571f4b02533bf957abd3250edf27781a02a0"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "synthesize_stepped_impedance_lpf",
+        "sha256": "378d35509d2e4b577a9992f5ccd68e80e41a0ab7cf7d8379046cf70e1fa4091e"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "workspace_create",
+        "sha256": "e333976466c05e61eff4db130d1368c4b51e894f417cc00bfb33921a2db1d427"
+      }
+    ],
+    "mcp-rf-analysis": [
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "cascade_networks",
+        "sha256": "932c428a7523176144d0335a722d5cf3c946335bd83d90cc3f4cac31a7e0ffe8"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "check_coex_matrix",
+        "sha256": "d3ac551bd117fd5f5a6f1c862b5fa7057ca8fddc93e150a7ba5ffbd8ba675c9d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "check_passband_compliance",
+        "sha256": "c9d131689f5e5b56536592532cfa8772b6d8564332044408eefa5a40e344e740"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "check_rejection_at",
+        "sha256": "5b46bd6ef01c16ce74ef7c244faa2e45d803979ca4595ed20a11204a67374ad1"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "cispr_limit_at",
+        "sha256": "9fc250019391f868989fbf657fbe44c3f31e028c7e527764095f3cf0042994fa"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compare_sparameters",
+        "sha256": "cbe5a5eb63bdbb9f3ca5271d6213831726e633b23cc73c8c0abdbbc4598f81c5"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compute_antenna_isolation_estimate",
+        "sha256": "ef075b612c0ab94501cd5c450a1b41940b831c85c06e8a3218d662b1b70d0dce"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compute_desense",
+        "sha256": "05bd00ad67f6f6ee8c51b92055e7398ce632e877f85820964c384975ec696133"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compute_path_loss",
+        "sha256": "1338652df7f1a57990a48f2c813e645d18277a361f2cbe796f79bb09fc91ca30"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "compute_stability",
+        "sha256": "60d8fcfac80b75ebe34c914ea0decad5288a79aece80050472c7a8225fe22dc6"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "deembed_network",
+        "sha256": "12b02a95ef55cf40af2bd5c88838fcdc1e84e6e21a9fde9c09c678b1ba450cd4"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "estimate_fext_db",
+        "sha256": "53eba54b070e71e408408fbf3df0da796f1ca9ce5ab1dc27c36202c9b51d9833"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "estimate_next_db",
+        "sha256": "74054b1cbbbc309830cc35d64a9427c1fdf40a61b1afb57702f4ab573b395db2"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "evaluate_against_spec_template",
+        "sha256": "9a8401c2094ce27a6e1934a58e16c559b9e8b6f4ec0ee6d7b3cdc6ac0f5e145f"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "extract_delay",
+        "sha256": "e7b30de8df7b37c0ba1ab256c66b0ebdf6cef9e72911f930b27484d0090c5a7e"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "eye_diagram_from_s2p",
+        "sha256": "da091eba59c5dfcb178d9755b889d9663cfb7b806c815d66e84a706823269898"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "fcc_part15_radiated_limit_at",
+        "sha256": "757d6da74a4458da213097e9a93ea4e615d27e2366b4a63c40360810029afb3d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "fit_equivalent_circuit",
+        "sha256": "9f6e21d8197576735a228167058ba49a75e640c46bb2790b861e19243d272828"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "is_in_restricted_band_tool",
+        "sha256": "4bc660e5624b8a676687a9d71c0ac444a7ac7a0b4a2a7f0c9ae0d9b6d0a3c6fe"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_5gnr_bands_tool",
+        "sha256": "a728a9e7ebf76a29a28739e434b2a9dbdca50433e4137f96d9cd16c7d7aacdee"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_fcc_restricted_bands_tool",
+        "sha256": "190e66a0f8f78155176cd776339581a479a5da801ae6b5a1bfee8294f719a96c"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_gnss_bands_tool",
+        "sha256": "5b5d808098d846655298cafa571b699758c45e4f7c459ab15032013bd66c01bd"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_halow_channels_tool",
+        "sha256": "b0d998a46d1ef5efc4f192364b5e9727e311ef2024891137dd871d9ff7240eab"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_ism_bands_tool",
+        "sha256": "a8a7493cbe1b59aa6f942ff69ce6ca23bbf344a94a34a05218d638d1ad2e4e72"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_lte_bands_tool",
+        "sha256": "97af00bebd09a3fcd493658c61675c8d15d7976d3e5f54a3bfed147d3856e7b8"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "list_spec_templates_tool",
+        "sha256": "24f3faf4cadb490be35915e09b589e147ffc92fa99aa2757e2d223e364713b18"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_band_by_freq_tool",
+        "sha256": "09a14fe2784a2b832ef77b99021e904979d524737e520d6efff35da436eb97e9"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "lookup_harmonic_victims",
+        "sha256": "37ded81880bf73d8d1892084d38e4d36175a545f283212c2d0be03c5455a9c61"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "place_zeros_for_coex",
+        "sha256": "5f0c9295e6639cc812c072f39f3c5cfbfd261db84c02e6d209572587d05f5d34"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "predict_conducted_emissions",
+        "sha256": "6211dfdf40badc2448deffe5e8b058f1874bccbef104af7f2b9fd849ec310023"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "predict_radiated_emissions_loop",
+        "sha256": "3139429475c366eeaeb8317e3e7ad13d67c30103c4ea5ef12a84ba82d598b270"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "probe_backend",
+        "sha256": "78f0c10ed9dab6e9aec7a797becd1febfe68ed3ebabeb2955df92ba98f727fb6"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "renormalize_impedance",
+        "sha256": "60a4a3a6474a3e1b37f32ab629c379900ebad0af683b2d2687be49696a6e262c"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "smith_chart_data",
+        "sha256": "cdae7115162fa97000981920e065abee9e44f173037d5228e4f908fc23998f8d"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "tdr_from_s11",
+        "sha256": "9e549c5865f7f696d263a741d3b6e211b7069e1c472c297209dded932050c25f"
+      }
+    ]
+  }
+}

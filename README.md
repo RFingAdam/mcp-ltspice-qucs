@@ -31,25 +31,26 @@ It collapses a typical filter-design loop — hours of LTspice nudging
 component values, swapping SPICE models, re-running, eyeballing S21 —
 into an agent-driven iteration at the **design intent** layer.
 
-Drive it from any MCP client. `mcp-ltspice` exposes 59 flat tools plus
-matching namespaced aliases (`filter.*`, `power.*`, `analog.*`).
+Drive it from any MCP client. `mcp-ltspice` exposes 76 primary tools plus
+59 namespaced aliases (`filter.*`, `power.*`, `analog.*`, and others).
 `mcp-qucs-s` adds native S-parameter simulation, Xyce harmonic balance,
 and closed-form microstrip / distributed-filter synthesis with 16
 substrate presets. `mcp-rf-analysis` adds simulator-agnostic skrf
 wrappers, band databases, FCC / ETSI / 3GPP spec evaluation, and
-multi-radio coexistence analysis. Every synthesis path is validated
-against real simulator output — ngspice, LTspice, qucsator-RF, and
-Xyce — not just its own math (876 passing tests).
+multi-radio coexistence analysis. Selected LC, Qucs-S, and Xyce paths
+have real-simulator integration tests. Required per-commit CI installs
+ngspice; the weekly self-hosted matrix executes LTspice, qucsator-RF,
+and Xyce instead of treating an absent backend as a pass.
 
 **What mcp-ltspice-qucs does well:**
 
 - **AI-native via MCP.** Three first-class [Model Context Protocol](https://modelcontextprotocol.io)
   servers. Any MCP agent can iterate filter topologies, sweep vendor
   parts, and run Monte Carlo yield analyses.
-- **Real simulators, not toy math.** Drives **LTspice** (native or
+- **Real simulator drivers plus fast analytical models.** Drives **LTspice** (native or
   under Wine), **ngspice**, **Qucs-S / qucsator-RF** for native
-  S-parameter simulation, and **Xyce** for harmonic balance. Analytical
-  models are cross-checked against simulator output at millidB level.
+  S-parameter simulation, and **Xyce** for harmonic balance. Selected
+  analytical ladder cases are cross-checked against simulator output.
 - **Closed-form synthesis and optimization.** LC ladders (Butterworth /
   Chebyshev / elliptic, all of LPF / HPF / BPF / BSF including elliptic
   band-transforms), Sallen-Key, MFB, Richards-Kuroda, and a complete
@@ -60,9 +61,14 @@ Xyce — not just its own math (876 passing tests).
   placement against LTE / 5G NR / GNSS / FCC-restricted bands, a
   GNSS ΔC/N₀ desense model, and a closed loop that iterates filter
   order until the coex matrix meets a desense target.
-- **Vendor parasitics built in.** Coilcraft 0402HP, Murata GJM,
-  Johanson, TDK models with SRF checks and E24/E96/E192 snap, plus
-  user-supplied measured-model directories.
+- **Circuit-file workbench and model-aware optimization.** Supported LTspice
+  ASC, SPICE, Qucs schematic, and Qucsator netlist files import into a
+  connectivity-preserving `CircuitDocument` 1.0 or return a complete
+  unsupported-construct report. Component search enforces package,
+  availability, ratings, Q/SRF, bias, temperature, and tolerance. Generic IR
+  optimization preserves topology, evaluates corners/yield, instantiates exact
+  selected models, and can require an independent final simulator before
+  reporting `simulator_validated`.
 - **CISPR-aware.** Conducted and radiated emission prediction against
   CISPR 22 / 32 and FCC Part 15 limits, anchored to closed-form
   references, before you build.
@@ -77,20 +83,26 @@ Xyce — not just its own math (876 passing tests).
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs.git
 cd mcp-ltspice-qucs
 uv sync --all-packages
-uv run pytest -q                  # 876 pass; simulator-gated tests skip when tools are absent
+uv run pytest -q                  # simulator-gated tests skip when tools are absent
 uv run python examples/basic_lpf/design.py
 ```
 
 See [`docs/installation.md`](docs/installation.md) for ngspice / LTspice /
 Qucs-S external-tool setup.
+The [general circuit workbench guide](docs/circuit-workbench.md) documents
+file-format boundaries, backend adapters, tolerance policies, component search,
+and generic optimization.
 
 ### Wire it into your MCP client
 
+The repository includes a tested [Codex project
+configuration](.codex/config.toml) and [Claude Code project
+configuration](.mcp.json). Trust the repository in the client, then inspect
+the three connected servers.
+
 **Claude Code:**
 ```bash
-claude mcp add ltspice -- uv run --directory /path/to/mcp-ltspice-qucs/packages/mcp-ltspice mcp-ltspice
-claude mcp add qucs-s  -- uv run --directory /path/to/mcp-ltspice-qucs/packages/mcp-qucs-s  mcp-qucs-s
-claude mcp add rf-analysis -- uv run --directory /path/to/mcp-ltspice-qucs/packages/mcp-rf-analysis mcp-rf-analysis
+claude mcp list
 ```
 
 Then ask your assistant:
@@ -98,24 +110,27 @@ Then ask your assistant:
 > *"Synthesize a 5th-order Butterworth LPF at fc = 1 GHz, swap in Coilcraft 0402HP and Murata GJM C0G parts at 5% tolerance, and report yield."*
 
 The agent calls `synthesize_lc_filter`, `substitute_real_components`,
-and `monte_carlo_analysis` in sequence. Demo result on the bundled LPF
-example: **all 5 spec criteria pass at 99% yield.**
+and `monte_carlo_analysis` in sequence. The bundled LPF's analytical
+preview reports **all 5 spec criteria passing at 99% yield** using
+catalog-snapped ideal values; verify the realized circuit in SPICE
+before treating that number as production evidence.
 
 ---
 
 ## Tools
 
-`mcp-ltspice-qucs` ships three MCP servers, 110 tools total:
+`mcp-ltspice-qucs` ships three MCP servers with 140 primary tools
+(199 registrations when the 59 deprecated `mcp-ltspice` aliases are included):
 
 | Server                | Tools | Purpose                                                                 |
 | --------------------- | ----: | ----------------------------------------------------------------------- |
-| **`mcp-ltspice`**     | 59    | LTspice + ngspice. LC ladder synthesis (incl. elliptic BPF/BSF), coex-driven closed-loop design, vendor parts, Monte Carlo, SMPS sizing + EMC, active filters, device catalogs |
-| **`mcp-qucs-s`**      | 17    | Qucs-S native S-param sim + Xyce harmonic balance. Microstrip + 16 substrate presets, couplers, Richards-Kuroda, stepped-impedance / edge-coupled / hairpin / interdigital / combline filters |
-| **`mcp-rf-analysis`** | 34    | Touchstone I/O, skrf wrappers, LTE / 5G NR / ISM / HaLow / GNSS bands, FCC / ETSI / 3GPP eval, coex matrix with GNSS ΔC/N₀ model, victim-weighted zero placement, EMC predictors |
+| **`mcp-ltspice`**     | 76    | LTspice + ngspice. Circuit IR import/export, durable jobs/artifacts, generic model-aware optimization, LC ladder synthesis, coex-driven design, Monte Carlo, SMPS sizing + EMC, active filters, device catalogs |
+| **`mcp-qucs-s`**      | 29    | Qucs schematic/netlist IR import/export, durable simulation jobs, native S-param simulation + Xyce harmonic balance, microstrip + 16 substrate presets, couplers, and distributed filters |
+| **`mcp-rf-analysis`** | 35    | Touchstone I/O, skrf wrappers, readiness probing, LTE / 5G NR / ISM / HaLow / GNSS bands, FCC / ETSI / 3GPP eval, coex matrix with GNSS ΔC/N₀ model, victim-weighted zero placement, EMC predictors |
 
-Tools register under both flat names (back-compat) and categorised
-aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`,
-`sim.*`). Full reference in
+The underscore-separated names are canonical. The categorised dotted aliases
+(`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) are
+deprecated compatibility names scheduled for removal in 1.0. Full reference in
 [`docs/tool-catalog.md`](docs/tool-catalog.md) +
 [`docs/tools/`](docs/tools/) (one page per server).
 
@@ -126,9 +141,9 @@ aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`,
 | Workflow                 | Headline tools                                                   | Reference                          |
 | ------------------------ | ---------------------------------------------------------------- | ---------------------------------- |
 | LC ladder filter design  | `synthesize_lc_filter` → `place_transmission_zero` → `substitute_real_components` | Butterworth / Chebyshev / Elliptic |
-| Active filter design     | `synthesize_sallen_key_lpf` / `_hpf` / `_bpf`, `synthesize_mfb_lpf` / `_bpf` | Sallen-Key, MFB                    |
-| SMPS EMC pre-compliance  | `design_pi_filter`, `predict_conducted_emissions`, `design_snubber`, `design_cm_choke` | CISPR 22 / CISPR 32                |
-| Microstrip + coupler     | `microstrip_synth`, `branchline_coupler`, `rat_race`, `lange_coupler` | Hammerstad-Jensen                  |
+| Active filter design     | `sallen_key_low_pass` / `sallen_key_high_pass` / `sallen_key_band_pass`, `mfb_low_pass` / `mfb_band_pass` | Sallen-Key, MFB                    |
+| SMPS EMC pre-compliance  | `design_pi_output_filter`, `predict_conducted_emissions`, `design_rc_snubber`, `design_cm_choke` | CISPR 22 / CISPR 32                |
+| Microstrip + coupler     | `synthesize_microstrip_line`, `synthesize_coupler` | Hammerstad-Jensen                  |
 | Monte Carlo yield        | `monte_carlo_analysis` (joblib parallel)                         | Gaussian component tolerance       |
 | Distributed filters      | `synthesize_stepped_impedance_lpf`, `synthesize_coupled_line_bpf`, `synthesize_hairpin_bpf`, `synthesize_interdigital_bpf`, `synthesize_combline_bpf` | Pozar §8.6-8.7, exact TEM N-line model |
 | Multi-radio coexistence  | `place_zeros_for_coex` → `synthesize_for_coex_target` → `check_coex_matrix` (GNSS ΔC/N₀) | 3GPP TS 36.101, FCC restricted bands |
@@ -173,7 +188,9 @@ full boundary statement, decision flow, and cross-MCP workflow examples.
 ## Documentation
 
 - **[Getting started](docs/getting-started.md)** — install through first call.
-- **[Tool catalog](docs/tool-catalog.md)** — all 110 tools, per-server pages under [`docs/tools/`](docs/tools/).
+- **[Tool catalog](docs/tool-catalog.md)** — all 140 primary tools, per-server pages under [`docs/tools/`](docs/tools/).
+- **[Backend matrix](docs/backend-matrix.md)** — runtime readiness and CI validation tiers.
+- **[Migration guide](docs/migration-0.5.md)** — canonical names, error semantics, jobs, and numerical changes.
 - **[Usage example](docs/usage.md)** — practical end-to-end walkthrough.
 - **[Architecture](docs/architecture.md)** — interop contract between servers.
 - **[Suite architecture](docs/suite-architecture.md)** — how this MCP fits in eng-mcp-suite.
