@@ -94,3 +94,6 @@ examples/**/report.pdf
 
 # Workflow scratch files (private to the maintainer)
 tasks/
+
+# Pitch/business material kept private
+/presentation/
