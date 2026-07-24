@@ -2,29 +2,22 @@
 
 from __future__ import annotations
 
-import shutil
-
 import pytest
 
-from mcp_ltspice.runner import find_ltspice
+from mcp_ltspice.capabilities import probe_spice_backend
 
-
-def _have(cmd: str) -> bool:
-    return shutil.which(cmd) is not None
-
-
-HAS_NGSPICE = _have("ngspice")
-
-# Ask the runner itself rather than re-probing $PATH here. The runner also
-# honours $LTSPICE_PATH, $WINEPREFIX, and the standard Windows / macOS / Wine
-# install locations — a conftest that only checked $PATH silently skipped the
-# ltspice-marked tests on machines where the runner would have found LTspice.
-HAS_LTSPICE = find_ltspice() is not None
+# Integration markers mean the backend completed its tiny known-answer run,
+# not merely that a binary exists. This prevents a broken Wine prefix,
+# first-run dialog, or unlaunchable install from turning an ordinary local
+# suite into a false product failure while the capability diagnostic retains
+# the precise reason.
+HAS_NGSPICE = bool(probe_spice_backend("ngspice", timeout_sec=20.0)["validated"])
+HAS_LTSPICE = bool(probe_spice_backend("ltspice", timeout_sec=30.0)["validated"])
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    skip_ngspice = pytest.mark.skip(reason="ngspice not installed")
-    skip_ltspice = pytest.mark.skip(reason="LTspice (Wine) not installed")
+    skip_ngspice = pytest.mark.skip(reason="ngspice is not known-answer validated")
+    skip_ltspice = pytest.mark.skip(reason="LTspice is not known-answer validated")
     for item in items:
         # get_closest_marker, not `"ngspice" in item.keywords`: keywords also
         # contains test names and parametrize ids, so a case parametrized over

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import tempfile
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -9,6 +12,10 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from mcp_qucs_s import __version__
+from mcp_qucs_s.backend_adapters import QucsatorAdapter, XyceAdapter
+from mcp_qucs_s.capabilities import probe_qucs_backend as _probe_qucs_backend
+from mcp_qucs_s.capabilities import qucs_capabilities as _qucs_capabilities
+from mcp_qucs_s.circuit_io import export_qucs_file, import_qucs_file
 from mcp_qucs_s.couplers import synthesize_coupler as _synthesize_coupler
 from mcp_qucs_s.distributed import combline_bpf as _combline_bpf
 from mcp_qucs_s.distributed import coupled_line_bpf as _coupled_line_bpf
@@ -39,11 +46,485 @@ from mcp_qucs_s.substrates import (
 from mcp_qucs_s.substrates import (
     list_substrate_presets as _list_substrate_presets,
 )
+from rf_mcp_common.backend import BackendRunRequest
+from rf_mcp_common.circuit_ir import CircuitAnalysis, CircuitDocument
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
+from rf_mcp_common.jobs import DurableJobManager, JobContext, WorkspaceStore
 from rf_mcp_common.logging import get_logger
+from rf_mcp_common.protocol import prepare_protocol_tools, run_stdio_server
+from rf_mcp_common.tool_annotations import DEFAULT_TOOL_ANNOTATIONS
+from rf_mcp_common.tool_errors import EnvelopeErrorMiddleware
 
 mcp = FastMCP(name="mcp-qucs-s", version=__version__)
+mcp.add_middleware(EnvelopeErrorMiddleware())
 log = get_logger("mcp_qucs_s.server")
+_WORKSPACES = WorkspaceStore()
+_JOBS = DurableJobManager(_WORKSPACES, max_workers=4)
+
+
+def _circuit_from_payload(value: dict[str, Any]) -> CircuitDocument:
+    """Accept either bare IR or the enriched circuit_parse response."""
+    return CircuitDocument.model_validate(
+        {key: item for key, item in value.items() if key in CircuitDocument.model_fields}
+    )
+
+
+def _parse_circuit_artifact(
+    workspace_id: str,
+    artifact_id: str,
+    format: str | None = None,
+) -> CircuitDocument:
+    record = _WORKSPACES.artifact(workspace_id, artifact_id)
+    return import_qucs_file(record["path"], format=format)  # type: ignore[arg-type]
+
+
+def _select_adapter(kind: str) -> QucsatorAdapter | XyceAdapter:
+    """Route a CircuitAnalysis kind to the backend that serves it.
+
+    Qucsator and Xyce each serve a disjoint set of analyses, so the backend
+    is always implied by ``kind`` rather than independently chosen.
+    """
+    if kind == "harmonic_balance":
+        return XyceAdapter()
+    if kind in {"sparameters", "noise"}:
+        return QucsatorAdapter()
+    raise ValueError(f"no qucs-s backend serves analysis kind {kind!r}")
+
+
+def _simulation_job_handler(
+    context: JobContext,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    workspace_id = str(payload["workspace_id"])
+    record = _WORKSPACES.artifact(workspace_id, str(payload["artifact_id"]))
+    analysis = CircuitAnalysis.model_validate(payload["analysis"])
+    adapter = _select_adapter(analysis.kind)
+    job_root = _JOBS.job_root(context.job_id)
+
+    def progress(completed: int, total: int, message: str) -> None:
+        context.update_progress(completed, total, message)
+
+    progress(0, 4, "importing")
+    if context.cancelled():
+        raise RuntimeError("cancelled before compile")
+    document = adapter.import_file(record["path"])
+    progress(1, 4, "compiling")
+    artifact = adapter.compile(document, analysis)
+    if context.cancelled():
+        raise RuntimeError("cancelled before run")
+    progress(2, 4, "running")
+    # Qucsator/Xyce have no verified OS sandbox profile (probe reports
+    # sandbox_profile.available=False); these jobs run unsandboxed on the
+    # immutable per-run workspace snapshot the adapter's `run` creates.
+    raw = adapter.run(
+        BackendRunRequest(
+            artifact=artifact,
+            workspace=job_root / "runs",
+            timeout_sec=float(payload.get("timeout_sec", 120.0)),
+            sandbox=False,
+        )
+    )
+    progress(3, 4, "parsing")
+    dataset = adapter.parse(raw)
+    validation = adapter.validate(dataset, analysis)
+    if not validation.valid:
+        raise ValueError(f"backend result failed validation: {validation.model_dump()}")
+
+    dataset_path = job_root / "result_dataset.json"
+    dataset_path.write_text(
+        json.dumps(dataset.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    netlist_path = job_root / artifact.filename
+    netlist_path.write_text(artifact.content, encoding="utf-8")
+
+    dataset_record = _WORKSPACES.add_generated(
+        workspace_id, dataset_path, media_type="application/json"
+    )
+    netlist_record = _WORKSPACES.add_generated(
+        workspace_id, netlist_path, media_type=artifact.media_type
+    )
+    output_artifact_id = None
+    raw_output_path = raw.metadata.get("dataset_path") or raw.metadata.get("hb_path")
+    if raw_output_path:
+        output_record = _WORKSPACES.add_generated(
+            workspace_id, raw_output_path, media_type="application/octet-stream"
+        )
+        output_artifact_id = output_record["artifact_id"]
+    progress(4, 4, "completed")
+
+    return {
+        "backend": adapter.backend,
+        "analysis": analysis.kind,
+        "returncode": raw.returncode,
+        "validation": validation.model_dump(mode="json"),
+        "dataset_artifact_id": dataset_record["artifact_id"],
+        "dataset_resource_uri": f"artifact://{workspace_id}/{dataset_record['artifact_id']}",
+        "netlist_artifact_id": netlist_record["artifact_id"],
+        "output_artifact_id": output_artifact_id,
+        "run_manifest_path": raw.metadata.get("manifest_path"),
+        "circuit_fingerprint": artifact.circuit_fingerprint,
+        "input_sha256": artifact.content_sha256,
+    }
+
+
+_JOBS.register("simulation", _simulation_job_handler)
+
+
+@mcp.resource("capabilities://mcp-qucs-s")
+def capabilities_resource() -> dict[str, Any]:
+    return _qucs_capabilities()
+
+
+@mcp.resource("artifact://{workspace_id}/{artifact_id}")
+def artifact_resource(workspace_id: str, artifact_id: str) -> bytes:
+    """Read a checksum-verified Qucs workspace artifact."""
+    return _WORKSPACES.read(workspace_id, artifact_id)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Create a durable server-owned workspace for Qucs circuit artifacts.",
+)
+def workspace_create(label: str | None = None) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _WORKSPACES.create(label),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"workspace_create failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Import a Qucs schematic or netlist into a confined workspace.",
+)
+def artifact_import(
+    workspace_id: str,
+    source_path: str,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        record = _WORKSPACES.import_file(
+            workspace_id,
+            source_path,
+            media_type="application/x-qucs",
+        )
+        return ok(
+            record | {"resource_uri": (f"artifact://{workspace_id}/{record['artifact_id']}")},
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"artifact_import failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Parse an imported Qucs schematic or Qucsator netlist into versioned "
+        "CircuitDocument IR. Unknown component pin geometry is a blocking, "
+        "source-located diagnostic."
+    ),
+)
+def circuit_parse(
+    workspace_id: str,
+    artifact_id: str,
+    format: Annotated[
+        str | None,
+        Field(description="'schematic', 'netlist', or infer from .sch suffix."),
+    ] = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        document = _parse_circuit_artifact(workspace_id, artifact_id, format)
+        payload = document.model_dump(mode="json")
+        payload.update(
+            {
+                "source_artifact_id": artifact_id,
+                "is_supported": document.is_supported,
+                "connectivity_signature": document.connectivity_signature(),
+                "electrical_fingerprint": document.electrical_fingerprint(),
+            }
+        )
+        return ok(
+            payload,
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_parse failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Validate an imported circuit graph and return all unsupported "
+        "construct diagnostics. require_lossless rejects any blocking diagnostic."
+    ),
+)
+def circuit_validate(
+    workspace_id: str,
+    artifact_id: str,
+    require_lossless: bool = False,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        document = _parse_circuit_artifact(workspace_id, artifact_id)
+        blocking = [
+            item.model_dump(mode="json")
+            for item in document.unsupported
+            if item.severity == "error"
+        ]
+        valid = document.is_supported
+        return ok(
+            {
+                "valid": valid,
+                "accepted": valid or not require_lossless,
+                "require_lossless": require_lossless,
+                "diagnostics": [item.model_dump(mode="json") for item in document.unsupported],
+                "blocking_diagnostics": blocking,
+                "connectivity_signature": document.connectivity_signature(),
+                "electrical_fingerprint": document.electrical_fingerprint(),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_validate failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Export a supported CircuitDocument to Qucsator netlist or its preserved "
+        "Qucs schematic and return a checksum-addressed artifact."
+    ),
+)
+def circuit_export(
+    workspace_id: str,
+    circuit: dict[str, Any],
+    output_format: Annotated[str, Field(description="'netlist' or 'schematic'")],
+    name: str | None = None,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        if output_format not in {"netlist", "schematic"}:
+            raise ValueError("output_format must be 'netlist' or 'schematic'")
+        document = _circuit_from_payload(circuit)
+        document.require_supported()
+        suffix = ".net" if output_format == "netlist" else ".sch"
+        safe_name = Path(name or f"{document.document_id}{suffix}").name
+        if Path(safe_name).suffix.lower() != suffix:
+            safe_name += suffix
+        with tempfile.TemporaryDirectory(prefix="rf-mcp-qucs-export-") as temporary:
+            target = Path(temporary) / safe_name
+            export_qucs_file(
+                document,
+                target,
+                format=output_format,  # type: ignore[arg-type]
+            )
+            record = _WORKSPACES.add_generated(
+                workspace_id,
+                target,
+                name=safe_name,
+                media_type="application/x-qucs",
+            )
+        return ok(
+            record
+            | {
+                "resource_uri": (f"artifact://{workspace_id}/{record['artifact_id']}"),
+                "electrical_fingerprint": document.electrical_fingerprint(),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"circuit_export failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Administrative readiness probe for qucsator or Xyce. Distinguishes "
+        "installed, launchable, and known-answer validated states."
+    ),
+)
+def probe_backend(
+    backend: Annotated[str, Field(description="'qucsator' or 'xyce'")],
+    validate: bool = True,
+    timeout_sec: Annotated[float, Field(gt=0, le=120)] = 20.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _probe_qucs_backend(
+                backend,
+                validate=validate,
+                timeout_sec=timeout_sec,
+            ),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"probe_backend failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Submit a durable, cancellable circuit simulation job: compile the "
+        "imported artifact, run it, parse the result into a normalized "
+        "ResultDataset, and validate it against the analysis. `analysis.kind` "
+        "selects the backend — Qucsator serves 'sparameters'/'noise', Xyce "
+        "serves 'harmonic_balance'. Qucsator and Xyce have no verified OS "
+        "sandbox profile, so jobs run unsandboxed on the immutable per-run "
+        "workspace snapshot; only use this on trusted local inputs."
+    ),
+)
+def simulation_submit(
+    workspace_id: str,
+    artifact_id: str,
+    analysis: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description=(
+                "CircuitAnalysis {id, kind, parameters}; kind is 'sparameters', "
+                "'noise', or 'harmonic_balance'. Defaults to the artifact's "
+                "first parsed analysis."
+            )
+        ),
+    ] = None,
+    timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        record = _WORKSPACES.artifact(workspace_id, artifact_id)
+        resolved_analysis = analysis
+        if resolved_analysis is None:
+            document = import_qucs_file(record["path"])
+            if not document.analyses:
+                raise ValueError("artifact has no parsed analysis; pass an explicit `analysis` IR")
+            resolved_analysis = document.analyses[0].model_dump(mode="json")
+        parsed_analysis = CircuitAnalysis.model_validate(resolved_analysis)
+        _select_adapter(parsed_analysis.kind)  # fail fast on an unroutable kind
+        job = _JOBS.submit(
+            "simulation",
+            {
+                "workspace_id": workspace_id,
+                "artifact_id": artifact_id,
+                "analysis": resolved_analysis,
+                "timeout_sec": timeout_sec,
+            },
+            workspace_id=workspace_id,
+        )
+        return ok(job, runtime_sec=timer.elapsed(), tool_version=__version__)
+    except Exception as exc:
+        return error(f"simulation_submit failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Get durable job state, progress, result, and retry diagnostics.",
+)
+def job_get(job_id: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _JOBS.get(job_id),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_get failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Request cancellation and terminate a running simulator process tree.",
+)
+def job_cancel(job_id: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _JOBS.cancel(job_id),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_cancel failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Retry a failed or cancelled durable job using its immutable payload.",
+)
+def job_retry(job_id: str) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _JOBS.retry(job_id),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_retry failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="List checksum-addressed artifacts in the workspace associated with a job.",
+)
+def job_list_artifacts(job_id: str) -> Envelope[list[dict[str, Any]]]:
+    timer = Timer()
+    try:
+        job = _JOBS.get(job_id)
+        workspace_id = job.get("workspace_id")
+        if workspace_id is None:
+            return ok([], runtime_sec=timer.elapsed(), tool_version=__version__)
+        manifest = _WORKSPACES.get(str(workspace_id))
+        artifacts = [
+            record | {"resource_uri": (f"artifact://{workspace_id}/{record['artifact_id']}")}
+            for record in manifest["artifacts"].values()
+        ]
+        return ok(
+            artifacts,
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"job_list_artifacts failed: {exc}", tool_version=__version__)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Read a small checksum-verified artifact by opaque ID. Binary content "
+        "is base64; larger artifacts must be consumed through their resource URI."
+    ),
+)
+def artifact_read(
+    workspace_id: str,
+    artifact_id: str,
+) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        record = _WORKSPACES.artifact(workspace_id, artifact_id)
+        content = _WORKSPACES.read(workspace_id, artifact_id)
+        return ok(
+            {
+                "artifact": record,
+                "encoding": "base64",
+                "content": base64.b64encode(content).decode("ascii"),
+            },
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"artifact_read failed: {exc}", tool_version=__version__)
 
 
 def _substrate(d: dict[str, float] | str) -> Substrate:
@@ -69,13 +550,14 @@ def _substrate(d: dict[str, float] | str) -> Substrate:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List curated substrate presets (FR4, Rogers RO4350B / RO4003C, "
         "Duroid 5880 / 6002, PTFE, Isola FR408HR, Taconic TLY5) with their "
         "{er, h_mm, t_um, tan_d} values. Pass a preset name as the `substrate` "
         "argument to `synthesize_microstrip_line` and `analyze_microstrip_tool` "
         "instead of the full dict."
-    )
+    ),
 )
 def list_substrate_presets_tool() -> Envelope[list[dict[str, Any]]]:
     timer = Timer()
@@ -89,13 +571,20 @@ def list_substrate_presets_tool() -> Envelope[list[dict[str, Any]]]:
         return error(f"list_substrate_presets failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Report whether Qucs-S and Xyce are installed and discoverable.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Report synthesis features and backend readiness states. Use "
+        "probe_backend(validate=true) for a fresh known-answer validation."
+    ),
+)
 def status() -> Envelope[dict[str, Any]]:
     return ok(
         {
             "version": __version__,
             "qucs_s_available": is_qucs_available(),
             "xyce_available": is_xyce_available(),
+            "backends": _qucs_capabilities(),
             "synthesis_tools": [
                 "synthesize_microstrip_line",
                 "analyze_microstrip",
@@ -124,6 +613,7 @@ def status() -> Envelope[dict[str, Any]]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize microstrip line dimensions for a target characteristic "
         "impedance and electrical length. Hammerstad-Jensen closed form. "
@@ -168,13 +658,14 @@ def synthesize_microstrip_line(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Analyze an existing microstrip line: Z0, eps_eff, wavelength. "
         "Hammerstad-Jensen closed form. NOTE: for PCB impedance analysis from "
         "stackup + trace data, prefer a PCB-layout-aware EMC MCP if one is "
         "available — those tools integrate with the wider PCB analysis "
         "workflow (CPW, stripline, differential, eye-diagram)."
-    )
+    ),
 )
 def analyze_microstrip_tool(
     width_mm: Annotated[float, Field(gt=0)],
@@ -193,6 +684,7 @@ def analyze_microstrip_tool(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a directional coupler: branch_line / rat_race / "
         "coupled_line / lange. Returns per-section dimensions."
@@ -226,6 +718,7 @@ def synthesize_coupler(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Convert a lumped LC ladder to its distributed-element microstrip "
         "equivalent via Richards transformation + Kuroda identities."
@@ -254,6 +747,7 @@ def lumped_to_distributed(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a stepped-impedance microstrip LPF (Pozar §8.6) from a "
         "lumped LPF ladder: series inductors become short high-Z sections "
@@ -291,6 +785,7 @@ def synthesize_stepped_impedance_lpf(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize an edge-coupled (parallel coupled-line) microstrip BPF "
         "(Pozar §8.7) from LPF prototype g-coefficients (pass the "
@@ -326,6 +821,7 @@ def synthesize_coupled_line_bpf(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a hairpin microstrip BPF (folded edge-coupled / "
         "Cristal-Frankel hairpin-line) from LPF prototype g-coefficients. "
@@ -365,6 +861,7 @@ def synthesize_hairpin_bpf(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize an interdigital microstrip BPF from LPF prototype "
         "g-coefficients: N coupled λ/4 resonators, alternately shorted, "
@@ -403,6 +900,7 @@ def synthesize_interdigital_bpf(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Synthesize a combline microstrip BPF from LPF prototype "
         "g-coefficients: N coupled lines shorted at the same end, each tuned "
@@ -449,6 +947,7 @@ def synthesize_combline_bpf(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run native Qucs-S S-parameter analysis on a qucsator netlist "
         "(generate one with simulate_lc_ladder, or hand-write it; this is "
@@ -473,7 +972,11 @@ def run_sp_analysis(
         result = run_qucs(netlist_path, timeout_sec=timeout_sec)
         s2p = dat_to_touchstone(result.output_path, output_s2p)
         return ok(
-            {"s2p_path": str(s2p), "dat_path": str(result.output_path)},
+            {
+                "s2p_path": str(s2p),
+                "dat_path": str(result.output_path),
+                "run_manifest_path": str(result.manifest_path),
+            },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
         )
@@ -482,6 +985,7 @@ def run_sp_analysis(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Design-to-Touchstone in one call: build a Qucs netlist for a lumped "
         "LC ladder, simulate it with qucsator, and write S-parameters as a "
@@ -549,6 +1053,7 @@ def simulate_lc_ladder(
                 "s2p_path": str(s2p),
                 "netlist_path": str(net),
                 "dat_path": str(result.output_path),
+                "run_manifest_path": str(result.manifest_path),
                 "n_elements": len(parsed),
             },
             runtime_sec=timer.elapsed(),
@@ -559,6 +1064,7 @@ def simulate_lc_ladder(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run harmonic-balance analysis via the Xyce backend. Returns the "
         "spectral content at all mixing products. Requires Xyce installed."
@@ -619,6 +1125,9 @@ def run_harmonic_balance(
             "spectrum": result.spectrum.top(20),
             "netlist_path": str(result.netlist_path),
             "output_path": str(result.output_path),
+            "run_manifest_path": (
+                str(result.manifest_path) if result.manifest_path is not None else None
+            ),
         }
         env_warnings: list[str] = []
         if result.im3_dbm is not None:
@@ -647,6 +1156,7 @@ def run_harmonic_balance(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Sweep drive level through harmonic balance and locate the 1 dB "
         "gain-compression point (P1dB). Requires Xyce. The lowest power swept "
@@ -694,6 +1204,7 @@ def sweep_compression_point(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description="Run Qucs-S sim and export S-parameters to Touchstone in one call.",
 )
 def export_touchstone(
@@ -710,7 +1221,10 @@ def export_touchstone(
         result = run_qucs(netlist_path)
         s2p = dat_to_touchstone(result.output_path, output_s2p)
         return ok(
-            {"s2p_path": str(Path(s2p).resolve())},
+            {
+                "s2p_path": str(Path(s2p).resolve()),
+                "run_manifest_path": str(result.manifest_path),
+            },
             runtime_sec=timer.elapsed(),
             tool_version=__version__,
         )
@@ -719,6 +1233,7 @@ def export_touchstone(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Run a Qucs-S noise analysis and return the four classical noise "
         "parameters per frequency: NF50 (dB), Fmin (dB), Gamma_opt "
@@ -796,7 +1311,10 @@ def extract_noise_parameters(
 
 def main() -> None:
     log.info("starting mcp-qucs-s", extra={"version": __version__})
-    mcp.run()
+    run_stdio_server(mcp)
+
+
+prepare_protocol_tools(mcp)
 
 
 if __name__ == "__main__":

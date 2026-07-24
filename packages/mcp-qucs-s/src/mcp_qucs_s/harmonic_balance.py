@@ -40,6 +40,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from rf_mcp_common.logging import get_logger
+from rf_mcp_common.simulation_workspace import (
+    SimulationWorkspace,
+    probe_executable_version,
+    run_process_tree,
+    sha256_file,
+    subprocess_environment,
+)
 
 log = get_logger("mcp_qucs_s.harmonic_balance")
 
@@ -103,6 +110,7 @@ class HBResult:
     input_power_dbm: float
     netlist_path: Path
     output_path: Path
+    manifest_path: Path | None = None
     im3_dbm: float | None = None
     im3_freqs_hz: list[float] = field(default_factory=list)
     oip3_dbm: float | None = None
@@ -214,7 +222,13 @@ def parse_hb_fd(prn_path: str | Path, *, z0: float = 50.0) -> HBSpectrum:
     return HBSpectrum(freqs_hz=f_pos, volts_peak=v, dbm=np.asarray(volts_to_dbm(v, z0)))
 
 
-def run_xyce(netlist_text: str, *, workdir: Path, timeout_sec: float = 300.0) -> Path:
+def run_xyce(
+    netlist_text: str,
+    *,
+    workdir: Path,
+    timeout_sec: float = 300.0,
+    model_sources: list[tuple[Path, str]] | None = None,
+) -> Path:
     """Run Xyce on ``netlist_text`` and return the ``.HB.FD.prn`` path.
 
     Xyce writes results beside the netlist, so ``workdir`` must be writable
@@ -228,37 +242,99 @@ def run_xyce(netlist_text: str, *, workdir: Path, timeout_sec: float = 300.0) ->
             "Debian/Ubuntu, and they no longer ship open-source builds."
         )
 
+    workdir = Path(workdir).expanduser().resolve()
     workdir.mkdir(parents=True, exist_ok=True)
-    netlist_path = workdir / "hb.cir"
-    netlist_path.write_text(netlist_text, encoding="utf-8")
-
-    proc = subprocess.run(
-        [str(exe), str(netlist_path)],
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        check=False,
-        cwd=str(workdir),
-    )
-    log_path = workdir / "hb.log"
-    log_path.write_text(
-        f"$ {exe} {netlist_path}\nreturncode: {proc.returncode}\n"
-        f"=== stdout ===\n{proc.stdout}\n=== stderr ===\n{proc.stderr}\n",
-        encoding="utf-8",
-    )
-
-    prn = netlist_path.with_suffix(".cir.HB.FD.prn")
-    if not prn.is_file():
-        candidates = sorted(workdir.glob("*.HB.FD.prn"))
-        if candidates:
-            prn = candidates[0]
-        else:
-            tail = (proc.stdout + proc.stderr)[-800:]
-            raise RuntimeError(
-                f"Xyce produced no HB frequency-domain output. "
-                f"returncode={proc.returncode}. Full log at {log_path}.\n{tail}"
+    workspace = SimulationWorkspace.create("xyce-hb", parent=workdir / ".mcp-runs")
+    staged_sources: set[tuple[Path, str]] = set()
+    for source, expected_sha256 in model_sources or []:
+        original = str(source)
+        resolved = source.expanduser().resolve(strict=True)
+        identity = (resolved, expected_sha256)
+        if identity in staged_sources:
+            continue
+        staged_sources.add(identity)
+        if sha256_file(resolved) != expected_sha256:
+            raise ValueError(f"model source checksum changed: {resolved}")
+        staged_name = f"{expected_sha256[:12]}-{resolved.name}"
+        staged = workspace.snapshot_input(resolved, name=staged_name)
+        for reference in {original, str(resolved)}:
+            netlist_text = netlist_text.replace(
+                f'.include "{reference}"',
+                f'.include "{staged.name}"',
             )
-    return prn
+    netlist_path = workspace.write_input_text("hb.cir", netlist_text)
+    staged_prn = netlist_path.with_suffix(".cir.HB.FD.prn")
+    staged_log = workspace.log_path("hb.log")
+
+    published_netlist = workdir / "hb.cir"
+    published_prn = published_netlist.with_suffix(".cir.HB.FD.prn")
+    published_log = workdir / "hb.log"
+    published_manifest = workdir / "hb.manifest.json"
+
+    environment = subprocess_environment({"XYCE_PATH"})
+    cmd = [str(exe), str(netlist_path)]
+    workspace.start(
+        cmd,
+        cwd=workspace.root,
+        environment=environment,
+        executable=exe,
+        backend_version=probe_executable_version(exe, environment=environment),
+    )
+    workspace.publish(netlist_path, published_netlist, role="published_input")
+
+    proc: subprocess.CompletedProcess[str] | None = None
+    try:
+        proc = run_process_tree(
+            cmd,
+            cwd=workspace.root,
+            environment=environment,
+            timeout_sec=timeout_sec,
+        )
+        workspace.write_streams(proc.stdout, proc.stderr)
+        staged_log.write_text(
+            f"$ {' '.join(cmd)}\nreturncode: {proc.returncode}\n"
+            f"=== stdout ===\n{proc.stdout}\n=== stderr ===\n{proc.stderr}\n",
+            encoding="utf-8",
+        )
+        workspace.record_artifact(staged_log, role="simulator_log")
+
+        if proc.returncode != 0:
+            tail = (proc.stdout + proc.stderr)[-800:]
+            raise RuntimeError(f"Xyce exited with returncode={proc.returncode}.\n{tail}")
+        if not staged_prn.is_file() or staged_prn.stat().st_size == 0:
+            raise RuntimeError("Xyce produced no non-empty HB frequency-domain output")
+        parse_hb_fd(staged_prn)
+        workspace.record_artifact(staged_prn, role="simulator_output")
+        workspace.publish(staged_prn, published_prn, role="published_output")
+        workspace.publish(staged_log, published_log, role="published_log")
+        workspace.complete(returncode=proc.returncode)
+        workspace.publish_manifest(published_manifest)
+        # Return the immutable per-run artifact.  The compatibility copy in
+        # ``workdir`` may be overwritten by a later run, but this path cannot.
+        return staged_prn
+    except subprocess.TimeoutExpired as exc:
+        stdout = _timeout_stream(exc.stdout)
+        stderr = _timeout_stream(exc.stderr)
+        workspace.write_streams(stdout, stderr)
+        staged_log.write_text(
+            f"$ {' '.join(cmd)}\ntimeout_sec: {timeout_sec}\n"
+            f"=== stdout ===\n{stdout}\n=== stderr ===\n{stderr}\n",
+            encoding="utf-8",
+        )
+        workspace.record_artifact(staged_log, role="simulator_log")
+        workspace.fail(f"Xyce timed out after {timeout_sec} seconds")
+        workspace.publish(staged_log, published_log, role="published_log")
+        manifest = workspace.publish_manifest(published_manifest)
+        raise RuntimeError(
+            f"Xyce timed out after {timeout_sec} seconds. Manifest: {manifest}"
+        ) from exc
+    except Exception as exc:
+        returncode = proc.returncode if proc is not None else None
+        workspace.fail(str(exc), returncode=returncode)
+        if staged_log.is_file():
+            workspace.publish(staged_log, published_log, role="published_log")
+        manifest = workspace.publish_manifest(published_manifest)
+        raise RuntimeError(f"{exc}. Manifest: {manifest}") from exc
 
 
 def analyze(
@@ -293,8 +369,9 @@ def analyze(
         fundamentals_hz=list(fundamentals_hz),
         fundamental_dbm=fund_dbm,
         input_power_dbm=input_power_dbm,
-        netlist_path=run_dir / "hb.cir",
+        netlist_path=prn.with_name("hb.cir"),
         output_path=prn,
+        manifest_path=prn.parents[1] / "manifest.json",
         gain_db=fund_dbm[0] - input_power_dbm if fund_dbm else None,
     )
 
@@ -315,6 +392,12 @@ def analyze(
         result.iip3_dbm = input_power_dbm + delta / 2.0
 
     return result
+
+
+def _timeout_stream(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
 def sweep_compression(

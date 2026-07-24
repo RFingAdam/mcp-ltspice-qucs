@@ -13,11 +13,22 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from rf_mcp_common.simulation_workspace import (
+    SimulationWorkspace,
+    probe_executable_version,
+    run_process_tree,
+    subprocess_environment,
+)
+
 
 @dataclass
 class QucsRunResult:
     output_path: Path
+    published_output_path: Path
     log_path: Path
+    workspace_path: Path
+    manifest_path: Path
+    published_manifest_path: Path
     returncode: int
     stdout: str
     stderr: str
@@ -109,6 +120,7 @@ def run_qucs(
     *,
     output_path: str | Path | None = None,
     timeout_sec: float = 300.0,
+    workspace_root: str | Path | None = None,
 ) -> QucsRunResult:
     """Invoke qucsator headlessly: ``qucsator -i in.net -o out.dat``.
 
@@ -124,29 +136,104 @@ def run_qucs(
     if exe is None:
         raise RuntimeError(_missing_engine_message())
 
-    out = Path(output_path).expanduser().resolve() if output_path else sch.with_suffix(".dat")
-    log = sch.with_suffix(".qucs.log")
-    cmd = [str(exe), "-i", str(sch), "-o", str(out)]
-    proc = subprocess.run(
+    requested_output = (
+        Path(output_path).expanduser().resolve() if output_path else sch.with_suffix(".dat")
+    )
+    published_log = sch.with_suffix(".qucs.log")
+    published_manifest = sch.with_suffix(".qucs.manifest.json")
+
+    workspace = SimulationWorkspace.create("qucsator", parent=workspace_root)
+    staged_input = workspace.snapshot_input(sch)
+    staged_output = workspace.output_path("result.dat")
+    staged_log = workspace.log_path("qucs.log")
+    environment = subprocess_environment({"QT_PLUGIN_PATH", "QUCSATOR_PATH", "QUCS_S_PATH"})
+    cmd = [str(exe), "-i", str(staged_input), "-o", str(staged_output)]
+    workspace.start(
         cmd,
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        check=False,
+        cwd=workspace.root,
+        environment=environment,
+        executable=exe,
+        backend_version=probe_executable_version(exe, environment=environment),
     )
-    log.write_text(
-        f"$ {' '.join(cmd)}\n=== STDOUT ===\n{proc.stdout}\n=== STDERR ===\n{proc.stderr}",
-        encoding="utf-8",
-    )
-    if not out.is_file():
-        raise RuntimeError(
-            f"Qucs-S did not produce {out}. stdout={proc.stdout[-500:]!r} "
-            f"stderr={proc.stderr[-500:]!r}"
+
+    proc: subprocess.CompletedProcess[str] | None = None
+    try:
+        proc = run_process_tree(
+            cmd,
+            cwd=workspace.root,
+            environment=environment,
+            timeout_sec=timeout_sec,
         )
-    return QucsRunResult(
-        output_path=out,
-        log_path=log,
-        returncode=proc.returncode,
-        stdout=proc.stdout,
-        stderr=proc.stderr,
-    )
+        workspace.write_streams(proc.stdout, proc.stderr)
+        staged_log.write_text(
+            f"$ {' '.join(cmd)}\nreturncode: {proc.returncode}\n"
+            f"=== STDOUT ===\n{proc.stdout}\n=== STDERR ===\n{proc.stderr}",
+            encoding="utf-8",
+        )
+        workspace.record_artifact(staged_log, role="simulator_log")
+
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"Qucs-S exited with returncode={proc.returncode}. stderr={proc.stderr[-500:]!r}"
+            )
+        _validate_qucs_dataset(staged_output)
+        workspace.record_artifact(staged_output, role="simulator_output")
+        published = workspace.publish(staged_output, requested_output, role="published_output")
+        # The workspace artifact is the canonical result for the default path:
+        # it cannot be overwritten by a concurrent invocation using the same
+        # input netlist.  An explicit output_path remains an opt-in shared
+        # publication target and is returned for backward compatibility.
+        out = published if output_path is not None else staged_output
+        log = workspace.publish(staged_log, published_log, role="published_log")
+        workspace.complete(returncode=proc.returncode)
+        manifest = workspace.publish_manifest(published_manifest)
+        return QucsRunResult(
+            output_path=out,
+            published_output_path=published,
+            log_path=log,
+            workspace_path=workspace.root,
+            manifest_path=workspace.manifest_path,
+            published_manifest_path=manifest,
+            returncode=proc.returncode,
+            stdout=proc.stdout,
+            stderr=proc.stderr,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = _timeout_stream(exc.stdout)
+        stderr = _timeout_stream(exc.stderr)
+        workspace.write_streams(stdout, stderr)
+        staged_log.write_text(
+            f"$ {' '.join(cmd)}\ntimeout_sec: {timeout_sec}\n"
+            f"=== STDOUT ===\n{stdout}\n=== STDERR ===\n{stderr}",
+            encoding="utf-8",
+        )
+        workspace.record_artifact(staged_log, role="simulator_log")
+        workspace.fail(f"Qucs-S timed out after {timeout_sec} seconds")
+        workspace.publish(staged_log, published_log, role="published_log")
+        manifest = workspace.publish_manifest(published_manifest)
+        raise RuntimeError(
+            f"Qucs-S timed out after {timeout_sec} seconds. Manifest: {manifest}"
+        ) from exc
+    except Exception as exc:
+        returncode = proc.returncode if proc is not None else None
+        workspace.fail(str(exc), returncode=returncode)
+        if staged_log.is_file():
+            workspace.publish(staged_log, published_log, role="published_log")
+        manifest = workspace.publish_manifest(published_manifest)
+        raise RuntimeError(f"{exc}. Manifest: {manifest}") from exc
+
+
+def _validate_qucs_dataset(path: Path) -> None:
+    """Reject missing, empty, or non-Qucs output before publishing it."""
+    if not path.is_file() or path.stat().st_size == 0:
+        raise RuntimeError(f"Qucs-S did not produce a non-empty dataset at {path}")
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        header = handle.read(4096)
+    if "<Qucs Dataset" not in header:
+        raise RuntimeError(f"Qucs-S output is not a recognized Qucs dataset: {path}")
+
+
+def _timeout_stream(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    return value.decode(errors="replace") if isinstance(value, bytes) else value

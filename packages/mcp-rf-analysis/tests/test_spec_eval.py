@@ -36,6 +36,20 @@ def test_check_passband_compliance_pass(lpf_s2p) -> None:
         rl_min_db=15,
     )
     assert res["status"] == "pass"
+    assert res["evaluation_frequency_hz"][0] == 1e6
+    assert res["evaluation_frequency_hz"][-1] == 250e6
+    assert res["method"] == "complex_linear_interpolation_with_exact_band_edges"
+
+
+def test_check_passband_rejects_partial_out_of_sweep(lpf_s2p) -> None:
+    res = check_passband_compliance(
+        lpf_s2p,
+        100e3,
+        250e6,
+        il_max_db=0.5,
+        rl_min_db=15,
+    )
+    assert res["status"] == "out_of_sweep"
 
 
 def test_check_passband_compliance_fail_above_cutoff(lpf_s2p) -> None:

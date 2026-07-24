@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from mcp_ltspice import server
+from mcp_ltspice.runner import RunResult, Simulator
 
 
 def test_server_instantiates() -> None:
@@ -72,9 +73,83 @@ def test_place_transmission_zero_tool_returns_ok(tmp_path) -> None:
         snap_series="E24",
     )
     assert env.status == "ok"
+    assert env.data["asc_path"] != synth.data["asc_path"]
+    assert Path(synth.data["asc_path"]).read_bytes() != Path(env.data["asc_path"]).read_bytes()
     assert env.data["target_freq_hz"] == 1.85e9
     # E24 snap should land within ~10%
     assert abs(env.data["freq_error_pct"]) < 10
+
+
+def test_run_simulation_snapshots_input_and_requests_sandbox(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "main.cir"
+    dependency = tmp_path / "part.lib"
+    source.write_text('.include "part.lib"\nR1 in 0 50\n', encoding="utf-8")
+    dependency.write_text(".model D D\n", encoding="utf-8")
+    calls: list[tuple[Path, bool]] = []
+
+    def fake_run(path, *, prefer, timeout, sandbox, cancel_requested):
+        snapshot = Path(path)
+        calls.append((snapshot, sandbox))
+        raw = snapshot.with_suffix(".raw")
+        log = snapshot.with_suffix(".log")
+        raw.write_bytes(b"raw")
+        log.write_text("ok", encoding="utf-8")
+        return RunResult(raw, log, Simulator.NGSPICE, 0, "", "", sandboxed=sandbox)
+
+    monkeypatch.setattr(server, "_run_simulation", fake_run)
+    env = server.run_simulation(str(source), prefer="ngspice")
+
+    assert env.status == "ok"
+    snapshot, sandbox = calls[0]
+    assert sandbox is True
+    assert snapshot != source
+    assert (snapshot.parent / "part.lib").read_bytes() == dependency.read_bytes()
+    assert env.data["trusted_in_place"] is False
+
+
+def test_durable_workspace_parse_and_analysis_job(tmp_path) -> None:
+    workspace = server.workspace_create("test")
+    assert workspace.status == "ok"
+    workspace_id = workspace.data["workspace_id"]
+    source = tmp_path / "simple.cir"
+    source.write_text("R1 in 0 50\n.ac lin 3 1k 3k\n", encoding="utf-8")
+    imported = server.artifact_import(workspace_id, str(source))
+    assert imported.status == "ok"
+    artifact_id = imported.data["artifact_id"]
+
+    parsed = server.circuit_parse(workspace_id, artifact_id)
+    assert parsed.status == "ok"
+    assert parsed.data["format"] == "spice_netlist"
+    assert parsed.data["is_supported"] is True
+    assert parsed.data["components"][0]["pins"] == {"1": "in", "2": "0"}
+    read = server.artifact_read(workspace_id, artifact_id)
+    assert read.status == "ok"
+    assert read.data["encoding"] == "base64"
+
+    components = {"L1": 10e-9, "C2": 2e-12, "L3": 10e-9}
+    spec = {
+        "passband": {
+            "f_start": 1e6,
+            "f_stop": 100e6,
+            "il_max_db": 3.0,
+            "rl_min_db": 0.1,
+        },
+        "stopband_targets": [{"freq": 2e9, "rejection_min_db": 0.1, "label": "stop"}],
+    }
+    submitted = server.analysis_submit(
+        "parameter_sweep",
+        {
+            "components": components,
+            "sweep": {"L1": [10e-9]},
+            "spec": spec,
+        },
+        workspace_id,
+    )
+    assert submitted.status == "ok"
+    terminal = server._JOBS.wait(submitted.data["job_id"], timeout_sec=5)
+    assert terminal["status"] == "completed"
+    fetched = server.job_get(submitted.data["job_id"])
+    assert fetched.data["result"]["n_points"] == 1
 
 
 def test_render_response_tool_returns_ok(tmp_path) -> None:

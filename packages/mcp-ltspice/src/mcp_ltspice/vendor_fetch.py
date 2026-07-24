@@ -22,15 +22,17 @@ of thing that should not pass silently.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from mcp_ltspice.vendor_models import (
+    ComponentModel,
     ParasiticCapacitor,
     ParasiticInductor,
     ParasiticPart,
@@ -53,6 +55,68 @@ class IndexedPart:
     value: float
     srf_hz: float | None
     source: str  # how kind/value were determined
+    model: ComponentModel
+
+
+@dataclass
+class LocalDirectoryProvider:
+    """Local-first component provider with explicit refresh/cache semantics."""
+
+    root: Path
+    provider_id: str = "local-directory"
+    _parts: tuple[IndexedPart, ...] = field(default=(), init=False, repr=False)
+    _errors: tuple[dict[str, str], ...] = field(default=(), init=False, repr=False)
+
+    def refresh(self) -> tuple[IndexedPart, ...]:
+        _table, indexed, errors = index_directory(self.root)
+        self._parts = tuple(indexed)
+        self._errors = tuple(errors)
+        return self._parts
+
+    @property
+    def errors(self) -> tuple[dict[str, str], ...]:
+        return self._errors
+
+    def list_models(self) -> tuple[ComponentModel, ...]:
+        if not self._parts:
+            self.refresh()
+        return tuple(part.model for part in self._parts)
+
+    def get_model(self, checksum_sha256: str) -> ComponentModel:
+        for model in self.list_models():
+            if model.checksum_sha256 == checksum_sha256:
+                return model
+        raise KeyError(f"component model checksum not found: {checksum_sha256}")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _subcircuit_from_lib(path: Path) -> tuple[str, tuple[str, str]]:
+    declarations: list[tuple[str, list[str]]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("*", ";")):
+            continue
+        match = re.match(r"(?i)^\.subckt\s+(\S+)\s+(.+)$", stripped)
+        if match:
+            declarations.append((match.group(1), match.group(2).split()))
+    if len(declarations) != 1:
+        raise ValueError(
+            f".lib must contain exactly one .SUBCKT for automatic attachment; "
+            f"found {len(declarations)}"
+        )
+    name, pins = declarations[0]
+    if len(pins) != 2:
+        raise ValueError(
+            f"subcircuit {name!r} has {len(pins)} pins; a two-terminal pin map is required"
+        )
+    return name, (pins[0], pins[1])
 
 
 def parse_value_from_name(name: str) -> float | None:
@@ -203,6 +267,28 @@ def index_directory(
                 )
                 srf = srf if srf is not None else _default_srf(kind, value)
                 source = "s2p+name" if name_value else "s2p"
+                model = ComponentModel(
+                    provider="user",
+                    source_reference=str(path.resolve()),
+                    manufacturer_part_number=None,
+                    model_kind="touchstone",
+                    pin_map={"port1": 1, "port2": 2},
+                    valid_frequency_hz=(None, None),
+                    valid_bias={},
+                    valid_temperature_c=(None, None),
+                    checksum_sha256=_sha256(path),
+                    source_path=str(path.resolve()),
+                    reduction="series_through_s21_to_first_order_lumped",
+                    record_kind="technology_model",
+                    orderable=False,
+                    source_document=str(path.resolve()),
+                    retrieved_at="2026-07-23",
+                    model_license="user-supplied; caller must verify redistribution rights",
+                    checksum_scope="source_file_bytes",
+                    provenance_warning=(
+                        "Filename is not treated as a verified manufacturer part number."
+                    ),
+                )
             else:  # .lib — index by filename only
                 if name_kind is None or name_value is None:
                     raise ValueError(
@@ -212,10 +298,40 @@ def index_directory(
                 kind, value = name_kind, name_value
                 srf = _default_srf(kind, value)
                 source = "lib-name"
+                subcircuit_name, _pins = _subcircuit_from_lib(path)
+                model = ComponentModel(
+                    provider="user",
+                    source_reference=str(path.resolve()),
+                    manufacturer_part_number=None,
+                    model_kind="subckt",
+                    pin_map={"positive": 1, "negative": 2},
+                    valid_frequency_hz=(None, None),
+                    valid_bias={},
+                    valid_temperature_c=(None, None),
+                    checksum_sha256=_sha256(path),
+                    source_path=str(path.resolve()),
+                    subcircuit_name=subcircuit_name,
+                    record_kind="technology_model",
+                    orderable=False,
+                    source_document=str(path.resolve()),
+                    retrieved_at="2026-07-23",
+                    model_license="user-supplied; caller must verify redistribution rights",
+                    checksum_scope="source_file_bytes",
+                    provenance_warning=(
+                        "Filename is not treated as a verified manufacturer part number."
+                    ),
+                )
 
             table[value] = _build_part(kind, value, srf)
             indexed.append(
-                IndexedPart(filename=path.name, kind=kind, value=value, srf_hz=srf, source=source)
+                IndexedPart(
+                    filename=path.name,
+                    kind=kind,
+                    value=value,
+                    srf_hz=srf,
+                    source=source,
+                    model=model,
+                )
             )
         except Exception as e:
             errors.append({"file": path.name, "error": str(e)})
@@ -232,8 +348,19 @@ def register_user_vendor_dir(directory: str | Path, namespace: str = "user") -> 
     if not namespace.strip():
         raise ValueError("namespace must be a non-empty string.")
 
-    table, indexed, errors = index_directory(directory)
-    register_vendor_table(namespace, table)
+    provider = LocalDirectoryProvider(
+        Path(directory).expanduser().resolve(),
+        provider_id=f"local-directory:{namespace}",
+    )
+    indexed = list(provider.refresh())
+    errors = list(provider.errors)
+    table = {
+        part.value: _build_part(part.kind, part.value, float(part.srf_hz))
+        for part in indexed
+        if part.srf_hz is not None
+    }
+    models = {(part.kind, part.value): part.model for part in indexed}
+    register_vendor_table(namespace, table, models)
 
     return {
         "namespace": namespace,
@@ -246,6 +373,7 @@ def register_user_vendor_dir(directory: str | Path, namespace: str = "user") -> 
                 "value": p.value,
                 "srf_hz": p.srf_hz,
                 "source": p.source,
+                "model": p.model.to_dict(),
             }
             for p in indexed
         ],

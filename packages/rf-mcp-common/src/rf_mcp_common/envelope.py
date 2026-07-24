@@ -13,7 +13,10 @@ from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
+from rf_mcp_common.version import distribution_version
+
 T = TypeVar("T")
+_DEFAULT_TOOL_VERSION = distribution_version("rf-mcp-common")
 
 
 class Envelope(BaseModel, Generic[T]):
@@ -38,7 +41,7 @@ def ok(
     *,
     warnings: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
-    tool_version: str = "0.1.0",
+    tool_version: str = _DEFAULT_TOOL_VERSION,
     runtime_sec: float | None = None,
 ) -> Envelope[T]:
     """Build a successful envelope."""
@@ -60,7 +63,7 @@ def error(
     *,
     warnings: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
-    tool_version: str = "0.1.0",
+    tool_version: str = _DEFAULT_TOOL_VERSION,
 ) -> Envelope[Any]:
     """Build a failure envelope with a human-readable message.
 

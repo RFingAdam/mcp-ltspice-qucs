@@ -1,23 +1,31 @@
 # Tool Catalog
 
 <!-- BEGIN GENERATED -->
-Three servers, **110 tools** total. Frequencies are always Hz on the
+Three servers, **140 primary tools** total. Frequencies are always Hz on the
 wire; every tool returns the [Envelope](reference/envelope.md) shape.
-`mcp-ltspice` additionally registers namespaced aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) for every primary tool; only primaries are listed here.
+`mcp-ltspice` additionally registers 59 deprecated namespaced aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) for its primary tools; only primaries are listed here.
 
 ## At a glance
 
 *(This section is generated — run `uv run python scripts/gen_tool_catalog.py`
 after adding or changing tools.)*
 
-=== "mcp-ltspice (59 tools)"
+=== "mcp-ltspice (76 tools)"
 
     | Tool | Purpose |
     |---|---|
+    | `analysis_submit` | Submit optimize_filter, monte_carlo_analysis, or parameter_sweep as a durable bounded job. |
     | `analyze_ldo` | Analyze an LDO at one operating point: efficiency, dropout, dissipation, output ripple. |
+    | `artifact_import` | Import a local artifact into a durable workspace. |
+    | `artifact_read` | Read a small checksum-verified artifact by opaque ID. |
     | `build_design_report_pdf` | Bundle a design directory's artifacts (schematics, response plots, and report.md) into a single shareable PDF. |
     | `cascaded_lpf_design` | Cascaded nth-order Butterworth or Bessel LPF as 2nd-order stages (Sallen-Key). |
     | `check_setup_hold` | Setup/hold timing check on a synchronous digital path. |
+    | `circuit_attach_models` | Attach exact provider model records to CircuitDocument components. |
+    | `circuit_export` | Export a supported CircuitDocument to normalized SPICE or back to its preserved LTspice ASC drawing. |
+    | `circuit_optimize_submit` | Submit generic topology-preserving CircuitDocument optimization as a durable job. |
+    | `circuit_parse` | Parse an imported LTspice ASC or SPICE artifact into versioned CircuitDocument IR with explicit pin-to-net connectivity. |
+    | `circuit_validate` | Validate an imported circuit graph and return all unsupported construct diagnostics. |
     | `compare_filter_orders` | Run the synthesize -> place zeros -> vendor-snap -> optimize -> MC yield workflow for several filter orders side-by-side and return the most shippable. |
     | `compute_phase_margin` | Compute crossover freq + phase margin from open-loop Bode arrays. |
     | `corner_analysis` | Evaluate a filter spec at named corners (e.g. |
@@ -29,11 +37,15 @@ after adding or changing tools.)*
     | `design_rc_snubber` | Design an RC snubber that damps switch-node ringing. |
     | `estimate_digital_to_analog_crosstalk` | Estimate digital-to-analog crosstalk via mutual capacitance. |
     | `estimate_supply_noise_injection` | Estimate supply-rail droop from digital switching activity. |
-    | `evaluate_filter_spec_tool` | Evaluate a Touchstone .s2p file against a coex-aware spec. |
-    | `extract_sparameters` | Parse a SPICE .raw AC analysis output and write 2-port S-parameters to a Touchstone .s2p file. |
+    | `evaluate_filter_spec` | Evaluate a Touchstone .s2p file against a coex-aware spec. |
+    | `extract_sparameters` | Run two matched-port AC excitations on an LTspice .asc and write the measured S11/S21/S12/S22 matrix to Touchstone. |
     | `find_mosfet_for_application` | Filter the MOSFET catalog by polarity, Vds, Id, Rds_on, Vgs threshold. |
     | `find_opamp_for_application` | Filter the op-amp catalog by spec constraints (GBW, noise, offset, supply, RRIO flags, family) and return ranked candidates. |
     | `find_transmission_zeros` | Locate notches (transmission zeros) in S21 by peak detection. |
+    | `job_cancel` | Request cancellation and terminate a running simulator process tree. |
+    | `job_get` | Get durable job state, progress, result, and retry diagnostics. |
+    | `job_list_artifacts` | List checksum-addressed artifacts in the workspace associated with a job. |
+    | `job_retry` | Retry a failed or cancelled durable job using its immutable payload. |
     | `list_bjts` | List all BJT part numbers. |
     | `list_diodes` | List all diode part numbers (signal / Schottky / TVS / zener / ESD). |
     | `list_mosfets` | List all MOSFET part numbers in the bundled catalog. |
@@ -52,9 +64,10 @@ after adding or changing tools.)*
     | `parameter_sweep` | Sweep one or more component values across a Cartesian product grid and report per-point spec margins + overall yield. |
     | `place_transmission_zero` | Move the transmission zero of a shunt LC trap to a target frequency, preserving (by default) the L/C ratio for impedance match. |
     | `predict_conducted_emissions` | Predict conducted-emission spectrum at the LISN port for an SMPS and compare to CISPR 22 / 32 limits (Class A / B, QP / AVG detector). |
+    | `probe_backend` | Administrative readiness probe for LTspice or ngspice. |
     | `propagation_delay` | Estimate combinational propagation delay (gates + wires + fanout). |
     | `register_user_vendor_dir` | Index a directory of user-supplied vendor models (.s2p / .lib) so they appear as substitution candidates under a namespace. |
-    | `render_asc_as_schematic` | Parse an existing LTspice .asc and re-render it as a clean schemdraw SVG/PNG (the .asc only renders inside LTspice). |
+    | `render_generated_lc_ladder_asc` | Read component values from an LTspice .asc generated by this package and re-render its LC ladder as schemdraw SVG/PNG. |
     | `render_lc_ladder_schematic` | Render a clean publication-quality schematic of an LC ladder filter. |
     | `render_response` | Render an S₂ₚ Bode plot as PNG. |
     | `required_psrr_for_ripple` | Compute the PSRR (dB) an LDO needs to meet an output-ripple target. |
@@ -62,10 +75,13 @@ after adding or changing tools.)*
     | `sallen_key_band_pass` | Synthesize a Sallen-Key 2nd-order BPF (single op-amp). |
     | `sallen_key_high_pass` | Synthesize a Sallen-Key 2nd-order HPF. |
     | `sallen_key_low_pass` | Synthesize a Sallen-Key 2nd-order LPF (op-amp + 2R + 2C). |
+    | `search_component_models` | Search curated and registered local component providers using hard constraints for value, package, orderability/stock, Q and SRF, tolerance, ratings, bias, t… |
     | `sensitivity_analysis` | Perturb each component by +/-pct and report the dB/% sensitivity of every spec criterion. |
+    | `simulate_realized_filter` | Select vendor L/C models, instantiate them into two simulator-ready LPF/HPF/BPF/BSF ladder netlists, run both matched-port excitations, and write a full meas… |
+    | `simulation_submit` | Submit a durable, cancellable SPICE simulation job. |
     | `srf_audit` | Flag inductors / capacitors whose self-resonant frequency is within margin_pct of the highest spec target. |
     | `stability_check` | Compute Rollett K-factor, |Δ|, and Edwards-Sinsky μ-factor across frequency for a 2-port network. |
-    | `substitute_real_components` | Replace ideal L/C values with vendor parts. |
+    | `substitute_real_components` | Snap ideal L/C values to vendor catalog parts and return first-order parasitic metadata (Cp/Ls, ESR, SRF) plus immutable model provenance. |
     | `synthesize_for_coex_target` | Closed-loop coex-driven synthesis: iterate elliptic LPF order until the coexistence matrix meets a desense target. |
     | `synthesize_lc_bpf_filter` | Synthesize a band-pass LC ladder via the LPF→BPF frequency transformation (Pozar §8.5). |
     | `synthesize_lc_bsf_filter` | Synthesize a band-stop LC ladder via the LPF→BSF frequency transformation (Pozar §8.5). |
@@ -73,20 +89,32 @@ after adding or changing tools.)*
     | `synthesize_lc_hpf_filter` | Synthesize a high-pass LC ladder via the LPF→HPF frequency transformation (Pozar §8.5). |
     | `type2_compensator` | Type-II compensator design (1 zero + 1 pole) for current-mode SMPS loops. |
     | `validate_against_spice` | Run a real SPICE simulation on a schematic and reconcile it against the closed-form analytical S2P for the same components. |
+    | `workspace_create` | Create a durable server-owned workspace and return its opaque ID. |
 
-=== "mcp-qucs-s (17 tools)"
+=== "mcp-qucs-s (29 tools)"
 
     | Tool | Purpose |
     |---|---|
     | `analyze_microstrip_tool` | Analyze an existing microstrip line: Z0, eps_eff, wavelength. |
+    | `artifact_import` | Import a Qucs schematic or netlist into a confined workspace. |
+    | `artifact_read` | Read a small checksum-verified artifact by opaque ID. |
+    | `circuit_export` | Export a supported CircuitDocument to Qucsator netlist or its preserved Qucs schematic and return a checksum-addressed artifact. |
+    | `circuit_parse` | Parse an imported Qucs schematic or Qucsator netlist into versioned CircuitDocument IR. |
+    | `circuit_validate` | Validate an imported circuit graph and return all unsupported construct diagnostics. |
     | `export_touchstone` | Run Qucs-S sim and export S-parameters to Touchstone in one call. |
     | `extract_noise_parameters` | Run a Qucs-S noise analysis and return the four classical noise parameters per frequency: NF50 (dB), Fmin (dB), Gamma_opt (magnitude and angle) and Rn (ohms). |
+    | `job_cancel` | Request cancellation and terminate a running simulator process tree. |
+    | `job_get` | Get durable job state, progress, result, and retry diagnostics. |
+    | `job_list_artifacts` | List checksum-addressed artifacts in the workspace associated with a job. |
+    | `job_retry` | Retry a failed or cancelled durable job using its immutable payload. |
     | `list_substrate_presets_tool` | List curated substrate presets (FR4, Rogers RO4350B / RO4003C, Duroid 5880 / 6002, PTFE, Isola FR408HR, Taconic TLY5) with their {er, h_mm, t_um, tan_d} values. |
     | `lumped_to_distributed` | Convert a lumped LC ladder to its distributed-element microstrip equivalent via Richards transformation + Kuroda identities. |
+    | `probe_backend` | Administrative readiness probe for qucsator or Xyce. |
     | `run_harmonic_balance` | Run harmonic-balance analysis via the Xyce backend. |
     | `run_sp_analysis` | Run native Qucs-S S-parameter analysis on a qucsator netlist (generate one with simulate_lc_ladder, or hand-write it; this is the netlist format, not the GUI… |
     | `simulate_lc_ladder` | Design-to-Touchstone in one call: build a Qucs netlist for a lumped LC ladder, simulate it with qucsator, and write S-parameters as a .s2p file. |
-    | `status` | Report whether Qucs-S and Xyce are installed and discoverable. |
+    | `simulation_submit` | Submit a durable, cancellable circuit simulation job: compile the imported artifact, run it, parse the result into a normalized ResultDataset, and validate i… |
+    | `status` | Report synthesis features and backend readiness states. |
     | `sweep_compression_point` | Sweep drive level through harmonic balance and locate the 1 dB gain-compression point (P1dB). |
     | `synthesize_combline_bpf` | Synthesize a combline microstrip BPF from LPF prototype g-coefficients: N coupled lines shorted at the same end, each tuned by a lumped capacitor at the open… |
     | `synthesize_coupled_line_bpf` | Synthesize an edge-coupled (parallel coupled-line) microstrip BPF (Pozar §8.7) from LPF prototype g-coefficients (pass the g_coefficients list a lumped synth… |
@@ -95,8 +123,9 @@ after adding or changing tools.)*
     | `synthesize_interdigital_bpf` | Synthesize an interdigital microstrip BPF from LPF prototype g-coefficients: N coupled λ/4 resonators, alternately shorted, tapped I/O. |
     | `synthesize_microstrip_line` | Synthesize microstrip line dimensions for a target characteristic impedance and electrical length. |
     | `synthesize_stepped_impedance_lpf` | Synthesize a stepped-impedance microstrip LPF (Pozar §8.6) from a lumped LPF ladder: series inductors become short high-Z sections (βl = ω_c·L/Z_h), shunt ca… |
+    | `workspace_create` | Create a durable server-owned workspace for Qucs circuit artifacts. |
 
-=== "mcp-rf-analysis (34 tools)"
+=== "mcp-rf-analysis (35 tools)"
 
     | Tool | Purpose |
     |---|---|
@@ -105,7 +134,7 @@ after adding or changing tools.)*
     | `check_passband_compliance` | Check passband insertion loss + return loss across [f_start, f_stop]. |
     | `check_rejection_at` | Check |S21| at a single frequency against a min-rejection target. |
     | `cispr_limit_at` | Conducted-emissions limit (dBuV) at a frequency for CISPR 22 / FCC 15B. |
-    | `compare_sparameters` | Element-wise diff between two .s2p files (S21 dB / S11 dB / mag / phase). |
+    | `compare_sparameters` | Compare two .s2p files (S21 dB / S11 dB / magnitude / phase) on the union of their measured points inside the overlapping frequency span. |
     | `compute_antenna_isolation_estimate` | Estimate antenna-to-antenna isolation in dB. |
     | `compute_desense` | Predict RX desense from an aggressor TX with filter and antenna isolation. |
     | `compute_path_loss` | Compute Friis or log-distance path loss in dB. |
@@ -117,7 +146,7 @@ after adding or changing tools.)*
     | `extract_delay` | Compute group delay (or unwrapped phase) of S21. |
     | `eye_diagram_from_s2p` | Compute eye-diagram metrics for a channel given its S2P. |
     | `fcc_part15_radiated_limit_at` | FCC Part 15.109 Class B radiated-emissions limit (dBuV/m) at distance. |
-    | `fit_equivalent_circuit` | Fit a lumped equivalent circuit to a measured 2-port network. |
+    | `fit_equivalent_circuit` | Fit a lumped equivalent circuit to a measured 2-port and report bounded-solver convergence, residuals, identifiability, and valid range. |
     | `is_in_restricted_band_tool` | Check whether a frequency falls into an FCC restricted band. |
     | `list_5gnr_bands_tool` | List 5G NR bands. |
     | `list_fcc_restricted_bands_tool` | List FCC §15.205 restricted bands. |
@@ -131,9 +160,10 @@ after adding or changing tools.)*
     | `place_zeros_for_coex` | Compute optimal elliptic-filter transmission-zero frequencies for coexistence: for each harmonic landing [n·f_lo, n·f_hi], the zero goes at the severity-weig… |
     | `predict_conducted_emissions` | Convert an AC line-current spectrum to LISN voltage and check against CISPR 22 / FCC 15B conducted-emissions limits. |
     | `predict_radiated_emissions_loop` | Estimate radiated E-field from a current-carrying loop (small-loop approximation). |
+    | `probe_backend` | Administrative readiness probe for the RF numerical stack. |
     | `renormalize_impedance` | Renormalize an S-parameter file to a new reference impedance. |
     | `smith_chart_data` | Return Smith chart data (S_ii real/imag + normalized impedance) for plotting. |
-    | `tdr_from_s11` | Time-Domain Reflectometry from S11. |
+    | `tdr_from_s11` | Validated S11 time-domain transform. |
 
 <!-- END GENERATED -->
 
@@ -146,7 +176,7 @@ Every tool returns:
   "status": "ok | error",
   "data": { ... } | null,
   "warnings": [ "..." ],
-  "metadata": { "tool_version": "0.1.0", "runtime_sec": 0.123 },
+  "metadata": { "tool_version": "0.6.0", "runtime_sec": 0.123 },
   "error": null | "human readable message"
 }
 ```

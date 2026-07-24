@@ -41,7 +41,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages
+        run: uv sync --all-packages --frozen
 
       - name: Build docs
         run: uv run mkdocs build --strict --site-dir _site

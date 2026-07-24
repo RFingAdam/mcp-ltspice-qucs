@@ -1,6 +1,6 @@
 [project]
 name = "mcp-rf-analysis"
-version = "0.5.0"
+version = "0.6.0"
 description = "Simulator-agnostic MCP server for RF S-parameter analysis, regulatory band databases (LTE / 5G NR / GNSS / ISM / HaLow), and multi-radio coexistence engineering"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,19 +9,19 @@ authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }
 keywords = ["mcp", "rf-engineering", "scikit-rf", "lte", "5g", "coexistence", "regulatory"]
 
 dependencies = [
-    "rf-mcp-common",
-    "fastmcp>=2.0.0",
-    "scikit-rf>=1.2.0",
-    "scipy>=1.11",
-    "numpy>=1.26",
-    "pandas>=2.1",
+    "rf-mcp-common>=0.6,<0.7",
+    "fastmcp>=3.4.4,<3.5",
+    "scikit-rf>=1.2.0,<2",
+    "scipy>=1.11,<2",
+    "numpy>=1.26,<3",
+    "pandas>=2.1,<4",
 ]
 
 [project.scripts]
 mcp-rf-analysis = "mcp_rf_analysis.server:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.25,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

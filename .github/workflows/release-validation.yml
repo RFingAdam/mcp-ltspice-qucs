@@ -1,0 +1,62 @@
+name: Release validation
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+
+      - name: Verify release surfaces
+        run: |
+          uv run pytest -q tests/test_versions.py tests/test_documentation_contract.py tests/test_tool_contract_snapshot.py tests/test_client_configs.py
+          uv run python scripts/gen_tool_catalog.py --check
+          uv run python scripts/gen_backend_matrix.py --check
+          uv run python scripts/gen_tool_contract_snapshot.py --check
+          uv run mkdocs build --strict --site-dir _site
+
+      - name: Audit locked dependencies
+        run: |
+          uv export --frozen --all-packages --no-hashes --output-file requirements-audit.txt
+          uvx pip-audit --requirement requirements-audit.txt
+
+      - name: Build all release artifacts
+        run: uv build --all-packages
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: rf-mcp-suite.spdx.json
+          output-file: dist/rf-mcp-suite.spdx.json
+          format: spdx-json
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "dist/*"
+
+      - name: Upload validated release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-artifacts
+          path: dist/
+          if-no-files-found: error

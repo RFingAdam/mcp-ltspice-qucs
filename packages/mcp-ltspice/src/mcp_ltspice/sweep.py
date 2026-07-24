@@ -21,16 +21,31 @@ Three primitives:
 from __future__ import annotations
 
 import itertools
+import json
+import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 import numpy as np
 
-from mcp_ltspice.eval import FilterSpec
-from mcp_ltspice.extract import (
-    components_dict_to_elements,
-    ladder_sparams_from_components,
+from mcp_ltspice.analysis_context import (
+    EvaluationMode,
+    FilterAnalysisContext,
+    FilterKind,
+    build_spec_frequency_grid,
+    evaluate_component_margins,
 )
+from mcp_ltspice.eval import FilterSpec
+from mcp_ltspice.resource_budget import (
+    MAX_FREQUENCY_POINTS,
+    MAX_INLINE_SWEEP_POINTS,
+    MAX_SWEEP_POINTS,
+    require_work_budget,
+)
+from mcp_ltspice.synthesis import Topology
+from rf_mcp_common.simulation_workspace import ProcessCancelledError, SimulationWorkspace
 
 
 @dataclass
@@ -48,53 +63,31 @@ class SweepResult:
     n_passing: int
     yield_pct: float
     points: list[SweepPoint]
+    analysis_context: dict[str, Any]
+    estimated_work_units: int
+    points_artifact: str | None = None
+    artifact_manifest: str | None = None
 
 
 def _evaluate_margins(
     components: dict[str, float],
     spec: FilterSpec,
     *,
-    transmission_zeros: bool,
+    context: FilterAnalysisContext,
     f_grid: np.ndarray,
-    z0: float,
 ) -> tuple[dict[str, float], str]:
     """Compute per-criterion margin in dB and overall pass/fail."""
-    elements = components_dict_to_elements(
-        components, transmission_zeros=transmission_zeros, topology="series_first"
+    evaluation = evaluate_component_margins(
+        components,
+        spec,
+        context=context,
+        f_grid=f_grid,
     )
-    s = ladder_sparams_from_components(elements, f_grid, z0=z0)
-    s21_db = 20 * np.log10(np.maximum(np.abs(s[:, 1, 0]), 1e-12))
-    s11_db = 20 * np.log10(np.maximum(np.abs(s[:, 0, 0]), 1e-12))
-
-    margins: dict[str, float] = {}
-    pb = spec.passband
-    pb_mask = (f_grid >= pb.f_start) & (f_grid <= pb.f_stop)
-    if pb_mask.any():
-        worst_il = float(-s21_db[pb_mask].min())
-        worst_rl = float(-s11_db[pb_mask].max())
-        margins["Passband IL"] = pb.il_max_db - worst_il
-        margins["Passband RL"] = worst_rl - pb.rl_min_db
-
-    for tgt in spec.stopband_targets:
-        if tgt.freq < f_grid.min() or tgt.freq > f_grid.max():
-            margins[tgt.label] = float("nan")
-            continue
-        s21_at = float(np.interp(tgt.freq, f_grid, s21_db))
-        rejection = -s21_at
-        margins[tgt.label] = rejection - tgt.rejection_min_db
-
-    finite_margins = [m for m in margins.values() if np.isfinite(m)]
-    overall = "pass" if all(m >= 0 for m in finite_margins) else "fail"
-    return margins, overall
+    return evaluation.margins, evaluation.overall
 
 
 def _make_freq_grid(spec: FilterSpec, n: int = 401) -> np.ndarray:
-    pb = spec.passband
-    span = max(
-        pb.f_stop * 5,
-        max((t.freq for t in spec.stopband_targets), default=pb.f_stop * 5) * 1.5,
-    )
-    return np.geomspace(max(pb.f_start, 1e3), span, n)
+    return build_spec_frequency_grid(spec, npoints=n)
 
 
 def parameter_sweep(
@@ -103,8 +96,20 @@ def parameter_sweep(
     spec: FilterSpec | dict[str, Any],
     *,
     z0: float = 50.0,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: FilterKind | str = "lowpass",
+    topology: Topology | str = Topology.SERIES_FIRST,
+    evaluation_mode: EvaluationMode = "analytical",
+    model_fidelity: str = "ideal_lumped",
+    provenance: dict[str, Any] | None = None,
+    component_substitution: dict[str, dict[str, Any]] | None = None,
+    transmission_zeros_hz: list[float] | None = None,
     f_grid_npoints: int = 401,
+    max_points: int = 5_000,
+    result_mode: Literal["auto", "inline", "artifact"] = "auto",
+    artifact_parent: str | Path | None = None,
+    cancel_requested: Callable[[], bool] | None = None,
+    progress: Callable[[int, int], None] | None = None,
 ) -> SweepResult:
     """Evaluate the spec across a Cartesian product of parameter values.
 
@@ -115,37 +120,109 @@ def parameter_sweep(
     """
     if isinstance(spec, dict):
         spec = FilterSpec.model_validate(spec)
-    f_grid = _make_freq_grid(spec, f_grid_npoints)
+    if max_points < 1 or max_points > MAX_SWEEP_POINTS:
+        raise ValueError("max_points must be in [1, 10,000]")
+    if not 8 <= f_grid_npoints <= MAX_FREQUENCY_POINTS:
+        raise ValueError("f_grid_npoints must be in [8, 10,000]")
+    if not sweep or any(not values for values in sweep.values()):
+        raise ValueError("sweep must contain at least one non-empty value grid")
+    n_requested = math.prod(len(values) for values in sweep.values())
+    if n_requested > max_points:
+        raise ValueError(
+            f"parameter sweep requests {n_requested} points, exceeding max_points={max_points}"
+        )
+    if result_mode == "inline" and n_requested > MAX_INLINE_SWEEP_POINTS:
+        raise ValueError(
+            f"inline sweep results are limited to {MAX_INLINE_SWEEP_POINTS} points; "
+            "use result_mode='artifact' or 'auto'"
+        )
+    estimated_work_units = require_work_budget(
+        evaluations=n_requested,
+        frequency_points=f_grid_npoints,
+        label="parameter sweep",
+    )
+    context = FilterAnalysisContext.create(
+        kind=kind,
+        topology=topology,
+        z0=z0,
+        transmission_zeros=transmission_zeros,
+        evaluation_mode=evaluation_mode,
+        model_fidelity=model_fidelity,
+        provenance=provenance,
+        component_substitution=component_substitution,
+    )
+    f_grid = build_spec_frequency_grid(
+        spec,
+        npoints=f_grid_npoints,
+        transmission_zeros_hz=transmission_zeros_hz or (),
+    )
 
     refs = list(sweep.keys())
     grids = [sweep[r] for r in refs]
     points: list[SweepPoint] = []
+    use_artifact = result_mode == "artifact" or (
+        result_mode == "auto" and n_requested > MAX_INLINE_SWEEP_POINTS
+    )
+    workspace = (
+        SimulationWorkspace.create("parameter-sweep", parent=artifact_parent)
+        if use_artifact
+        else None
+    )
+    artifact = workspace.output_path("sweep_points.jsonl") if workspace is not None else None
+    artifact_handle = artifact.open("w", encoding="utf-8") if artifact is not None else None
 
-    for combo in itertools.product(*grids):
-        sampled = dict(components)
-        for r, v in zip(refs, combo, strict=True):
-            sampled[r] = float(v)
-        margins, overall = _evaluate_margins(
-            sampled,
-            spec,
-            transmission_zeros=transmission_zeros,
-            f_grid=f_grid,
-            z0=z0,
-        )
-        points.append(
-            SweepPoint(
+    n_pass = 0
+    try:
+        for index, combo in enumerate(itertools.product(*grids), start=1):
+            if cancel_requested is not None and cancel_requested():
+                raise ProcessCancelledError("parameter sweep was cancelled")
+            sampled = dict(components)
+            for r, v in zip(refs, combo, strict=True):
+                sampled[r] = float(v)
+            margins, overall = _evaluate_margins(
+                sampled,
+                spec,
+                context=context,
+                f_grid=f_grid,
+            )
+            point = SweepPoint(
                 parameters=dict(zip(refs, combo, strict=True)),
                 margins=margins,
                 overall=overall,
             )
-        )
-
-    n_pass = sum(1 for p in points if p.overall == "pass")
+            n_pass += int(overall == "pass")
+            if artifact_handle is None:
+                points.append(point)
+            else:
+                artifact_handle.write(
+                    json.dumps(
+                        {
+                            "parameters": point.parameters,
+                            "margins": point.margins,
+                            "overall": point.overall,
+                        }
+                    )
+                    + "\n"
+                )
+            if progress is not None and (
+                index == n_requested or index % min(100, n_requested) == 0
+            ):
+                progress(index, n_requested)
+    finally:
+        if artifact_handle is not None:
+            artifact_handle.close()
+    if workspace is not None and artifact is not None:
+        workspace.record_artifact(artifact, role="sweep_points")
+        workspace.complete(returncode=0)
     return SweepResult(
-        n_points=len(points),
+        n_points=n_requested,
         n_passing=n_pass,
-        yield_pct=100.0 * n_pass / len(points) if points else 0.0,
+        yield_pct=100.0 * n_pass / n_requested,
         points=points,
+        analysis_context=context.as_dict(),
+        estimated_work_units=estimated_work_units,
+        points_artifact=str(artifact) if artifact is not None else None,
+        artifact_manifest=(str(workspace.manifest_path) if workspace is not None else None),
     )
 
 
@@ -155,7 +232,14 @@ def corner_analysis(
     spec: FilterSpec | dict[str, Any],
     *,
     z0: float = 50.0,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: FilterKind | str = "lowpass",
+    topology: Topology | str = Topology.SERIES_FIRST,
+    evaluation_mode: EvaluationMode = "analytical",
+    model_fidelity: str = "ideal_lumped",
+    provenance: dict[str, Any] | None = None,
+    component_substitution: dict[str, dict[str, Any]] | None = None,
+    transmission_zeros_hz: list[float] | None = None,
     f_grid_npoints: int = 401,
 ) -> dict[str, Any]:
     """Evaluate the spec at named corners.
@@ -174,7 +258,21 @@ def corner_analysis(
     """
     if isinstance(spec, dict):
         spec = FilterSpec.model_validate(spec)
-    f_grid = _make_freq_grid(spec, f_grid_npoints)
+    context = FilterAnalysisContext.create(
+        kind=kind,
+        topology=topology,
+        z0=z0,
+        transmission_zeros=transmission_zeros,
+        evaluation_mode=evaluation_mode,
+        model_fidelity=model_fidelity,
+        provenance=provenance,
+        component_substitution=component_substitution,
+    )
+    f_grid = build_spec_frequency_grid(
+        spec,
+        npoints=f_grid_npoints,
+        transmission_zeros_hz=transmission_zeros_hz or (),
+    )
 
     out: dict[str, Any] = {}
     failing_corners = 0
@@ -183,9 +281,8 @@ def corner_analysis(
         margins, overall = _evaluate_margins(
             sampled,
             spec,
-            transmission_zeros=transmission_zeros,
+            context=context,
             f_grid=f_grid,
-            z0=z0,
         )
         out[name] = {
             "components": sampled,
@@ -200,6 +297,7 @@ def corner_analysis(
         "n_failing_corners": failing_corners,
         "all_corners_pass": failing_corners == 0,
         "results": out,
+        "analysis_context": context.as_dict(),
     }
 
 
@@ -209,7 +307,14 @@ def sensitivity_analysis(
     *,
     perturbation_pct: float = 1.0,
     z0: float = 50.0,
-    transmission_zeros: bool = True,
+    transmission_zeros: bool | None = None,
+    kind: FilterKind | str = "lowpass",
+    topology: Topology | str = Topology.SERIES_FIRST,
+    evaluation_mode: EvaluationMode = "analytical",
+    model_fidelity: str = "ideal_lumped",
+    provenance: dict[str, Any] | None = None,
+    component_substitution: dict[str, dict[str, Any]] | None = None,
+    transmission_zeros_hz: list[float] | None = None,
     f_grid_npoints: int = 401,
 ) -> dict[str, Any]:
     """For each component, perturb by ±perturbation_pct and measure
@@ -222,15 +327,28 @@ def sensitivity_analysis(
     """
     if isinstance(spec, dict):
         spec = FilterSpec.model_validate(spec)
-    f_grid = _make_freq_grid(spec, f_grid_npoints)
+    context = FilterAnalysisContext.create(
+        kind=kind,
+        topology=topology,
+        z0=z0,
+        transmission_zeros=transmission_zeros,
+        evaluation_mode=evaluation_mode,
+        model_fidelity=model_fidelity,
+        provenance=provenance,
+        component_substitution=component_substitution,
+    )
+    f_grid = build_spec_frequency_grid(
+        spec,
+        npoints=f_grid_npoints,
+        transmission_zeros_hz=transmission_zeros_hz or (),
+    )
     delta = perturbation_pct / 100.0
 
     nominal_margins, _ = _evaluate_margins(
         components,
         spec,
-        transmission_zeros=transmission_zeros,
+        context=context,
         f_grid=f_grid,
-        z0=z0,
     )
 
     sensitivities: list[dict[str, Any]] = []
@@ -241,9 +359,8 @@ def sensitivity_analysis(
         plus_margins, _ = _evaluate_margins(
             plus_comps,
             spec,
-            transmission_zeros=transmission_zeros,
+            context=context,
             f_grid=f_grid,
-            z0=z0,
         )
         # -δ
         minus_comps = dict(components)
@@ -251,9 +368,8 @@ def sensitivity_analysis(
         minus_margins, _ = _evaluate_margins(
             minus_comps,
             spec,
-            transmission_zeros=transmission_zeros,
+            context=context,
             f_grid=f_grid,
-            z0=z0,
         )
 
         for crit in nominal_margins:
@@ -285,4 +401,5 @@ def sensitivity_analysis(
         "ranked_sensitivities": sensitivities,
         "per_component_total_sensitivity": dict(ranked_components),
         "most_influential_component": ranked_components[0][0] if ranked_components else None,
+        "analysis_context": context.as_dict(),
     }

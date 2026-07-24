@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "ltspice": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--frozen",
+        "--directory",
+        "${CLAUDE_PROJECT_DIR:-.}",
+        "--package",
+        "mcp-ltspice",
+        "mcp-ltspice"
+      ],
+      "env": {}
+    },
+    "qucs-s": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--frozen",
+        "--directory",
+        "${CLAUDE_PROJECT_DIR:-.}",
+        "--package",
+        "mcp-qucs-s",
+        "mcp-qucs-s"
+      ],
+      "env": {}
+    },
+    "rf-analysis": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--frozen",
+        "--directory",
+        "${CLAUDE_PROJECT_DIR:-.}",
+        "--package",
+        "mcp-rf-analysis",
+        "mcp-rf-analysis"
+      ],
+      "env": {}
+    }
+  }
+}

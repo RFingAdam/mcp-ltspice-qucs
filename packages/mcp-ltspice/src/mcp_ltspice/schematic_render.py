@@ -398,24 +398,45 @@ def render_cascaded_lpf_schematic(
     return paths
 
 
-def render_asc_as_schematic(
+def render_generated_lc_ladder_asc(
     asc_path: str | Path,
     output_path: str | Path,
     *,
     transmission_zeros: bool = True,
     title: str | None = None,
 ) -> Path:
-    """Parse a generated .asc and re-render it as a clean schemdraw SVG.
+    """Render only the canonical ladder fixture emitted by this package."""
+    from mcp_ltspice.asc_io import read_asc_text, read_components
 
-    Only handles the LC-ladder topology our ``generate_lpf_asc`` emits;
-    falls back to listing components if the structure isn't recognized.
-    """
-    from mcp_ltspice.asc_io import read_components
+    text = read_asc_text(asc_path).text
+    symbol_types = re.findall(r"^SYMBOL\s+(\S+)", text, flags=re.MULTILINE)
+    instance_names = re.findall(r"^SYMATTR\s+InstName\s+(\S+)", text, flags=re.MULTILINE)
+    unsupported = sorted(set(symbol_types) - {"voltage", "res", "ind", "cap"})
+    required_fixture = {"V1", "Rs1", "RL1"}
+    if unsupported or not required_fixture.issubset(instance_names):
+        raise ValueError(
+            "incomplete-render: source is not a generated LC ladder fixture; "
+            f"unsupported_symbols={unsupported}, "
+            f"missing_fixture={sorted(required_fixture - set(instance_names))}"
+        )
+    if len(symbol_types) != len(instance_names):
+        raise ValueError("incomplete-render: every generated symbol must have exactly one InstName")
+    directives = re.findall(r"^TEXT\s+.*\s!(\.\S+.*)$", text, flags=re.MULTILINE)
+    if any(not directive.lower().startswith(".ac ") for directive in directives):
+        raise ValueError(
+            "incomplete-render: generated ladder renderer does not preserve non-AC directives"
+        )
 
     components = read_components(asc_path)
+    if not components:
+        raise ValueError("incomplete-render: generated ladder contains no L/C components")
     return render_lc_ladder_schematic(
         components,
         output_path,
         transmission_zeros=transmission_zeros,
         title=title or Path(asc_path).stem,
     )
+
+
+# Python compatibility only; the MCP surface uses the narrowed canonical name.
+render_asc_as_schematic = render_generated_lc_ladder_asc

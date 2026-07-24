@@ -27,15 +27,19 @@ LTspice is preferred for ``.asc`` fidelity, falling back to ngspice.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from functools import lru_cache
+from pathlib import Path, PurePosixPath
 
 from rf_mcp_common.logging import get_logger
+from rf_mcp_common.simulation_workspace import run_process_tree
 
 log = get_logger("mcp_ltspice.runner")
 
@@ -57,6 +61,7 @@ class RunResult:
     returncode: int
     stdout: str
     stderr: str
+    sandboxed: bool = False
 
 
 def find_ltspice() -> Path | None:
@@ -111,6 +116,92 @@ def find_ngspice() -> Path | None:
 def find_wine() -> Path | None:
     p = shutil.which("wine") or shutil.which("wine64")
     return Path(p) if p else None
+
+
+@lru_cache(maxsize=1)
+def bubblewrap_ready() -> bool:
+    """Return whether bubblewrap can actually create an isolated namespace."""
+    executable = shutil.which("bwrap")
+    if executable is None or os.name == "nt":
+        return False
+    try:
+        result = subprocess.run(
+            [
+                executable,
+                "--die-with-parent",
+                "--unshare-net",
+                "--ro-bind",
+                "/usr",
+                "/usr",
+                "/usr/bin/true",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def _sandbox_ngspice_command(command: list[str], workdir: Path) -> list[str]:
+    """Wrap an ngspice command in a no-network, workspace-only bubblewrap."""
+    executable = shutil.which("bwrap")
+    if executable is None or not bubblewrap_ready():
+        raise RuntimeError(
+            "OS simulation sandbox is unavailable. Install/configure bubblewrap "
+            "with unprivileged user namespaces, or explicitly use trusted_in_place=True."
+        )
+    wrapped = [
+        executable,
+        "--die-with-parent",
+        "--new-session",
+        "--unshare-net",
+        "--unshare-pid",
+        "--clearenv",
+        "--setenv",
+        "PATH",
+        "/usr/bin:/bin",
+        "--setenv",
+        "HOME",
+        "/work",
+        "--ro-bind",
+        "/usr",
+        "/usr",
+    ]
+    for system_path in ("/bin", "/lib", "/lib64"):
+        if Path(system_path).exists():
+            wrapped.extend(["--ro-bind", system_path, system_path])
+    for config_path in ("/etc/ld.so.cache", "/etc/ngspice"):
+        if Path(config_path).exists():
+            wrapped.extend(["--ro-bind", config_path, config_path])
+    wrapped.extend(
+        [
+            "--proc",
+            "/proc",
+            "--dev",
+            "/dev",
+            "--tmpfs",
+            "/tmp",
+            "--bind",
+            str(workdir),
+            "/work",
+            "--chdir",
+            "/work",
+        ]
+    )
+    rewritten = []
+    for argument in command:
+        path = Path(argument)
+        if path.is_absolute():
+            with contextlib.suppress(ValueError):
+                # bubblewrap's mount target is always a POSIX path, regardless
+                # of the host OS; PurePosixPath keeps forward slashes even
+                # when `path` is a WindowsPath.
+                argument = str(PurePosixPath("/work", *path.relative_to(workdir).parts))
+        rewritten.append(argument)
+    return [*wrapped, *rewritten]
 
 
 def simulator_from_env() -> Simulator | None:
@@ -276,7 +367,13 @@ def _check_produced_artifact(
         )
 
 
-def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunResult:
+def _run_ltspice(
+    asc_path: Path,
+    ltspice_exe: Path,
+    *,
+    timeout: float,
+    cancel_requested: Callable[[], bool] | None = None,
+) -> RunResult:
     """Invoke LTspice in batch mode (-b)."""
     raw_path = asc_path.with_suffix(".raw")
     log_path = asc_path.with_suffix(".log")
@@ -304,7 +401,11 @@ def _run_ltspice(asc_path: Path, ltspice_exe: Path, *, timeout: float) -> RunRes
         )
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        proc = run_process_tree(
+            cmd,
+            timeout_sec=timeout,
+            cancel_requested=cancel_requested,
+        )
     except subprocess.TimeoutExpired as e:
         hint = _first_run_hint(ltspice_exe) if ltspice_first_run_pending(ltspice_exe) else ""
         raise RuntimeError(
@@ -349,18 +450,35 @@ def _asc_to_ngspice_netlist(asc_path: Path) -> Path:
     return netlist_path
 
 
-def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunResult:
-    netlist = _asc_to_ngspice_netlist(asc_path)
+def _run_ngspice(
+    asc_path: Path,
+    ngspice_exe: Path,
+    *,
+    timeout: float,
+    sandbox: bool = False,
+    cancel_requested: Callable[[], bool] | None = None,
+) -> RunResult:
+    netlist = (
+        asc_path
+        if asc_path.suffix.lower() in {".cir", ".net", ".sp", ".spice"}
+        else _asc_to_ngspice_netlist(asc_path)
+    )
     raw_path = asc_path.with_suffix(".raw")
     log_path = asc_path.with_suffix(".log")
     if raw_path.exists():
         raw_path.unlink()  # parity with LTspice: don't let a stale .raw mask a failure
     cmd = [str(ngspice_exe), "-b", "-r", str(raw_path), "-o", str(log_path), str(netlist)]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+    launched_cmd = _sandbox_ngspice_command(cmd, asc_path.parent) if sandbox else cmd
+    proc = run_process_tree(
+        launched_cmd,
+        cwd=asc_path.parent,
+        timeout_sec=timeout,
+        cancel_requested=cancel_requested,
+    )
     # ngspice writes its own log via -o; append our captured stdout/stderr for completeness.
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(
-            f"\n# ngspice command: {' '.join(cmd)}\n"
+            f"\n# ngspice command: {' '.join(launched_cmd)}\n"
             f"# returncode: {proc.returncode}\n\n"
             f"=== captured stdout ===\n{proc.stdout}\n\n"
             f"=== captured stderr ===\n{proc.stderr}\n"
@@ -373,6 +491,7 @@ def _run_ngspice(asc_path: Path, ngspice_exe: Path, *, timeout: float) -> RunRes
         returncode=proc.returncode,
         stdout=proc.stdout,
         stderr=proc.stderr,
+        sandboxed=sandbox,
     )
 
 
@@ -381,6 +500,8 @@ def run_simulation(
     *,
     prefer: Simulator | None = None,
     timeout: float = 120.0,
+    sandbox: bool = False,
+    cancel_requested: Callable[[], bool] | None = None,
 ) -> RunResult:
     """Run the simulation. Returns a :class:`RunResult` with the raw path.
 
@@ -397,23 +518,61 @@ def run_simulation(
         prefer = simulator_from_env()
 
     if prefer == Simulator.LTSPICE:
+        if sandbox:
+            raise RuntimeError(
+                "The LTspice/Wine backend has no verified OS sandbox profile. "
+                "Use ngspice or explicitly opt into trusted local execution."
+            )
         exe = find_ltspice()
         if exe is None:
             raise RuntimeError("LTspice not found (set $LTSPICE_PATH)")
-        return _run_ltspice(asc_path, exe, timeout=timeout)
+        return _run_ltspice(
+            asc_path,
+            exe,
+            timeout=timeout,
+            cancel_requested=cancel_requested,
+        )
     if prefer == Simulator.NGSPICE:
         exe = find_ngspice()
         if exe is None:
             raise RuntimeError("ngspice not found on PATH (`apt install ngspice`)")
-        return _run_ngspice(asc_path, exe, timeout=timeout)
+        return _run_ngspice(
+            asc_path,
+            exe,
+            timeout=timeout,
+            sandbox=sandbox,
+            cancel_requested=cancel_requested,
+        )
 
-    # Auto: prefer LTspice for .asc fidelity, fall back to ngspice
-    exe = find_ltspice()
+    # Auto: native SPICE netlists go to ngspice first; LTspice is preferred
+    # for .asc fidelity.
+    if asc_path.suffix.lower() in {".cir", ".net", ".sp", ".spice"}:
+        exe = find_ngspice()
+        if exe is not None:
+            return _run_ngspice(
+                asc_path,
+                exe,
+                timeout=timeout,
+                sandbox=sandbox,
+                cancel_requested=cancel_requested,
+            )
+    exe = find_ltspice() if not sandbox else None
     if exe is not None:
-        return _run_ltspice(asc_path, exe, timeout=timeout)
+        return _run_ltspice(
+            asc_path,
+            exe,
+            timeout=timeout,
+            cancel_requested=cancel_requested,
+        )
     exe = find_ngspice()
     if exe is not None:
-        return _run_ngspice(asc_path, exe, timeout=timeout)
+        return _run_ngspice(
+            asc_path,
+            exe,
+            timeout=timeout,
+            sandbox=sandbox,
+            cancel_requested=cancel_requested,
+        )
     raise RuntimeError(
         "No SPICE simulator found. Install ngspice (`apt install ngspice`) or LTspice via Wine."
     )

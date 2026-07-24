@@ -11,14 +11,215 @@ grouped by package.
 
 Nothing yet.
 
+## [0.6.0] — 2026-07-24
+
+### Fixed — simulator run isolation and stale-artifact rejection
+
+- Qucsator and Xyce harmonic-balance invocations now execute in unique
+  per-run workspaces. A failed process can no longer satisfy the run with a
+  `.dat` or `.HB.FD.prn` file left by an earlier invocation.
+- Non-zero exits, empty output, malformed Qucs datasets, and malformed Xyce HB
+  results fail before publication. Validated outputs are copied atomically;
+  the canonical default result remains in its immutable run workspace so
+  repeated or concurrent runs cannot overwrite it.
+- Every run writes a JSON manifest with input/output hashes, backend identity
+  and version, command, allowlisted environment keys, timestamps, streams,
+  return code, status, and published artifacts. Qucs-S MCP results now expose
+  the manifest path.
+
+### Fixed — S-parameter comparison on mismatched frequency grids
+
+- `compare_sparameters` now compares the union of both measured grids inside
+  their common frequency span instead of using exact frequency intersection.
+  Shared endpoints can no longer hide every interior difference, partial
+  overlaps never extrapolate, and disjoint ranges fail explicitly.
+- Phase comparison now reports the shortest circular difference, so `179°`
+  versus `-179°` is 2° rather than 358°. Results include the overlap,
+  interpolation policy, and original input ranges.
+
+### Fixed — single-source package and server versions
+
+- Package `__version__` attributes and FastMCP server metadata now derive
+  from installed distribution metadata. The `v0.5.0` packages no longer
+  identify themselves as `0.1.0`.
+- Default shared envelopes use the installed `rf-mcp-common` version, and
+  consistency tests cover module, server, and envelope surfaces.
+- Updated stale architecture, envelope, Qucs implementation-status, and bug
+  template text.
+
+### Added — shared simulation workspace contract
+
+- `rf-mcp-common` now provides `SimulationWorkspace`, SHA-256 artifact
+  hashing, a minimal subprocess environment, and backend-version probing for
+  reuse by the LTspice/ngspice runners and future durable job API.
+
+### Fixed — documentation contract and capability boundaries
+
+- Corrected current tool names, signatures, counts, examples, license text,
+  package relationships, Qucs-S implementation status, and backend coverage.
+- Documentation now distinguishes ideal analytical response, legacy catalog
+  snapping with first-order parasitic metadata, and actual simulator
+  validation. The bounded circuit workbench separately supports explicit
+  model attachment and supported LTspice/Qucs/SPICE import; unsupported
+  constructs are rejected. One-sweep S-parameter extraction remains
+  explicitly limited to reciprocal symmetric two-ports.
+- The generated tool catalog now reports primary and alias counts and supports
+  `--check`; CI and workspace tests fail when it drifts from live registries.
+
+### Fixed — true two-excitation SPICE S-parameter extraction
+
+- The public `extract_sparameters` tool now accepts a source `.asc`, validates
+  the `V1`/`Rs1`/`RL1` matched-port fixture, constructs a port-2 excitation,
+  and runs both sweeps on the same LTspice or ngspice backend.
+- S11/S21 and S12/S22 are measured independently and merged only when the
+  frequency grids match. Missing traces, fixture-current inconsistency,
+  ambiguous rewiring, and a missing second result fail instead of emitting a
+  structurally valid matrix containing copied or zero terms.
+- Results include the extraction method, fixture, source/raw/log paths,
+  assumptions, validation residuals, backend, return codes, and isolated
+  workspace. The legacy single-sweep helper now requires an explicit
+  `assume_reciprocal_symmetric=True` opt-in.
+
+### Added — model-preserving passive realization
+
+- Every selected passive now carries a `ComponentModel` record with provider,
+  immutable source reference, model kind, pin map, operating-range fields,
+  source path/subcircuit identity where applicable, reduction method, and
+  SHA-256 checksum.
+- User `.lib` registration accepts exactly one unambiguous two-pin
+  subcircuit; missing/ambiguous pin maps block registration. Measured `.s2p`
+  files retain their source checksum and explicitly record the first-order
+  reduction used by analytical paths.
+- `simulate_realized_filter` instantiates curated loss/SRF subcircuits or
+  registered `.lib` models into isolated port-1/port-2 netlists, runs both
+  sweeps on one backend, and returns a full Touchstone matrix with model
+  manifests and extraction provenance. Changing a supplied library changes
+  both its checksum and the simulated response.
+
+### Fixed — topology, transforms, and engineering summaries
+
+- Sweep, optimization, Monte Carlo, comparison, and validation now carry
+  explicit filter kind/topology, reject unsupported combinations, and include
+  exact band edges and point targets in their evaluation grids.
+- TDR now builds a uniform DC-anchored spectrum or an explicitly labelled
+  band-pass response, preserves complex data, reports range/time resolution,
+  and rejects transforms whose assumptions are not met.
+- Delay extraction requires an explicit band. Equivalent-circuit fits report
+  residuals, convergence, bounds, validity range, and identifiability
+  warnings. Passband checks interpolate complex values at exact edges and
+  reject partial frequency coverage.
+- The schematic renderer accepts only package-generated LC fixtures it can
+  reconstruct exactly. Arbitrary `.asc` content fails explicitly.
+
+### Added — confined execution, budgets, capabilities, and durable jobs
+
+- Simulator input dependency trees are imported into immutable,
+  checksum-addressed workspaces. Include/path/symlink escapes are rejected,
+  ngspice has a no-network bubblewrap profile, and processes use
+  timeout/cancellation tree cleanup.
+- Expensive calls enforce component, point, iteration, core, trace, and
+  combined-work limits. Large outputs stream to bounded JSONL artifacts.
+- All servers expose cached `capabilities://` resources and `probe_backend`
+  tools that distinguish installed, launchable, validated, and unavailable
+  states through tiny known-answer checks.
+- `mcp-ltspice` exposes durable workspace/artifact/job primitives for import,
+  parse/validate, submit, progress, cancel, retry, recovery, listing, and
+  bounded artifact reads.
+
+### Fixed — MCP contracts and release engineering
+
+- Error envelopes become structured protocol `ToolError` failures, and every
+  tool carries safety annotations. Underscore names are canonical; 59 dotted
+  compatibility aliases carry deprecation/removal metadata.
+- Real in-memory and stdio initialize/list/call/error tests cover every
+  server. Tool schemas, annotations, and metadata are hash-snapshotted.
+- Codex `.codex/config.toml` and Claude Code `.mcp.json` project fixtures are
+  executable and contract-tested.
+- Dependencies have tested upper bounds. CI exercises locked and
+  minimum-direct sets, builds wheels/source distributions, and installs
+  wheels in isolation. Weekly self-hosted jobs cover Qucsator, Xyce, native
+  and Wine LTspice, current Codex, and current Claude Code.
+- Tag validation audits exported requirements, builds strict docs/contracts,
+  emits an SPDX SBOM, and creates build-provenance attestations.
+
+### Added — auditable component provenance
+
+- Catalog records distinguish generic technology models from orderable MPNs
+  and include provider, source document/revision/retrieval time, license,
+  checksum scope, package/tolerance/ratings, and test conditions.
+- A provider protocol and checksum-addressed local-directory provider support
+  deterministic user-model indexing and refresh. User filenames are never
+  promoted to claimed manufacturer part numbers.
+
+### Added — bounded general circuit workbench
+
+- Added versioned `CircuitDocument` 1.0 with explicit pin-to-net connectivity,
+  ports, analyses, dependencies, provenance, drawing geometry, transformations,
+  electrical fingerprints, and source-located unsupported diagnostics.
+- Added bounded import/export for SPICE-family netlists, supported LTspice ASC
+  symbols/wires, Qucs/Qucs-S schematics, and Qucsator netlists. Supported
+  fixtures round-trip without connectivity/value loss; unknown electrical
+  constructs block export and simulation.
+- Added common ngspice, LTspice, Qucsator, and Xyce adapter contracts,
+  normalized complex result datasets, readiness negotiation, and stable
+  tolerance policies. A real asymmetric two-port agrees across ngspice and
+  Qucsator for all four S-parameters.
+- Added MCP workspace/import/parse/export flows with checksum-addressed
+  `artifact://` resources. The live catalog now contains 140 primary tools
+  (76 LTspice, 29 Qucs-S, 35 RF analysis) plus 59 deprecated LT aliases.
+
+### Added — constrained component search and generic IR optimization
+
+- Component search now applies hard value, package, availability/orderability,
+  Q/SRF, tolerance, rating, bias, temperature, model-kind, and provider
+  constraints. Unknown requested data fails instead of being treated as a
+  match.
+- Selected model records attach exact hashes, provenance, pin maps, validity,
+  and source dependencies to the IR. SPICE/Xyce compilation stages
+  checksum-verified sources and honors logical pin order; Qucsator rejects
+  unsupported cross-dialect models instead of substituting ideal parts.
+- Added deterministic bounded/discrete topology-preserving optimization with
+  hard constraints, named SPICE temperature/parameter corners, yield
+  estimation, cooperative progress/cancellation, exact model attestation,
+  independent-backend validation, and JSON/Markdown design-change reports.
+  Fixed models cannot be nominally retuned; explicit instance parameters and
+  generic lumped approximations can be.
+
+### Fixed — `validate_against_spice` no longer emits a fabricated two-port
+
+- The general two-sweep S-parameter fix above closed the fabrication in the
+  public `extract_sparameters`/`simulate_realized_filter` tools, but
+  `validate_against_spice`'s `output_spice_s2p` still wrote the single-sweep
+  network that mirrors S22 from S11 and S12 from S21 — silently wrong for any
+  asymmetric or non-reciprocal ladder. It now runs the same honest two-sweep
+  extraction for the emitted file; the fast |S21| verdict still comes from
+  the cheap single sweep. The tool description and `output_spice_s2p` field
+  now disclose the two-sweep method and its V1+Rs1/RL1 fixture requirement.
+
+### Added — durable simulation jobs for `mcp-qucs-s`
+
+- `mcp-qucs-s` gains the same simulate-through-IR job pipeline as
+  `mcp-ltspice`: `circuit_validate`, `simulation_submit`, `job_get`,
+  `job_cancel`, `job_retry`, `job_list_artifacts`, and `artifact_read` (22 →
+  29 tools). `simulation_submit` compiles the imported artifact, runs it,
+  parses the result into a normalized `ResultDataset`, and validates it
+  against the requested analysis; `analysis.kind` routes `sparameters`/
+  `noise` to Qucsator and `harmonic_balance` to Xyce. This wires the
+  `QucsatorAdapter`/`XyceAdapter` backend adapters, which existed with full
+  compile/run/parse coverage but no caller.
+- Qucsator and Xyce have no verified OS sandbox profile, so these jobs run
+  unsandboxed on the immutable per-run workspace snapshot the adapter's `run`
+  creates; only submit trusted local inputs.
+
 ## [0.5.0] — 2026-07-23
 
-The release that emptied the issue tracker. Every simulation backend
-(ngspice, LTspice, qucsator-RF, Xyce) is driveable and validated; the
+The release that emptied the issue tracker. Drivers exist for ngspice,
+LTspice, qucsator-RF, and Xyce; required CI validates ngspice while the
+other simulator integrations are capability-gated. The
 filter portfolio gains the full elliptic family and all five
 distributed microstrip topologies on an exact coupled-line TEM model;
-the coexistence chain runs closed-loop from victim bands to a realized,
-vendor-substituted design; mypy runs with zero disabled error codes;
+the coexistence chain runs closed-loop from victim bands to a
+catalog-snapped analytical design; mypy runs with zero disabled error codes;
 and CI covers Linux (3.11–3.13) plus native Windows discovery.
 Highlights below, in reverse-merge order.
 
@@ -960,6 +1161,7 @@ Initial release of the four-package monorepo.
   elliptic LPF for 802.11ah HaLow + multi-radio coex. Passes all 8 spec
   criteria with 86.6% Monte Carlo yield at 2% component tolerance.
 
-[Unreleased]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/compare/v0.5.0...v0.6.0
 [0.2.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/RFingAdam/mcp-ltspice-qucs/releases/tag/v0.1.0

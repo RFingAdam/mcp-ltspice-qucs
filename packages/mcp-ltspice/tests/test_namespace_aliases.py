@@ -1,12 +1,9 @@
 """Tests for tool namespacing — both flat and namespaced names work, both
 point to the same implementation, and every category is represented.
 
-Background: the package previously had 30+ tools in a flat namespace,
-making domain-driven discovery hard for LLM agents. Each tool now also
-registers under a `<category>.<name>` alias (e.g. ``filter.synthesize_lc``
-for ``synthesize_lc_filter``). Both names continue to work; the
-namespaced form is preferred and the flat form will be deprecated in a
-future major release.
+The underscore-separated names are the portable canonical surface. Dotted
+names remain registered only as deprecated compatibility aliases through
+the 0.x release line.
 """
 
 from __future__ import annotations
@@ -43,7 +40,10 @@ def test_every_alias_resolves_to_a_real_tool():
 def test_flat_and_namespaced_point_to_same_function():
     """Calling either name should hit the same Python implementation."""
     for flat_name, _ in server.NAMESPACE_ALIASES.items():
-        flat_fn = getattr(server, flat_name, None)
+        implementation_name = (
+            "evaluate_filter_spec_tool" if flat_name == "evaluate_filter_spec" else flat_name
+        )
+        flat_fn = getattr(server, implementation_name, None)
         assert flat_fn is not None, f"Flat name `{flat_name}` not on server module"
         assert callable(flat_fn), f"Flat name `{flat_name}` is not callable"
 
@@ -93,7 +93,10 @@ def test_alias_count_matches_flat_count_among_registered_pairs():
     """
     names = _registered_tool_names()
     for flat_name, ns_name in server.NAMESPACE_ALIASES.items():
-        if not callable(getattr(server, flat_name, None)):
+        implementation_name = (
+            "evaluate_filter_spec_tool" if flat_name == "evaluate_filter_spec" else flat_name
+        )
+        if not callable(getattr(server, implementation_name, None)):
             continue
         assert flat_name in names, f"Flat tool `{flat_name}` not registered"
         assert ns_name in names, f"Namespaced alias `{ns_name}` not registered"

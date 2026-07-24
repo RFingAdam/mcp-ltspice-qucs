@@ -28,13 +28,22 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages
+        run: uv sync --all-packages --frozen
 
       - name: Ruff format check
         run: uv run ruff format --check .
 
       - name: Ruff lint
         run: uv run ruff check .
+
+      - name: Generated tool catalog is current
+        run: uv run python scripts/gen_tool_catalog.py --check
+
+      - name: Generated backend matrix is current
+        run: uv run python scripts/gen_backend_matrix.py --check
+
+      - name: MCP tool contracts are current
+        run: uv run python scripts/gen_tool_contract_snapshot.py --check
 
       # No `|| true`. Until v0.4.1 this step was both failing and ignored:
       # mypy aborted on a duplicate-conftest error before checking anything,
@@ -62,7 +71,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Sync workspace
-        run: uv sync --all-packages
+        run: uv sync --all-packages --frozen
 
       - name: Install ngspice
         run: |
@@ -70,10 +79,90 @@ jobs:
           sudo apt-get install -y -qq ngspice
 
       - name: Verify ngspice
-        run: ngspice --version
+        run: |
+          ngspice --version
+          uv run python -c "from mcp_ltspice.capabilities import probe_spice_backend; result = probe_spice_backend('ngspice'); assert result['validated'], result"
 
       - name: Run pytest with coverage
         run: uv run pytest -q --cov --cov-report=xml --cov-report=term
+
+  minimum-dependencies:
+    name: Minimum direct dependencies (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Resolve minimum direct versions
+        run: uv lock --resolution lowest-direct
+
+      - name: Sync minimum dependency environment
+        run: uv sync --all-packages --no-dev --resolution lowest-direct
+
+      - name: Install the bounded test runner only
+        run: uv pip install --python .venv/bin/python "pytest>=8.3.3,<10"
+
+      - name: Run protocol and contract tests
+        run: >-
+          .venv/bin/python -m pytest -q
+          tests/test_mcp_protocol.py
+          tests/test_mcp_error_contract.py
+          tests/test_tool_contract_snapshot.py
+          tests/test_client_configs.py
+          tests/test_versions.py
+
+  package:
+    name: Build and install release artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Build wheels and source distributions
+        run: uv build --all-packages
+
+      - name: Create isolated environment
+        run: uv venv "${RUNNER_TEMP}/wheel-smoke"
+
+      - name: Install built wheels
+        run: >-
+          uv pip install
+          --python "${RUNNER_TEMP}/wheel-smoke/bin/python"
+          dist/*.whl
+
+      - name: Verify imports and console entry points
+        run: |
+          "${RUNNER_TEMP}/wheel-smoke/bin/python" - <<'PY'
+          import importlib.metadata as metadata
+          import mcp_ltspice
+          import mcp_qucs_s
+          import mcp_rf_analysis
+          import rf_mcp_common
+
+          names = {
+              entry.name
+              for entry in metadata.entry_points(group="console_scripts")
+          }
+          expected = {"mcp-ltspice", "mcp-qucs-s", "mcp-rf-analysis"}
+          assert expected <= names
+          print("isolated wheel imports and entry points OK")
+          PY
+
+      - name: Inspect source distributions
+        run: test "$(find dist -name '*.tar.gz' | wc -l)" -eq 4
 
   test-windows:
     # Covers the native-Windows simulator-discovery branch (issue #40):
@@ -97,7 +186,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages
+        run: uv sync --all-packages --frozen
 
       - name: Native discovery branch (no os_name hook)
         run: |
@@ -123,7 +212,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages
+        run: uv sync --all-packages --frozen
 
       - name: Run basic LPF design
         run: uv run python examples/basic_lpf/design.py

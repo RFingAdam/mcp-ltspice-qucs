@@ -158,6 +158,46 @@ def test_mcp_tool_writes_both_touchstone_files(tmp_path, lpf) -> None:
 @requires_ngspice
 @pytest.mark.ngspice
 @pytest.mark.integration
+def test_output_spice_s2p_is_not_fabricated_for_asymmetric_ladder(tmp_path) -> None:
+    """F-02 residual: the emitted spice .s2p must not mirror S11 into S22.
+
+    A 2-element L-C ladder is not mirror-symmetric, so an honest measurement
+    must show S22 != S11. The single-sweep `spice_network` used internally
+    for the fast |S21| verdict mirrors S22 = S11 by construction and must
+    never be what gets written to `output_spice_s2p`.
+    """
+    import skrf as rf
+
+    from mcp_ltspice import server as S
+
+    components = {"L1": 10e-9, "C2": 2e-12}
+    asc = generate_lpf_asc(
+        components,
+        tmp_path / "asymmetric.asc",
+        f_start_hz=1e7,
+        f_stop_hz=3e9,
+        npoints_per_decade=50,
+    )
+    fn = getattr(S.validate_against_spice, "fn", S.validate_against_spice)
+    env = fn(
+        str(asc),
+        components,
+        prefer="ngspice",
+        output_spice_s2p=str(tmp_path / "spice.s2p"),
+    ).model_dump()
+
+    assert env["status"] == "ok", env["error"]
+    net = rf.Network(str(tmp_path / "spice.s2p"))
+    assert np.max(np.abs(net.s[:, 0, 0] - net.s[:, 1, 1])) > 0.01, (
+        "S22 must not be mirrored from S11 for an asymmetric ladder"
+    )
+    provenance = env["data"]["spice_s2p_provenance"]
+    assert provenance["extraction_method"] == "two_excitation_power_waves"
+
+
+@requires_ngspice
+@pytest.mark.ngspice
+@pytest.mark.integration
 def test_thresholds_are_configurable(lpf) -> None:
     """An absurdly tight passband threshold turns agreement into a flag."""
     design, asc = lpf

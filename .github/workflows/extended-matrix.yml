@@ -1,0 +1,116 @@
+name: Extended simulator and MCP client matrix
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: extended-matrix-${{ github.ref }}
+  cancel-in-progress: false
+
+# These jobs intentionally target capability-labelled self-hosted runners.
+# Proprietary LTspice and authenticated current-client checks cannot be made
+# truthful on anonymous GitHub-hosted runners. Missing runners leave the job
+# queued instead of silently reporting an untested backend as passing.
+jobs:
+  qucsator:
+    name: Qucsator-RF known-answer integrations
+    runs-on: [self-hosted, linux, x64, qucsator-rf, ngspice]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+      - name: Probe backend
+        run: |
+          (qucsator_rf --version || qucsator --version)
+          uv run python -c "from mcp_qucs_s.capabilities import probe_qucs_backend; result = probe_qucs_backend('qucsator'); assert result['validated'], result"
+      - name: Run all Qucsator integrations
+        run: uv run pytest -q -m qucs
+      - name: Cross-check one equivalent two-port on ngspice and Qucsator
+        run: |
+          ngspice --version
+          uv run pytest -q tests/test_cross_backend_known_answer.py
+
+  xyce:
+    name: Xyce harmonic-balance known-answer integrations
+    runs-on: [self-hosted, linux, x64, xyce]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+      - name: Probe backend
+        run: |
+          Xyce -v
+          uv run python -c "from mcp_qucs_s.capabilities import probe_qucs_backend; result = probe_qucs_backend('xyce'); assert result['validated'], result"
+      - name: Run all Xyce integrations
+        run: uv run pytest -q -m xyce
+
+  ltspice-native:
+    name: LTspice integrations (native Windows)
+    runs-on: [self-hosted, windows, x64, ltspice]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+      - name: Validate backend
+        run: uv run python -c "from mcp_ltspice.capabilities import probe_spice_backend; result = probe_spice_backend('ltspice'); assert result['validated'], result"
+      - run: uv run pytest -q -m ltspice
+
+  ltspice-wine:
+    name: LTspice integrations (Wine)
+    runs-on: [self-hosted, linux, x64, ltspice-wine]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+      - run: wine --version
+      - name: Validate backend
+        run: uv run python -c "from mcp_ltspice.capabilities import probe_spice_backend; result = probe_spice_backend('ltspice'); assert result['validated'], result"
+      - run: uv run pytest -q -m ltspice
+
+  codex-client:
+    name: Current Codex MCP discovery and tool call
+    runs-on: [self-hosted, linux, x64, codex-client]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+      - run: codex --version
+      - name: Register the analysis server in an isolated Codex profile
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home
+        run: >-
+          codex mcp add rf-analysis --
+          uv run --frozen --directory "${GITHUB_WORKSPACE}"
+          --package mcp-rf-analysis mcp-rf-analysis
+      - name: Discover and call a canonical tool
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home
+        run: |
+          codex mcp list
+          codex exec --skip-git-repo-check --sandbox read-only --json \
+            "Call the rf-analysis MCP tool list_ism_bands_tool exactly once and report whether 2.4 GHz is covered."
+
+  claude-client:
+    name: Current Claude Code MCP discovery and tool call
+    runs-on: [self-hosted, linux, x64, claude-client]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.13
+      - run: uv sync --all-packages --frozen
+      - run: claude --version
+      - name: Discover and call a canonical tool
+        run: >-
+          claude
+          --strict-mcp-config
+          --mcp-config .mcp.json
+          --output-format json
+          -p
+          "Call the rf-analysis MCP tool list_ism_bands_tool exactly once and report whether 2.4 GHz is covered."

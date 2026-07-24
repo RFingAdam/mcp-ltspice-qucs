@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from mcp_rf_analysis.si import (
@@ -10,6 +11,7 @@ from mcp_rf_analysis.si import (
     eye_diagram_from_s2p,
     tdr_from_s11,
 )
+from mcp_rf_analysis.si.tdr import tdr_transform
 
 # ---- TDR -----------------------------------------------------------------
 
@@ -30,6 +32,98 @@ def test_tdr_window_options(lpf_s2p) -> None:
     # Rectangular has more sidelobe ripple, hann is smoother — but both
     # produce the same number of samples
     assert len(a["impedance_ohm"]) == len(b["impedance_ohm"])
+
+
+def _delayed_reflection(frequency_hz, delay_s=2e-9, amplitude=0.2):
+    return amplitude * np.exp(-1j * 2 * np.pi * frequency_hz * delay_s)
+
+
+def test_tdr_recovers_delayed_discontinuity_location_and_sign() -> None:
+    frequency = np.linspace(0.0, 10e9, 2001)
+    delay = 2e-9
+    result = tdr_transform(
+        frequency,
+        _delayed_reflection(frequency, delay_s=delay, amplitude=-0.2),
+        transform_mode="lowpass",
+        window="rect",
+        padding_factor=4,
+    )
+    impulse = np.asarray(result["rho_impulse"])
+    peak = int(np.argmax(np.abs(impulse)))
+    assert result["time_ns"][peak] == pytest.approx(delay * 1e9, abs=0.03)
+    assert impulse[peak] < 0
+    expected_mm = delay * result["phase_velocity_m_s"] / 2 * 1000
+    assert result["distance_mm"][peak] == pytest.approx(expected_mm, rel=0.02)
+
+
+def test_tdr_log_grid_controlled_resampling_matches_linear_peak() -> None:
+    linear = np.linspace(1e6, 10e9, 2001)
+    logarithmic = np.geomspace(1e6, 10e9, 2001)
+    expected_delay = 1.5e-9
+    reference = tdr_transform(
+        linear,
+        _delayed_reflection(linear, expected_delay),
+        window="rect",
+    )
+    resampled = tdr_transform(
+        logarithmic,
+        _delayed_reflection(logarithmic, expected_delay),
+        window="rect",
+    )
+    reference_peak = int(np.argmax(np.abs(reference["rho_impulse"])))
+    resampled_peak = int(np.argmax(np.abs(resampled["rho_impulse"])))
+    assert resampled["time_ns"][resampled_peak] == pytest.approx(
+        reference["time_ns"][reference_peak], abs=0.05
+    )
+    assert resampled["input_grid"]["resampled"] is True
+    assert "resampled" in resampled["warnings"][0]
+
+
+@pytest.mark.parametrize(
+    "frequency",
+    [
+        np.asarray([1e6, 2e6, 2e6, 3e6]),
+        np.asarray([1e6, 3e6, 2e6, 4e6]),
+    ],
+)
+def test_tdr_rejects_duplicate_or_nonmonotonic_frequency(frequency) -> None:
+    with pytest.raises(ValueError, match="strictly increasing"):
+        tdr_transform(frequency, np.zeros(frequency.size, dtype=complex))
+
+
+def test_tdr_nonuniform_rejected_when_resampling_disabled() -> None:
+    frequency = np.geomspace(1e6, 1e9, 101)
+    with pytest.raises(ValueError, match="non-uniform"):
+        tdr_transform(
+            frequency,
+            _delayed_reflection(frequency),
+            resample_nonuniform=False,
+        )
+
+
+def test_bandpass_start_frequency_recovers_delay_without_claiming_impedance() -> None:
+    frequency = np.linspace(2e9, 8e9, 1201)
+    delay = 3e-9
+    result = tdr_transform(
+        frequency,
+        _delayed_reflection(frequency, delay),
+        transform_mode="bandpass",
+        window="rect",
+    )
+    peak = int(np.argmax(result["rho"]))
+    assert result["time_ns"][peak] == pytest.approx(delay * 1e9, abs=0.05)
+    assert result["impedance_ohm"] is None
+    assert "envelope only" in result["warnings"][-1]
+
+
+def test_lowpass_missing_dc_reject_policy() -> None:
+    frequency = np.linspace(1e9, 10e9, 1001)
+    with pytest.raises(ValueError, match="requires DC"):
+        tdr_transform(
+            frequency,
+            _delayed_reflection(frequency),
+            dc_extrapolation="reject",
+        )
 
 
 # ---- Eye diagram --------------------------------------------------------

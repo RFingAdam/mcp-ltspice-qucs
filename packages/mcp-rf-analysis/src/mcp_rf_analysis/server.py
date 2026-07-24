@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
 
 from fastmcp import FastMCP
 from pydantic import Field
@@ -19,6 +19,7 @@ from mcp_rf_analysis.bands import (
     list_lte_bands,
     lookup_band_by_freq,
 )
+from mcp_rf_analysis.capabilities import analysis_capabilities as _analysis_capabilities
 from mcp_rf_analysis.coex import (
     check_coex_matrix as _check_coex_matrix,
 )
@@ -101,11 +102,40 @@ from mcp_rf_analysis.touchstone_utils import (
 )
 from rf_mcp_common.envelope import Envelope, Timer, error, ok
 from rf_mcp_common.logging import get_logger
+from rf_mcp_common.protocol import prepare_protocol_tools, run_stdio_server
+from rf_mcp_common.tool_annotations import DEFAULT_TOOL_ANNOTATIONS
+from rf_mcp_common.tool_errors import EnvelopeErrorMiddleware
 
 T = TypeVar("T")
 
 mcp = FastMCP(name="mcp-rf-analysis", version=__version__)
+mcp.add_middleware(EnvelopeErrorMiddleware())
 log = get_logger("mcp_rf_analysis.server")
+
+
+@mcp.resource("capabilities://mcp-rf-analysis")
+def capabilities_resource() -> dict[str, Any]:
+    """Current numerical-stack capabilities and validation state."""
+    return _analysis_capabilities(validate=True)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Administrative readiness probe for the RF numerical stack. Runs a "
+        "small known-answer network calculation when validate is true."
+    ),
+)
+def probe_backend(validate: bool = True) -> Envelope[dict[str, Any]]:
+    timer = Timer()
+    try:
+        return ok(
+            _analysis_capabilities(validate=validate),
+            runtime_sec=timer.elapsed(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"probe_backend failed: {exc}", tool_version=__version__)
 
 
 def _wrap(func: Any, *args: Any, **kwargs: Any) -> Envelope[T]:
@@ -135,11 +165,12 @@ def _wrap(func: Any, *args: Any, **kwargs: Any) -> Envelope[T]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Cascade two or more 2-port networks (left-to-right). The result "
         "covers only the frequency range common to every input; a warning "
         "names the retained range when any input is trimmed."
-    )
+    ),
 )
 def cascade_networks(s2p_paths: list[str], output_path: str) -> Envelope[dict[str, Any]]:
     notes: list[str] = []
@@ -152,7 +183,10 @@ def cascade_networks(s2p_paths: list[str], output_path: str) -> Envelope[dict[st
     return env
 
 
-@mcp.tool(description="De-embed left/right fixtures from a measured 2-port network.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="De-embed left/right fixtures from a measured 2-port network.",
+)
 def deembed_network(
     measured_s2p: str,
     fixture_left_s2p: str,
@@ -177,7 +211,10 @@ def deembed_network(
     return env
 
 
-@mcp.tool(description="Renormalize an S-parameter file to a new reference impedance.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Renormalize an S-parameter file to a new reference impedance.",
+)
 def renormalize_impedance(
     s2p_path: str, new_z0: Annotated[float, Field(gt=0)], output_path: str
 ) -> Envelope[dict[str, Any]]:
@@ -186,13 +223,17 @@ def renormalize_impedance(
     )
 
 
-@mcp.tool(description="Compute Rollett K-factor + |Δ| + μ-factor across frequency.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Compute Rollett K-factor + |Δ| + μ-factor across frequency.",
+)
 def compute_stability(s2p_path: str) -> Envelope[dict[str, Any]]:
     return _wrap(_compute_stability, s2p_path)
 
 
 @mcp.tool(
-    description="Return Smith chart data (S_ii real/imag + normalized impedance) for plotting."
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Return Smith chart data (S_ii real/imag + normalized impedance) for plotting.",
 )
 def smith_chart_data(
     s2p_path: str, port: Annotated[int, Field(ge=1)] = 1
@@ -203,7 +244,10 @@ def smith_chart_data(
 # -------- Spec evaluation --------
 
 
-@mcp.tool(description="Check |S21| at a single frequency against a min-rejection target.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Check |S21| at a single frequency against a min-rejection target.",
+)
 def check_rejection_at(
     s2p_path: str,
     freq_hz: Annotated[float, Field(gt=0)],
@@ -212,7 +256,10 @@ def check_rejection_at(
     return _wrap(_check_rejection_at, s2p_path, freq_hz, min_rejection_db)
 
 
-@mcp.tool(description="Check passband insertion loss + return loss across [f_start, f_stop].")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Check passband insertion loss + return loss across [f_start, f_stop].",
+)
 def check_passband_compliance(
     s2p_path: str,
     f_start: Annotated[float, Field(ge=0)],
@@ -230,12 +277,15 @@ def check_passband_compliance(
     )
 
 
-@mcp.tool(description="Evaluate a .s2p against a bundled spec template (FCC / ETSI / 3GPP).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Evaluate a .s2p against a bundled spec template (FCC / ETSI / 3GPP).",
+)
 def evaluate_against_spec_template(s2p_path: str, template_name: str) -> Envelope[dict[str, Any]]:
     return _wrap(_evaluate_against_spec_template, s2p_path, template_name)
 
 
-@mcp.tool(description="List names of bundled spec templates.")
+@mcp.tool(annotations=DEFAULT_TOOL_ANNOTATIONS, description="List names of bundled spec templates.")
 def list_spec_templates_tool() -> Envelope[list[str]]:
     return _wrap(_list_spec_templates)
 
@@ -244,11 +294,12 @@ def list_spec_templates_tool() -> Envelope[list[str]]:
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List LTE bands. Optional ``region`` substring filter. NOTE: this is a "
         "filter-design helper backed by a curated subset; for the authoritative "
         "regulatory band table prefer `lte_bands_list` from the **mcp-emc-regulations** MCP."
-    )
+    ),
 )
 def list_lte_bands_tool(
     region: str | None = None,
@@ -257,23 +308,25 @@ def list_lte_bands_tool(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List 5G NR bands. ``family`` is 'fr1' or 'fr2'. NOTE: filter-design helper; "
         "for authoritative regulatory band data prefer `nr_bands_list` from the "
         "**mcp-emc-regulations** MCP."
-    )
+    ),
 )
 def list_5gnr_bands_tool(family: str = "fr1") -> Envelope[list[dict[str, Any]]]:
     return _wrap(list_5gnr_bands, family)
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List GNSS signals (GPS / GLONASS / Galileo / BeiDou). Filter-design helper "
         "with sensitivity / bandwidth metadata used by `lookup_harmonic_victims` and "
         "`check_coex_matrix`. For broader regulatory queries see the "
         "**mcp-emc-regulations** MCP."
-    )
+    ),
 )
 def list_gnss_bands_tool(
     system: str | None = None,
@@ -282,11 +335,12 @@ def list_gnss_bands_tool(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List ISM band allocations. ``region`` is the ITU region (1=EMEA, 2=Americas, 3=APAC). "
         "NOTE: filter-design helper; for authoritative regulatory band tables prefer "
         "`ism_bands_list` from the **mcp-emc-regulations** MCP."
-    )
+    ),
 )
 def list_ism_bands_tool(
     region: int | None = None,
@@ -295,22 +349,24 @@ def list_ism_bands_tool(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List 802.11ah HaLow channels for a region (US, EU, JP, KR, CN, SG, AU_NZ, IN). "
         "Bundled here because no other MCP carries HaLow channel grids; data feeds "
         "`lookup_harmonic_victims` and `check_coex_matrix`."
-    )
+    ),
 )
 def list_halow_channels_tool(region: str = "US") -> Envelope[dict[str, Any]]:
     return _wrap(list_halow_channels, region)
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Find every band/system that contains a given frequency. "
         "Returns a structured dict mapping {lte_ul, lte_dl, 5gnr_ul, 5gnr_dl, gnss, ism, halow} "
         "→ list of matching entries. The reverse-lookup direction is unique to this MCP."
-    )
+    ),
 )
 def lookup_band_by_freq_tool(
     freq_hz: Annotated[float, Field(gt=0)],
@@ -319,17 +375,21 @@ def lookup_band_by_freq_tool(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "List FCC §15.205 restricted bands. NOTE: filter-design helper used by "
         "`lookup_harmonic_victims`; for authoritative regulatory queries prefer "
         "`fcc_restricted_bands_list` from the **mcp-emc-regulations** MCP."
-    )
+    ),
 )
 def list_fcc_restricted_bands_tool() -> Envelope[list[dict[str, Any]]]:
     return _wrap(list_fcc_restricted_bands)
 
 
-@mcp.tool(description="Check whether a frequency falls into an FCC restricted band.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Check whether a frequency falls into an FCC restricted band.",
+)
 def is_in_restricted_band_tool(
     freq_hz: Annotated[float, Field(gt=0)],
 ) -> Envelope[dict[str, Any]]:
@@ -341,7 +401,8 @@ def is_in_restricted_band_tool(
 
 
 @mcp.tool(
-    description="For a TX center frequency, find which RX bands its 2nd / 3rd / etc. harmonics land in."
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="For a TX center frequency, find which RX bands its 2nd / 3rd / etc. harmonics land in.",
 )
 def lookup_harmonic_victims(
     f_center_hz: Annotated[float, Field(gt=0)],
@@ -351,6 +412,7 @@ def lookup_harmonic_victims(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Compute the multi-radio coex aggressor × victim matrix with predicted "
         "desense. RX entries may set victim_type='gnss' to switch to the "
@@ -360,7 +422,7 @@ def lookup_harmonic_victims(
         "reported as delta_cn0_db_hz with mechanism "
         "fundamental/harmonic_n/broadband_noise and documented assumptions; "
         "desense_margin_db for GNSS entries = 1 dB C/N0 budget - dCN0."
-    )
+    ),
 )
 def check_coex_matrix(
     tx_list: list[dict[str, Any]],
@@ -378,6 +440,7 @@ def check_coex_matrix(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Compute optimal elliptic-filter transmission-zero frequencies for "
         "coexistence: for each harmonic landing [n·f_lo, n·f_hi], the zero "
@@ -388,7 +451,7 @@ def check_coex_matrix(
         "matching mcp-ltspice's elliptic convention (lowest zero → trap 2) "
         "for direct composition with place_transmission_zero, a markdown "
         "rationale, and the victims left unprotected by the zero budget."
-    )
+    ),
 )
 def place_zeros_for_coex(
     passband_hz: Annotated[
@@ -419,7 +482,10 @@ def place_zeros_for_coex(
 # -------- Link budget --------
 
 
-@mcp.tool(description="Compute Friis or log-distance path loss in dB.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Compute Friis or log-distance path loss in dB.",
+)
 def compute_path_loss(
     freq_hz: Annotated[float, Field(gt=0)],
     distance_m: Annotated[float, Field(gt=0)],
@@ -437,7 +503,9 @@ def compute_path_loss(
     )
 
 
-@mcp.tool(description="Estimate antenna-to-antenna isolation in dB.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS, description="Estimate antenna-to-antenna isolation in dB."
+)
 def compute_antenna_isolation_estimate(
     antenna_separation_m: Annotated[float, Field(gt=0)],
     freq_hz: Annotated[float, Field(gt=0)],
@@ -451,7 +519,10 @@ def compute_antenna_isolation_estimate(
     )
 
 
-@mcp.tool(description="Predict RX desense from an aggressor TX with filter and antenna isolation.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Predict RX desense from an aggressor TX with filter and antenna isolation.",
+)
 def compute_desense(
     aggressor_power_dbm: float,
     filter_rejection_db: Annotated[float, Field(ge=0)],
@@ -470,7 +541,14 @@ def compute_desense(
 # -------- Touchstone utilities --------
 
 
-@mcp.tool(description="Element-wise diff between two .s2p files (S21 dB / S11 dB / mag / phase).")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Compare two .s2p files (S21 dB / S11 dB / magnitude / phase) on the "
+        "union of their measured points inside the overlapping frequency span. "
+        "Never extrapolates; phase uses the shortest circular difference."
+    ),
+)
 def compare_sparameters(
     s2p_a: str,
     s2p_b: str,
@@ -479,20 +557,44 @@ def compare_sparameters(
     return _wrap(_compare_sparameters, s2p_a, s2p_b, metric=metric)
 
 
-@mcp.tool(description="Compute group delay (or unwrapped phase) of S21.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Compute group delay (or unwrapped phase) of S21. Supply "
+        "analysis_band_hz for any band summary; no implicit passband is guessed."
+    ),
+)
 def extract_delay(
     s2p_path: str,
     method: str = "group_delay",
+    analysis_band_hz: tuple[float, float] | None = None,
 ) -> Envelope[dict[str, Any]]:
-    return _wrap(_extract_delay, s2p_path, method)
+    return _wrap(
+        _extract_delay,
+        s2p_path,
+        method,
+        analysis_band_hz=analysis_band_hz,
+    )
 
 
-@mcp.tool(description="Fit a lumped equivalent circuit to a measured 2-port network.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Fit a lumped equivalent circuit to a measured 2-port and report "
+        "bounded-solver convergence, residuals, identifiability, and valid range."
+    ),
+)
 def fit_equivalent_circuit(
     s2p_path: str,
     topology: str = "series_l_shunt_c",
+    fit_band_hz: tuple[float, float] | None = None,
 ) -> Envelope[dict[str, Any]]:
-    return _wrap(_fit_equivalent_circuit, s2p_path, topology=topology)
+    return _wrap(
+        _fit_equivalent_circuit,
+        s2p_path,
+        topology=topology,
+        fit_band_hz=fit_band_hz,
+    )
 
 
 # ===========================================================================
@@ -504,21 +606,41 @@ def fit_equivalent_circuit(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
-        "Time-Domain Reflectometry from S11. Inverse-FFT to time domain "
-        "and convert to Z(distance) profile via the substrate's phase "
-        "velocity. Useful for locating impedance discontinuities."
+        "Validated S11 time-domain transform. Low-pass mode constructs a "
+        "DC/conjugate spectrum and returns Z(distance); band-pass mode returns "
+        "a reflection envelope only. Reports grid policy, warnings, physical "
+        "resolution, and unambiguous range."
     ),
 )
 def tdr_from_s11(
     s2p_path: str,
     er_eff: Annotated[float, Field(gt=0)] = 4.0,
-    window: str = "hann",
+    window: Literal["hann", "rect"] = "hann",
+    transform_mode: Literal["lowpass", "bandpass"] = "lowpass",
+    resample_nonuniform: bool = True,
+    dc_extrapolation: Literal["constant", "linear", "zero", "reject"] = "constant",
+    padding_factor: Annotated[int, Field(ge=1, le=64)] = 4,
+    reference_plane_delay_s: Annotated[float, Field(ge=0)] = 0.0,
+    gate_time_s: tuple[float, float] | None = None,
 ) -> Envelope[dict[str, Any]]:
-    return _wrap(_tdr, s2p_path, er_eff=er_eff, window=window)
+    return _wrap(
+        _tdr,
+        s2p_path,
+        er_eff=er_eff,
+        window=window,
+        transform_mode=transform_mode,
+        resample_nonuniform=resample_nonuniform,
+        dc_extrapolation=dc_extrapolation,
+        padding_factor=padding_factor,
+        reference_plane_delay_s=reference_plane_delay_s,
+        gate_time_s=gate_time_s,
+    )
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Compute eye-diagram metrics for a channel given its S2P. "
         "Returns eye height, width (UI), worst-case ISI."
@@ -560,7 +682,10 @@ def eye_diagram_from_s2p(
         return error(f"eye_diagram_from_s2p failed: {e}", tool_version=__version__)
 
 
-@mcp.tool(description="Near-End Crosstalk (NEXT) estimate for two coupled traces.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Near-End Crosstalk (NEXT) estimate for two coupled traces.",
+)
 def estimate_next_db(
     coupling_length_mm: Annotated[float, Field(gt=0)],
     trace_separation_mm: Annotated[float, Field(gt=0)],
@@ -578,7 +703,10 @@ def estimate_next_db(
     )
 
 
-@mcp.tool(description="Far-End Crosstalk (FEXT) estimate for two coupled traces.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Far-End Crosstalk (FEXT) estimate for two coupled traces.",
+)
 def estimate_fext_db(
     coupling_length_mm: Annotated[float, Field(gt=0)],
     trace_separation_mm: Annotated[float, Field(gt=0)],
@@ -599,7 +727,10 @@ def estimate_fext_db(
 # ----- EMC pre-compliance --------------------------------------------------
 
 
-@mcp.tool(description="Conducted-emissions limit (dBuV) at a frequency for CISPR 22 / FCC 15B.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="Conducted-emissions limit (dBuV) at a frequency for CISPR 22 / FCC 15B.",
+)
 def cispr_limit_at(
     freq_hz: Annotated[float, Field(gt=0)],
     standard: str = "cispr22_b",
@@ -617,6 +748,7 @@ def cispr_limit_at(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Convert an AC line-current spectrum to LISN voltage and check "
         "against CISPR 22 / FCC 15B conducted-emissions limits."
@@ -642,7 +774,10 @@ def predict_conducted_emissions(
         )
 
 
-@mcp.tool(description="FCC Part 15.109 Class B radiated-emissions limit (dBuV/m) at distance.")
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description="FCC Part 15.109 Class B radiated-emissions limit (dBuV/m) at distance.",
+)
 def fcc_part15_radiated_limit_at(
     freq_hz: Annotated[float, Field(gt=0)],
     distance_m: Annotated[float, Field(gt=0)] = 3.0,
@@ -666,6 +801,7 @@ def fcc_part15_radiated_limit_at(
 
 
 @mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
         "Estimate radiated E-field from a current-carrying loop (small-loop "
         "approximation). Useful first-order radiated-EMI check."
@@ -688,7 +824,10 @@ def predict_radiated_emissions_loop(
 
 def main() -> None:
     log.info("starting mcp-rf-analysis", extra={"version": __version__})
-    mcp.run()
+    run_stdio_server(mcp)
+
+
+prepare_protocol_tools(mcp)
 
 
 if __name__ == "__main__":

@@ -22,18 +22,17 @@ want to run actual LTspice / ngspice / Qucs-S simulations, follow
 uv run pytest -q
 ```
 
-You should see ~180 tests pass. Two simulator integration tests skip
-when LTspice / ngspice are absent; that's expected.
+The simulator-independent suite runs everywhere. Tests marked for
+LTspice, ngspice, Qucs-S, or Xyce skip when that backend is absent.
 
 ## 3. Run the headline example
 
 ```bash
-uv run python examples/halow_lpf/design.py
+uv run python examples/basic_lpf/design.py
 ```
 
-Takes ~30 seconds. Generates `examples/halow_lpf/{final.s2p,
-final.asc, response.png, report.md}` and prints a pass/fail spec table
-plus Monte Carlo yield.
+Generates `examples/basic_lpf/{basic_lpf.s2p,basic_lpf.asc,response.png}`
+and prints a pass/fail spec table plus analytical Monte Carlo yield.
 
 ## 4. Use a server from your MCP client
 
@@ -64,14 +63,12 @@ Add this to your client's MCP config (Claude Desktop, IDE plugin, etc.):
 Restart your client and the tools appear under the configured server
 names.
 
-## 5. Sanity-check a server interactively
+## 5. Sanity-check the registration
 
-```bash
-uv run mcp-ltspice    # listens on stdio for MCP requests
-```
-
-In another shell, use the `mcp` CLI (or your IDE's MCP inspector) to
-list tools and call `synthesize_lc_filter`.
+Restart your MCP client, inspect the configured server's tool list, and
+call `synthesize_lc_filter`. Running `uv run mcp-ltspice` directly starts
+the stdio server and waits for an MCP client; it is not an interactive
+shell.
 
 ## What next
 
@@ -79,5 +76,8 @@ list tools and call `synthesize_lc_filter`.
   three-server layout and the Touchstone interop contract.
 - Browse the [Tool Catalog](tool-catalog.md) for the full list of
   available tools.
+- Use the [General circuit workbench](circuit-workbench.md) to import a
+  supported schematic/netlist, attach exact models, and run bounded
+  simulator-backed optimization.
 - Try the [basic LPF example](examples/basic-lpf.md) end-to-end to see
   the workflow in action.

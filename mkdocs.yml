@@ -101,8 +101,14 @@ plugins:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Usage walkthrough: usage.md
   - Architecture: architecture.md
+  - Suite architecture: suite-architecture.md
   - Installation: installation.md
+  - Backend matrix: backend-matrix.md
+  - Circuit workbench: circuit-workbench.md
+  - Dependency policy: dependency-policy.md
+  - Migration guide: migration-0.5.md
   - Tool catalog:
       - Overview: tool-catalog.md
       - mcp-ltspice: tools/ltspice.md
