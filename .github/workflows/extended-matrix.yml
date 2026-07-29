@@ -18,7 +18,7 @@ jobs:
     name: Qucsator-RF known-answer integrations
     runs-on: [self-hosted, linux, x64, qucsator-rf, ngspice]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.13
       - run: uv sync --all-packages --frozen
@@ -37,7 +37,7 @@ jobs:
     name: Xyce harmonic-balance known-answer integrations
     runs-on: [self-hosted, linux, x64, xyce]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.13
       - run: uv sync --all-packages --frozen
@@ -52,7 +52,7 @@ jobs:
     name: LTspice integrations (native Windows)
     runs-on: [self-hosted, windows, x64, ltspice]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.13
       - run: uv sync --all-packages --frozen
@@ -64,7 +64,7 @@ jobs:
     name: LTspice integrations (Wine)
     runs-on: [self-hosted, linux, x64, ltspice-wine]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.13
       - run: uv sync --all-packages --frozen
@@ -77,7 +77,7 @@ jobs:
     name: Current Codex MCP discovery and tool call
     runs-on: [self-hosted, linux, x64, codex-client]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.13
       - run: uv sync --all-packages --frozen
@@ -101,7 +101,7 @@ jobs:
     name: Current Claude Code MCP discovery and tool call
     runs-on: [self-hosted, linux, x64, claude-client]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.13
       - run: uv sync --all-packages --frozen
