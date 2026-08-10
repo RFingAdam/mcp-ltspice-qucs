@@ -11,6 +11,7 @@ usually enough — bullet what changed and why, not how.
 
 <!-- How did you test? Paste the relevant test output or commands. -->
 
+- [ ] I have read and agree to [CLA.md](../CLA.md) for this contribution.
 - [ ] `uv run pytest -q` passes locally
 - [ ] `uv run ruff format --check .` passes
 - [ ] `uv run ruff check .` passes
