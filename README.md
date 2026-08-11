@@ -249,6 +249,15 @@ AGPL move. Underlying Qucs-S (GPL), LTspice (proprietary), and
 scikit-rf (BSD) are runtime-invoked dependencies, not redistributed
 by these wrappers.
 
+## Commercial licensing
+
+This project is licensed under AGPL-3.0-or-later. A commercial license —
+for embedding in a closed-source product, hosting as a paid service
+without AGPL's share-back obligations, or proprietary redistribution —
+is available on a case-by-case basis. See [eng-mcp-suite's licensing
+policy](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md#commercial-licensing)
+or open an issue and tag `@RFingAdam`.
+
 ## Acknowledgments
 
 - **[LTspice](https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html)** — Analog Devices' SPICE simulator.
