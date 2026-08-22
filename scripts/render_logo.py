@@ -1,7 +1,7 @@
 """Regenerate the project logos from a real filter response.
 
 The curve in every logo is the actual |S21| (and faint |S11|) of an
-order-5 elliptic low-pass filter synthesized by this codebase — the
+order-5 elliptic low-pass filter synthesized by this codebase. The
 product draws its own logo. Run from the repo root:
 
     uv run python scripts/render_logo.py
@@ -22,7 +22,7 @@ from mcp_ltspice.synthesis.lc_filter import synthesize_lc_lpf
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Palette — the established navy/blue/teal brand.
+# Palette: the established navy/blue/teal brand.
 BG_TOP, BG_BOT = "#0B1220", "#101B31"
 GRID, GRID_SOFT = "#1C2A47", "#15213A"
 CURVE_A, CURVE_B = "#3AA1FF", "#5FD7C8"
@@ -131,14 +131,14 @@ def logo_card() -> str:
 {plot_group(40, 36, 400, 130, "c")}
   <text x="40" y="200" font-family="{MONO}" font-size="21" font-weight="600"
         fill="{INK}" letter-spacing="0.5">mcp-ltspice-qucs</text>
-  <text x="40" y="221" font-family="{MONO}" font-size="11.5" fill="{INK_DIM}">order-5 elliptic |S21| — drawn by its own tools</text>
+  <text x="40" y="221" font-family="{MONO}" font-size="11.5" fill="{INK_DIM}">order-5 elliptic |S21|: drawn by its own tools</text>
 </svg>"""
 
 
 def logo_banner() -> str:
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img"
-     aria-label="mcp-ltspice-qucs — RF filter synthesis, simulation, and coexistence analysis via LTspice, Qucs-S, ngspice, and Xyce">
+     aria-label="mcp-ltspice-qucs: RF filter synthesis, simulation, and coexistence analysis via LTspice, Qucs-S, ngspice, and Xyce">
   <title>mcp-ltspice-qucs</title>
 {defs("b")}
   <rect x="0" y="0" width="1280" height="320" rx="0" fill="url(#bbg)"/>
@@ -146,7 +146,7 @@ def logo_banner() -> str:
   <text x="64" y="130" font-family="{MONO}" font-size="46" font-weight="700"
         fill="{INK}" letter-spacing="0.5">mcp-ltspice-qucs</text>
   <text x="64" y="172" font-family="{MONO}" font-size="19" fill="{INK_DIM}">RF filter synthesis, simulation, and coexistence</text>
-  <text x="64" y="198" font-family="{MONO}" font-size="19" fill="{INK_DIM}">analysis — LTspice · Qucs-S · ngspice · Xyce</text>
+  <text x="64" y="198" font-family="{MONO}" font-size="19" fill="{INK_DIM}">analysis: LTspice · Qucs-S · ngspice · Xyce</text>
   <text x="64" y="252" font-family="{MONO}" font-size="14" fill="{CURVE_A}">110 MCP tools · 4 simulator backends · validated against all of them</text>
 </svg>"""
 

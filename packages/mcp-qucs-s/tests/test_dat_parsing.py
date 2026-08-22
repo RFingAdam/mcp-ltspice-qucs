@@ -2,7 +2,7 @@
 
 The fixture in ``fixtures/butterworth_lpf_o3.dat`` is genuine output from
 qucsator-RF 1.0.7 for the netlist beside it, so these tests cannot drift
-away from the format the simulator actually writes — which is how the
+away from the format the simulator actually writes, which is how the
 original parser came to be wrong.
 
 It expected each S-parameter split into ``S[1,1].r`` and ``S[1,1].i``

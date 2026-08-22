@@ -2,7 +2,7 @@
 zero placement.
 
 The optimal TZ for a harmonic landing is the severity-weighted centroid
-of its victim-overlap intervals — not the geometric centre of the
+of its victim-overlap intervals. Not the geometric centre of the
 landing. The reference pin is hand-computed: passband 850–950 MHz gives
 a 2H landing of 1700–1900 MHz; victims [1805, 1880] MHz at severity 2
 and [1710, 1780] MHz at severity 1 overlap fully, so
@@ -133,7 +133,7 @@ def test_trap_index_hints_follow_ascending_zero_order() -> None:
 
 def test_gnss_auto_load_catches_l1_at_third_harmonic() -> None:
     """525 MHz TX: 3H landing [1560, 1590] MHz straddles GPS L1
-    (1575.42 MHz) — include_gnss must find it with no user victims."""
+    (1575.42 MHz): include_gnss must find it with no user victims."""
     result = place_zeros_for_coex(
         passband_hz=(520 * MHZ, 530 * MHZ),
         harmonics=[3],
@@ -148,7 +148,7 @@ def test_gnss_auto_load_catches_l1_at_third_harmonic() -> None:
 
 
 def test_fcc_restricted_auto_load_contributes_victims() -> None:
-    """GPS L1 sits inside an FCC restricted band too — with only
+    """GPS L1 sits inside an FCC restricted band too: with only
     include_fcc_restricted the 3H zero still lands near it."""
     result = place_zeros_for_coex(
         passband_hz=(520 * MHZ, 530 * MHZ),

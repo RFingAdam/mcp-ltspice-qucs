@@ -336,7 +336,7 @@ def compare_filter_orders(
         2. Place transmission zeros at ``zero_targets_hz`` (up to the
            number of traps the order supports)
         3. Substitute vendor real parts (with optional SRF gating via
-           ``srf_margin`` / ``max_value_drift_pct`` — passed through to
+           ``srf_margin`` / ``max_value_drift_pct``: passed through to
            :func:`substitute_real_components` so the comparison uses the
            same gating as the final design)
         4. Optimize with vendor-bounded DE and passband weight

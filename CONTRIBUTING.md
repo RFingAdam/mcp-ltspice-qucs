@@ -7,7 +7,7 @@ changes.
 ## Before you contribute
 
 By submitting a pull request to this repository, you agree to the terms
-of [CLA.md](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/CLA.md) — a short contributor license agreement that lets the
+of [CLA.md](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/CLA.md). A short contributor license agreement that lets the
 Maintainer offer this Project under both its default open license and a
 separate paid commercial license (see [COMMERCIAL.md](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/COMMERCIAL.md)),
 without needing to track down every past contributor individually every
@@ -15,7 +15,7 @@ time that offering changes. You keep your own copyright; you're just
 granting the Maintainer the same relicensing rights over your
 contribution that they already have over the rest of the codebase.
 
-No signature or bot step is required today — opening the PR is the
+No signature or bot step is required today: opening the PR is the
 agreement. Read CLA.md before you submit if you want the full terms.
 
 ## Quick setup
@@ -34,7 +34,7 @@ argument to make invalid; install a simulator (see the
 [Installation guide](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/docs/installation.md))
 to exercise the simulator-driven paths.
 
-Before opening a PR, run the same three commands CI runs — if these are
+Before opening a PR, run the same three commands CI runs. If these are
 clean, CI will be too:
 
 ```bash
@@ -47,10 +47,10 @@ uv run pytest -q
 
 The repo is a uv workspace with four packages under `packages/`:
 
-- `rf-mcp-common` — shared envelope, Touchstone I/O, E-series snap, logging
-- `mcp-ltspice` — LTspice + ngspice runner, filter synthesis, spec eval
-- `mcp-rf-analysis` — skrf wrappers, regulatory band DBs, coex matrix
-- `mcp-qucs-s` — Qucs-S native S-param + harmonic balance + microstrip
+- `rf-mcp-common`: shared envelope, Touchstone I/O, E-series snap, logging
+- `mcp-ltspice`: LTspice + ngspice runner, filter synthesis, spec eval
+- `mcp-rf-analysis`: skrf wrappers, regulatory band DBs, coex matrix
+- `mcp-qucs-s`: Qucs-S native S-param + harmonic balance + microstrip
 
 See [ARCHITECTURE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/ARCHITECTURE.md) for the inter-server contract.
 
@@ -69,9 +69,9 @@ uv run pytest --cov                    # with coverage
 Tests that need a real simulator carry a marker and skip cleanly when
 the binary is absent: `ngspice`, `ltspice`, `qucs`, `xyce`. Availability
 is decided by the package's own discovery function (e.g.
-`mcp_ltspice.runner.find_ltspice`), so anything the runner can find —
+`mcp_ltspice.runner.find_ltspice`), so anything the runner can find:
 `$LTSPICE_PATH`, `$WINEPREFIX`, the standard Windows / macOS / Wine
-install paths — also un-skips the tests.
+install paths: also un-skips the tests.
 
 If `-m ltspice` skips when you believe LTspice is installed, run:
 
@@ -79,7 +79,7 @@ If `-m ltspice` skips when you believe LTspice is installed, run:
 uv run python -c "from mcp_ltspice.runner import find_ltspice; print(find_ltspice())"
 ```
 
-A `None` there means the runner cannot see it either — that is the bug
+A `None` there means the runner cannot see it either. That is the bug
 to report, not the skip. Setting `$LTSPICE_PATH` to a file that does not
 exist logs a warning rather than failing silently.
 
@@ -106,7 +106,7 @@ every commit.
 ## Adding a new tool to a server
 
 1. Implement the underlying logic in a new module under
-   `packages/<server>/src/<pkg>/`. Pure functions — don't touch
+   `packages/<server>/src/<pkg>/`. Pure functions. Don't touch
    FastMCP yet.
 2. Write tests under `packages/<server>/tests/` that exercise it
    without any simulator dependency where possible.
@@ -125,7 +125,7 @@ Three steps:
    existing servers. Add it to `tool.uv.workspace.members` in the
    root `pyproject.toml`.
 2. Depend on `rf-mcp-common` so the envelope and Touchstone helpers
-   are available — don't reimplement either.
+   are available. Don't reimplement either.
 3. Use Touchstone files for any inter-server data exchange. The
    contract is documented in [ARCHITECTURE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/ARCHITECTURE.md).
 

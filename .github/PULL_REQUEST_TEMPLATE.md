@@ -1,6 +1,6 @@
 <!--
 Thanks for the PR. A short prose description above the checklist is
-usually enough — bullet what changed and why, not how.
+usually enough: bullet what changed and why, not how.
 -->
 
 ## Summary

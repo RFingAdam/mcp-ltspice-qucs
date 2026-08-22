@@ -8,7 +8,7 @@ margin. The model (documented assumptions, all hand-checkable):
 - Interference noise density at the RX:
   ``I₀ = PA_noise_dBm/Hz − filter_rejection_at_victim − antenna_iso``
 - GNSS effective noise floor: ``N₀ = −174 + NF`` dBm/Hz
-- ``ΔC/N₀ = 10·log₁₀(1 + 10^((I₀−N₀)/10))`` — the effective-floor rise;
+- ``ΔC/N₀ = 10·log₁₀(1 + 10^((I₀−N₀)/10))``. The effective-floor rise;
   at I₀ = N₀ this is exactly 3.010 dB.
 - A fundamental/harmonic landing *inside* the GNSS band is CW-like:
   the correlator spreads it over the code rate,
@@ -87,7 +87,7 @@ def test_broadband_noise_strong_case() -> None:
 
 def test_victim_side_pa_noise_override_wins() -> None:
     """The issue's sketch puts pa_broadband_noise_dbm_hz_at_offset on the
-    victim (they know their offset) — it must override the TX default."""
+    victim (they know their offset). It must override the TX default."""
     tx = {"name": "TX", "f_center_hz": 915e6, "power_dbm": 30.0, "broadband_noise_dbm_hz": -130.0}
     rx = {**GPS_L1, "pa_broadband_noise_dbm_hz_at_offset": -160.0}
     rows = [r for r in _matrix(tx, rx, antenna_iso_db=25.0) if r["mechanism"] == "broadband_noise"]

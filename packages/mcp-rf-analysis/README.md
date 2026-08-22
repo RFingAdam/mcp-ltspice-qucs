@@ -1,7 +1,7 @@
 # mcp-rf-analysis
 
 Simulator-agnostic MCP server. Consumes Touchstone files from any
-source — LTspice, Qucs-S, CST, ADS, or VNA measurements — and exposes
+source: LTspice, Qucs-S, CST, ADS, or VNA measurements, and exposes
 RF domain knowledge that's the same regardless of where the S-parameters
 came from.
 
@@ -33,11 +33,11 @@ executable known-answer check of the numerical stack.
 
 ## Bundled databases
 
-`resources/bands/` — LTE, 5G NR, GNSS, ISM, HaLow band allocations.
+`resources/bands/`: LTE, 5G NR, GNSS, ISM, HaLow band allocations.
 Sources cited in each JSON file (3GPP TS 36.101, 38.101, IEEE 802.11ah,
 FCC Part 15, ETSI EN 300 220 / 300 328).
 
-`resources/limits/` — FCC, ETSI, 3GPP regulatory limit tables.
+`resources/limits/`: FCC, ETSI, 3GPP regulatory limit tables.
 
-`resources/templates/` — Reusable spec sheets for common pass/fail
+`resources/templates/`: Reusable spec sheets for common pass/fail
 evaluations.

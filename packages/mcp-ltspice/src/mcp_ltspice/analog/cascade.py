@@ -149,7 +149,7 @@ def transfer_function_db(
 ) -> dict[str, list[float]]:
     """Compute the cascaded |H(jω)| in dB across frequency.
 
-    Useful for verifying a design before committing components — gives
+    Useful for verifying a design before committing components: gives
     you the ideal-op-amp transfer function so you can compare with a
     real LTspice sim that includes op-amp non-idealities.
     """

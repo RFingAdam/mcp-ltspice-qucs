@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for the idea! For new tools, the most useful issues
-        describe a *workflow* the tool would unlock — not just an API
+        describe a *workflow* the tool would unlock. Not just an API
         signature in isolation.
 
   - type: textarea
@@ -27,7 +27,7 @@ body:
       label: Proposed solution
       description: |
         What new tool or change to an existing tool would help? If you
-        have an API sketch, paste it as a code block — but the *what*
+        have an API sketch, paste it as a code block, but the *what*
         matters more than the *how*.
       render: python
 

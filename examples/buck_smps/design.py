@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""5V → 3.3V buck SMPS at 2A — component sizing + MOSFET selection.
+"""5V → 3.3V buck SMPS at 2A: component sizing + MOSFET selection.
 
 Demonstrates the power-supply tools: design_buck for L/Cout sizing,
 find_mosfet_for_application for switch selection, type2_compensator
@@ -42,7 +42,7 @@ def main() -> None:
     if d.notes:
         print(f"    Notes: {'; '.join(d.notes)}")
 
-    # 2. Pick a high-side MOSFET — needs to handle V_in plus margin, plus the
+    # 2. Pick a high-side MOSFET: needs to handle V_in plus margin, plus the
     #    peak inductor current with margin, low Rds_on for efficiency
     print(f"\n[2] High-side MOSFET candidates (Vds ≥ 10 V, Id ≥ {d.inductor_peak_a * 1.5:.1f} A):")
     candidates = find_mosfet_for_application(
@@ -65,7 +65,7 @@ def main() -> None:
         #   P_sw   = 0.5 · V_in · I_peak · t_transition · f_sw
         # t_transition is the Vds rise+fall time; assume 5 ns from a
         # typical gate driver. For more accuracy, scale this by Qgd /
-        # I_gate_drive — but for the first-pass estimate 5 ns is fine.
+        # I_gate_drive: but for the first-pass estimate 5 ns is fine.
         t_transition_ns = 5.0
         p_cond = (d.inductor_rms_a**2) * (chosen.rds_on_max_mohm * 1e-3) * d.duty_cycle
         p_sw = 0.5 * V_IN * d.inductor_peak_a * (t_transition_ns * 1e-9) * F_SW

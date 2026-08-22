@@ -1,4 +1,4 @@
-"""Edge-coupled (parallel coupled-line) BPF synthesis (issue #27) — the
+"""Edge-coupled (parallel coupled-line) BPF synthesis (issue #27). The
 coupled-section core that hairpin / interdigital / combline build on.
 
 Electrical synthesis is exact closed form (Pozar §8.7, eq. 8.121):
@@ -12,8 +12,8 @@ analysis (even: C_p + C_f + C_f'; odd: C_p + C_f + C_ga + C_gd, exact
 elliptic-integral ratio via scipy) inverted numerically for (W, S).
 
 Simulator ground truth (probe-verified this session): qucsator's CTLIN
-is the ideal coupled line — vacuum velocity, node order line1-near /
-line1-far / line2-far / line2-near — and the diagonal-connected section
+is the ideal coupled line: vacuum velocity, node order line1-near /
+line1-far / line2-far / line2-near, and the diagonal-connected section
 (2 & 4 open) matches the closed-form section ABCD to 0.0000 mdB, so the
 ideal cascade must agree with qucsator at numerical precision. MCOUPLED
 (Kirschning) is the real-model check for the synthesized W/S/L.
@@ -97,7 +97,7 @@ def _s21_db(design, freqs):
 
 
 def test_single_section_image_impedance_identity() -> None:
-    """At θ = 90° a lone section's image impedance is (Z0e−Z0o)/2 — with
+    """At θ = 90° a lone section's image impedance is (Z0e−Z0o)/2: with
     the system Z₀ set to exactly that, the section must be reflectionless."""
     ze, zo = 70.61, 39.24
     zi = (ze - zo) / 2.0
@@ -176,7 +176,7 @@ def test_synthesis_round_trips_through_analysis() -> None:
 
 def test_unrealizable_coupling_is_rejected() -> None:
     """A 3 dB coupler-grade Ze/Zo ratio is beyond edge-coupled microstrip
-    on this substrate — the synthesis must say so, not return a corner."""
+    on this substrate. The synthesis must say so, not return a corner."""
     with pytest.raises(ValueError, match=r"[Uu]nrealizable|converge"):
         synthesize_coupled_microstrip(121.0, 21.0, FR4)
 
@@ -279,9 +279,9 @@ def test_mcoupled_realization_centers_near_design(tmp_path) -> None:
     microstrip model: passband centred near f₀ with a usable passband and
     real stopbands. Run on a low-loss Rogers-class laminate so dielectric
     loss doesn't mask the shape (on FR-4 the classical midband-loss
-    estimate 4.343·Σg/(Δ·Qu) is ≈ 4 dB and was measured at 4.05 dB —
+    estimate 4.343·Σg/(Δ·Qu) is ≈ 4 dB and was measured at 4.05 dB:
     consistent physics, but a poor canvas for asserting the response).
-    Quasi-static synthesis vs the dispersive model costs a few percent —
+    Quasi-static synthesis vs the dispersive model costs a few percent:
     bounds are honest, not decorative."""
     rogers = Substrate(er=3.66, h_mm=0.508, t_um=35.0, tan_d=0.0037)
     d = _design(substrate=rogers)

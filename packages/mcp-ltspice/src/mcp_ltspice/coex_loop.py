@@ -4,7 +4,7 @@ One call closes the loop the engineer used to orchestrate by hand:
 
 1. :func:`mcp_rf_analysis.coex_zeros.place_zeros_for_coex` positions the
    elliptic transmission zeros on the victim-weighted harmonic centroids
-   (#12) — one zero per available trap.
+   (#12). One zero per available trap.
 2. ``synthesize_lc_lpf("elliptic", …)`` builds the prototype and
    ``place_transmission_zero`` aims each trap (E24-snapped parts).
 3. ``substitute_real_components`` realizes vendor parts with an SRF
@@ -20,8 +20,8 @@ One call closes the loop the engineer used to orchestrate by hand:
    the best-so-far design with ``converged=False`` and the full
    iteration log either way.
 
-This module is the one place mcp-ltspice depends on mcp-rf-analysis —
-one-directional, no cycle (mcp-rf-analysis never imports this package).
+This module is the one place mcp-ltspice depends on mcp-rf-analysis.
+One-directional, no cycle (mcp-rf-analysis never imports this package).
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from mcp_ltspice.synthesis.lc_filter import synthesize_lc_lpf
 from mcp_ltspice.synthesis.zeros import place_transmission_zero
 from mcp_ltspice.vendor_models import substitute_real_components
 
-#: Raw (pre-filter) PA harmonic levels, dBc — the same broadband PA
+#: Raw (pre-filter) PA harmonic levels, dBc. The same broadband PA
 #: assumption check_coex_matrix documents.
 _RAW_PA_DBC = {2: -30.0, 3: -40.0, 4: -50.0, 5: -55.0}
 
@@ -92,7 +92,7 @@ def synthesize_for_coex_target(
         raise ValueError(f"need 3 ≤ min_order ≤ max_order; got {min_order}..{max_order}")
     if min_order % 2 == 0:
         raise ValueError(f"min_order must be odd (elliptic synthesis); got {min_order}")
-    # Zeros go on the dominant PA products (2H/3H) by default — 4H/5H sit
+    # Zeros go on the dominant PA products (2H/3H) by default: 4H/5H sit
     # ≥50 dBc down before any filtering, and letting their broad FCC
     # landings outrank 2H/3H would also push the trap SRF spec beyond
     # what 0402 parts can realise. The coex matrix still evaluates all
@@ -144,7 +144,7 @@ def synthesize_for_coex_target(
                 )["components"]
 
         # SRF spec: parts must still behave at the highest placed zero.
-        # Start at the issue's 1.2 margin and degrade gracefully — a
+        # Start at the issue's 1.2 margin and degrade gracefully. A
         # turn-key loop reports a relaxed margin instead of dying when
         # the vendor family can't provide it (e.g. a 14 nH 0402 with
         # SRF ≥ 3.3 GHz does not exist).

@@ -4,7 +4,7 @@ Demonstrates the `compare_filter_orders` tool: side-by-side 5th vs 7th
 vs 9th-order elliptic LPF designs, scored on pass/fail + Monte Carlo
 yield + SRF severity − component count.
 
-Generic spec — adapt `spec.json` for your application and the rest of
+Generic spec: adapt `spec.json` for your application and the rest of
 the pipeline runs unchanged.
 
 ## Run
@@ -30,6 +30,6 @@ For each order in `[5, 7, 9]`:
 
 ## Outputs
 
-- `order5_final.s2p`, `order7_final.s2p`, `order9_final.s2p` — analytical
+- `order5_final.s2p`, `order7_final.s2p`, `order9_final.s2p`: analytical
   Touchstone files
-- `report.md` — full BOM + spec table + score breakdown for every order
+- `report.md`: full BOM + spec table + score breakdown for every order

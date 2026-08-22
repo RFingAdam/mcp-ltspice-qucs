@@ -49,7 +49,7 @@ def test_snap_string_series_works() -> None:
 
 
 def test_snap_decade_boundaries() -> None:
-    # 9.5 should round to 9.1 (E24) or 10 in next decade — closer to 9.1
+    # 9.5 should round to 9.1 (E24) or 10 in next decade: closer to 9.1
     # but 9.5 - 9.1 = 0.4 vs 10 - 9.5 = 0.5 → 9.1 wins
     res = snap_to_eseries(9.5e-9, ESeries.E24)
     assert res.snapped == pytest.approx(9.1e-9)

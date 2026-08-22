@@ -20,7 +20,7 @@ def common_frequency_grid(
     *,
     collect_warnings: list[str] | None = None,
 ) -> NDArray[np.float64]:
-    """Frequency grid shared by every network — the *overlap*, never beyond.
+    """Frequency grid shared by every network. The *overlap*, never beyond.
 
     One policy, used by both :func:`cascade_networks` and
     :func:`deembed_network`, which previously disagreed:
@@ -37,7 +37,7 @@ def common_frequency_grid(
     The old code intersected the grids with :func:`numpy.intersect1d`, which
     demands exact float equality. Two instruments essentially never produce
     bit-identical grids, so real inputs fell through to "use network 1's grid
-    and interpolate the rest" — extrapolating the others past the end of
+    and interpolate the rest": extrapolating the others past the end of
     their measured data, with no warning.
     """
     lo = max(float(n.f.min()) for n in nets)
@@ -50,7 +50,7 @@ def common_frequency_grid(
         )
         raise ValueError(
             f"Frequency ranges do not overlap, so there is nothing to compute "
-            f"without extrapolating past measured data. Ranges — {spans}."
+            f"without extrapolating past measured data. Ranges: {spans}."
         )
 
     # Sample on the densest input's points inside the overlap, so the result

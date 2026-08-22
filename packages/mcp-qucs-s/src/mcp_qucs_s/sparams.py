@@ -29,7 +29,7 @@ def _parse_qucs_number(token: str, var_name: str, dat_path: str | Path) -> compl
     """Parse one Qucs data value, real or complex.
 
     Raises with the variable and file named rather than letting a bare
-    ``ValueError: could not convert string to float`` escape — which is
+    ``ValueError: could not convert string to float`` escape, which is
     exactly what a real ``.dat`` used to produce, giving no clue that the
     parser simply did not understand the format.
     """
@@ -88,8 +88,8 @@ def _freq_and_s_matrix(
     """Assemble (freq, S) from parsed .dat variables, validating as we go.
 
     Shared by both loaders so they report the same diagnostic. A partial
-    .dat — Qucs-S was interrupted, or the schematic only saved some
-    ports — otherwise surfaced as a bare KeyError naming an internal
+    .dat: Qucs-S was interrupted, or the schematic only saved some
+    ports: otherwise surfaced as a bare KeyError naming an internal
     string, with no hint of which file was short.
     """
     if "frequency" not in data:

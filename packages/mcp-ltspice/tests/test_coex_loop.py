@@ -8,7 +8,7 @@ matrix (#15, GNSS-aware) → escalate the order until the worst-case
 desense meets the target or max_order is reached.
 
 The tests drive the real pipeline end to end (real synthesis fits, real
-vendor tables, real matrix) — no mocks; runtime is dominated by the
+vendor tables, real matrix). No mocks; runtime is dominated by the
 elliptic LSQ fit at ~50 ms per order.
 """
 

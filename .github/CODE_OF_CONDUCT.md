@@ -6,4 +6,4 @@ This project follows the
 Disagree about technical decisions, not about people. Assume good
 faith. If something feels off, report it via
 [security advisories](https://github.com/RFingAdam/mcp-ltspice-qucs/security/advisories)
-(use "Report a vulnerability" — works for conduct issues too).
+(use "Report a vulnerability": works for conduct issues too).

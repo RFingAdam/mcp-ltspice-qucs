@@ -48,7 +48,7 @@ def test_cispr22_class_b_step_at_5mhz() -> None:
     just below, 60 dBµV just above. A buggy log-linear interpolator
     would silently average the two and report ~57 dBµV at 5.5 MHz.
 
-    This test pins the regression fixed in v0.3.0 — the step must
+    This test pins the regression fixed in v0.3.0. The step must
     appear in the table data, not be smeared across the 5-30 MHz
     range.
     """
@@ -59,7 +59,7 @@ def test_cispr22_class_b_step_at_5mhz() -> None:
     limit_just_above = cispr_limit_at(5.1e6)
     assert limit_just_above == pytest.approx(60.0, abs=0.5), (
         f"At 5.1 MHz the CISPR Class B QP limit must be 60 dBµV "
-        f"(post-step value); got {limit_just_above:.2f} dBµV — the "
+        f"(post-step value); got {limit_just_above:.2f} dBµV. The "
         f"interpolator is silently smearing the 5 MHz step."
     )
     # Mid-band stays at 60 dBµV (no further interp drift)

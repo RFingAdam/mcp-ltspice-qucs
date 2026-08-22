@@ -67,7 +67,7 @@ def compute_antenna_isolation_estimate(
         wavelength = C0 / freq_hz
         if ground_plane_size_m < wavelength / 4:
             iso_db -= 6.0
-            notes.append("Small ground plane — added 6 dB coupling penalty")
+            notes.append("Small ground plane: added 6 dB coupling penalty")
     return {
         "freq_hz": freq_hz,
         "separation_m": antenna_separation_m,

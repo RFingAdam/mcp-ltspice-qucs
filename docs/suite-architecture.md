@@ -5,7 +5,7 @@ How mcp-ltspice-qucs fits inside [eng-mcp-suite](https://github.com/RFingAdam/en
 The internal architecture of the three servers (interop contract,
 Envelope shape, Touchstone exchange format) is documented in
 [`ARCHITECTURE.md`](architecture.md). This page is about the **external**
-boundary — what this MCP feeds, what it consumes, and which workflow
+boundary: what this MCP feeds, what it consumes, and which workflow
 bundles include it.
 
 ---
@@ -35,19 +35,19 @@ antenna port and at the schematic-to-layout boundary.
 
 ### Feeds (this MCP produces output that)…
 
-- **mcp-pcb-emcopilot** — candidate filter schematic + Touchstone
+- **mcp-pcb-emcopilot**: candidate filter schematic + Touchstone
   `.s2p` for layout-aware insertion-loss budgeting and review.
-- **mcp-emc-regulations** — predicted conducted-emission spectrum from
+- **mcp-emc-regulations**: predicted conducted-emission spectrum from
   SMPS designs for margin-check against CISPR 22 / CISPR 32.
-- **mcp-rf-analysis** (internal) — Touchstone output from `mcp-ltspice`
+- **mcp-rf-analysis** (internal): Touchstone output from `mcp-ltspice`
   is consumable by cascade / de-embed tools through the shared file
   contract.
 
 ### Consumes (this MCP accepts input from)…
 
-- **lineforge** — characteristic impedance + εr_eff for matching
+- **lineforge**: characteristic impedance + εr_eff for matching
   network design on a known PCB cross-section.
-- **mcp-nec2-antenna** — antenna feedpoint impedance for matching-
+- **mcp-nec2-antenna**: antenna feedpoint impedance for matching-
   network synthesis.
 
 ### Workflow bundles that include this MCP

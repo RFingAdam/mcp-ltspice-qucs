@@ -1,9 +1,9 @@
-# Related MCP servers — scope and boundaries
+# Related MCP servers: scope and boundaries
 
 `mcp-ltspice-qucs` is one piece of a larger ecosystem of
 engineering-domain MCP servers. This document tells an LLM agent (or a
 human reader) **which tool to reach for** when a question spans more
-than one domain — and where this suite explicitly does **not**
+than one domain, and where this suite explicitly does **not**
 duplicate work that another MCP already covers.
 
 Some of the sister MCPs referenced below are public (linked); others
@@ -13,24 +13,24 @@ suite to solve a problem that's outside its layer.
 
 ## What this MCP suite covers
 
-- **Filter synthesis** — LC ladders (Butterworth / Chebyshev / elliptic),
+- **Filter synthesis**: LC ladders (Butterworth / Chebyshev / elliptic),
   active filters (Sallen-Key / MFB), transmission-zero placement, real-
   vendor part substitution, optimisation, Monte Carlo yield.
-- **Distributed-element synthesis** (closed-form) — microstrip lines,
+- **Distributed-element synthesis** (closed-form): microstrip lines,
   branch-line / rat-race / Lange / coupled-line couplers,
   Richards-Kuroda lumped-to-distributed conversion.
-- **SPICE simulation** — LTspice (Wine) or ngspice; `.raw` parser;
+- **SPICE simulation**: LTspice (Wine) or ngspice; `.raw` parser;
   S-parameter extraction.
-- **SMPS sizing** — buck / boost / LDO; type-II compensator; Bode +
+- **SMPS sizing**: buck / boost / LDO; type-II compensator; Bode +
   phase-margin analysis.
-- **SMPS EMC pre-compliance** (circuit-level) — Pi LC output filter,
+- **SMPS EMC pre-compliance** (circuit-level): Pi LC output filter,
   DM input filter with Middlebrook check, conducted-emissions
   prediction with CISPR 22/32 limit overlay, RC snubber, common-mode
   choke selection.
-- **Coexistence** — multi-radio harmonic-victim lookup, desense matrix.
-- **Component catalogues** — op-amp / MOSFET / BJT / diode / voltage
+- **Coexistence**: multi-radio harmonic-victim lookup, desense matrix.
+- **Component catalogues**: op-amp / MOSFET / BJT / diode / voltage
   reference datasheet metadata.
-- **Digital / mixed-signal helpers** — setup/hold timing, propagation
+- **Digital / mixed-signal helpers**: setup/hold timing, propagation
   delay, digital-to-analog crosstalk, supply-noise injection.
 
 ## What this MCP suite explicitly does not cover
@@ -39,9 +39,9 @@ suite to solve a problem that's outside its layer.
 |---|---|---|
 | **Antenna design / radiation patterns** | A NEC2 method-of-moments antenna MCP (closed-form + dipole, vertical, loop, Yagi, inverted-V) and/or an FDTD full-wave EM MCP (patch, monopole, helix, horn, microstrip antenna) | Antenna synthesis and radiation simulation are their own domain. We deliberately stop at the antenna port. |
 | **PCB-level EMC / SI / PI** (impedance from layout, decoupling, return paths, crosstalk from geometry, stackup, copper pours, vias) | A PCB-layout-aware EMC MCP | We're circuit-level (schematic in, S-params / yield out). Layout-aware EMC is board-level (layout in, EMC margin out). Two sides of "I have a circuit, now lay it out". |
-| **Regulatory standards lookup** (CISPR / FCC Part 15 / Part 18 / Part 95 / ETSI / 3GPP / IEC 61000 / ISO 11452 / CISPR 25) | [`mcp-emc-regulations`] | Authoritative regulatory tables and cross-reference. Our band-list / CISPR-limit tools are filter-design helpers (subsets used internally by `lookup_harmonic_victims` etc.) — not the canonical reference. |
+| **Regulatory standards lookup** (CISPR / FCC Part 15 / Part 18 / Part 95 / ETSI / 3GPP / IEC 61000 / ISO 11452 / CISPR 25) | [`mcp-emc-regulations`] | Authoritative regulatory tables and cross-reference. Our band-list / CISPR-limit tools are filter-design helpers (subsets used internally by `lookup_harmonic_victims` etc.). Not the canonical reference. |
 | **RF testing of physical hardware** (BLE / WiFi / HaLow on a real DUT) | A hardware-DUT RF test MCP | We're pre-silicon / pre-board simulation. Hardware testing drives an actual device. |
-| **Physical-layer SDR captures** | An SDR capture MCP | Same — we're at design-time, SDR capture is at runtime. |
+| **Physical-layer SDR captures** | An SDR capture MCP | Same. We're at design-time, SDR capture is at runtime. |
 | **3D CAD / mechanical** | [`mcp-blender`] | Out of scope. |
 | **Drawio engineering diagrams** | [`drawio-engineering-mcp`] | Out of scope. |
 
@@ -56,8 +56,8 @@ capability, prefer the canonical source.
 
 | This MCP | Canonical alternative | When to use which |
 |---|---|---|
-| `mcp-qucs-s.synthesize_microstrip_line` (Z₀ → W, L) | — (synthesis is unique) | This MCP — synthesis is unique |
-| `mcp-qucs-s.analyze_microstrip_tool` (W → Z₀) | a PCB-layout-aware EMC MCP | **Prefer the layout-aware tool** for analysis if one is available — it integrates with the wider PCB workflow (CPW, stripline, differential, eye-diagram). Use ours when you're already mid-Richards-Kuroda flow. |
+| `mcp-qucs-s.synthesize_microstrip_line` (Z₀ → W, L) |: (synthesis is unique) | This MCP: synthesis is unique |
+| `mcp-qucs-s.analyze_microstrip_tool` (W → Z₀) | a PCB-layout-aware EMC MCP | **Prefer the layout-aware tool** for analysis if one is available. It integrates with the wider PCB workflow (CPW, stripline, differential, eye-diagram). Use ours when you're already mid-Richards-Kuroda flow. |
 
 ### Frequency-band data (regulatory tables)
 
@@ -80,7 +80,7 @@ categories matching a single frequency) is unique to this MCP.
 
 ### HaLow channel grids
 
-`list_halow_channels_tool` is **unique to this MCP** — no external
+`list_halow_channels_tool` is **unique to this MCP**. No external
 server (that we're aware of) carries the IEEE 802.11ah regional
 channel sets (EU 863–870, US/AU/NZ 902–928, JP 916.5–927.5, KR
 917.5–923.5, CN 755–787, etc.).
@@ -142,7 +142,7 @@ Are you testing a physical DUT or capturing IQ samples?
 
 ### Designing a 2.4 GHz front-end with antenna + matching network + filter
 
-1. *(antenna MCP — NEC2 closed-form or FDTD full-wave)* → antenna design + radiation pattern
+1. *(antenna MCP: NEC2 closed-form or FDTD full-wave)* → antenna design + radiation pattern
 2. `mcp-qucs-s.synthesize_coupler` → branch-line splitter if needed
 3. `mcp-ltspice.synthesize_lc_filter` (Chebyshev BPF) → harmonic / image filter
 4. `mcp-rf-analysis.cascade_networks` → composite S-parameters

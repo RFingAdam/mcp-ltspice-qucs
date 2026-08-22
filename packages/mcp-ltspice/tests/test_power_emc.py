@@ -236,7 +236,7 @@ class TestConductedEmissions:
         r = predict_conducted_emissions(
             f_switching_hz=50e3, switch_voltage_v=12.0, rise_time_s=20e-9, n_harmonics=2
         )
-        assert np.isnan(r.limit_dbuv[0])  # 50 kHz — below 150 kHz
+        assert np.isnan(r.limit_dbuv[0])  # 50 kHz: below 150 kHz
 
 
 # ---------------------------------------------------------------------------

@@ -29,7 +29,7 @@ def lpf_s2p(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def thru_s2p(tmp_path: Path) -> Path:
-    """A pass-through (S21=1) network — useful for cascade identity tests.
+    """A pass-through (S21=1) network: useful for cascade identity tests.
 
     Uses the same frequency grid as ``lpf_s2p`` so cascade/deembed tests
     don't lose resolution to grid intersection.

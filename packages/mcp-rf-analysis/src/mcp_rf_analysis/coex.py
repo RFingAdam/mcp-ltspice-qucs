@@ -60,7 +60,7 @@ def lookup_harmonic_victims(
 #: (``pa_broadband_noise_dbm_hz_at_offset``) specifies one.
 GNSS_DEFAULT_PA_NOISE_DBM_HZ = -150.0
 GNSS_DEFAULT_NF_DB = 2.0
-#: GPS C/A code rate — the correlator spreads an in-band CW tone over
+#: GPS C/A code rate. The correlator spreads an in-band CW tone over
 #: this bandwidth (spectral separation coefficient Q = 1 assumed).
 GNSS_DEFAULT_CHIP_RATE_HZ = 1.023e6
 #: C/N₀ degradation budget used to express GNSS entries as a
@@ -221,7 +221,7 @@ def check_coex_matrix(
                     }
                 )
 
-    # Broadband PA noise at each GNSS victim — evaluated once per TX×RX
+    # Broadband PA noise at each GNSS victim: evaluated once per TX×RX
     # pair, independent of harmonic landings (the dominant real-world
     # GNSS desense mechanism for co-located transmitters).
     for tx in tx_list:

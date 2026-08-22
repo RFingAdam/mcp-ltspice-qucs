@@ -6,7 +6,7 @@ admittance matrix ``Y_c`` and common electrical length θ is
     [ −j·cotθ·Y_c    +j·cscθ·Y_c ]
     [ +j·cscθ·Y_c    −j·cotθ·Y_c ]
 
-— **linear in Y_c**, which is the whole trick: a tridiagonal ``Y_c``
+That form is **linear in Y_c**, which is the whole trick: a tridiagonal ``Y_c``
 decomposes into per-line stub terms and per-coupling K-blocks
 ``y_m·[[1,−1],[−1,1]]``, so the array is *exactly* a parallel network of
 ordinary two-port lines (one stub per line, admittance
@@ -19,7 +19,7 @@ qucsator exactly (see ``generate_interdigital_netlist``).
 :func:`segmented_array_sparams` stacks commensurate array segments
 (needed for tapped feeds) into one nodal admittance system and reduces
 it to S-parameters exactly. The interdigital pair-resonance split is
-closed form — ``det = 0`` gives ``cosθ = ±y_m/Y_r`` — exposed as
+closed form: ``det = 0`` gives ``cosθ = ±y_m/Y_r``: exposed as
 :func:`interdigital_pair_k` / :func:`mutual_for_k`.
 """
 
@@ -67,7 +67,7 @@ def combline_pair_split(
     Both lines are shorted at the same end and tuned by
     ``C = Y_r·cot(θ0)/ω0``. Keeping both top ends, the coupling block is
     the same-end (−j·cotθ) one, so ``det = 0`` gives the exact
-    transcendental ``ω·C = (Y_r ± y_m)·cot(θ(ω))`` — the − branch is the
+    transcendental ``ω·C = (Y_r ± y_m)·cot(θ(ω))``. The − branch is the
     lower resonance, the + branch the upper. Returns ``(f_low, f_high)``.
     """
     if y_r <= 0 or y_m < 0 or not 0.0 < theta0_deg < 90.0:
@@ -111,7 +111,7 @@ def segmented_array_sparams(
     (level, line) pairs. Port ordering: bottom ports by line index,
     then the ``ports`` list in order, then top ports by line index.
     ``cap_loads`` attaches lumped capacitors to ground at (level, line,
-    farad) — combline loading; a load on a shorted node is rejected.
+    farad): combline loading; a load on a shorted node is rejected.
 
     Returns S of shape (npoints, nports, nports). Frequencies where a
     segment hits θ = m·π (the commensurate-line poles) are filled with

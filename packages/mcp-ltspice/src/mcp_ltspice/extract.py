@@ -2,12 +2,12 @@
 
 Two paths:
 
-1. **Analytical** — given a list of LC ladder components, compute S₁₁ and
+1. **Analytical**: given a list of LC ladder components, compute S₁₁ and
    S₂₁ from the cascaded ABCD matrices (lossless, ideal). No simulator
    required, used for fast design-space exploration and synthesis
    validation.
 
-2. **Simulator-extracted** — parse a SPICE ``.raw`` AC-analysis output
+2. **Simulator-extracted**: parse a SPICE ``.raw`` AC-analysis output
    from LTspice / ngspice and compute S-parameters via the standard
    2-port voltage / current method.
 """
@@ -108,11 +108,11 @@ def ladder_sparams_from_components(
     - ``("series_c", {"C": 2.2e-12})``
     - ``("shunt_c", {"C": 2.2e-12})``
     - ``("shunt_l", {"L": 4.7e-9})``
-    - ``("shunt_lc_trap", {"L": ..., "C": ...})`` — series-LC to GND (BSF shunt; elliptic LPF trap). ``Y = sC / (s²LC + 1)``; admittance peaks at ω₀.
-    - ``("series_lc_series", {"L": ..., "C": ...})`` — series-LC in main path (BPF series-section). ``Z = sL + 1/(sC)``; impedance dips at ω₀.
-    - ``("shunt_lc_parallel", {"L": ..., "C": ...})`` — parallel-LC to GND (BPF shunt-section). ``Y = sC + 1/(sL)``; admittance dips at ω₀, blocking signal flow into the shunt branch in-band so it passes to the next series element.
-    - ``("series_lc_parallel", {"L": ..., "C": ...})`` — parallel-LC in main path (BSF series-section). ``Z = sL / (s²LC + 1)``; impedance peaks at ω₀.
-    - ``("shunt_composite_trap", {"L_s": ..., "C_s": ..., "L_p": ..., "C_p": ...})`` — series-LC (L_s, C_s) in series with a parallel-LC tank (L_p ∥ C_p), the whole branch to GND. The image of an elliptic LPF trap under the BPF/BSF transform. ``Z = sL_s + 1/(sC_s) + sL_p/(s²L_pC_p + 1)``; the branch shorts at the two mapped transmission zeros — the roots of ``u²·L_sC_sL_pC_p − u·(L_sC_s + L_pC_p + L_pC_s) + 1 = 0`` in ``u = ω²``.
+    - ``("shunt_lc_trap", {"L": ..., "C": ...})``: series-LC to GND (BSF shunt; elliptic LPF trap). ``Y = sC / (s²LC + 1)``; admittance peaks at ω₀.
+    - ``("series_lc_series", {"L": ..., "C": ...})``: series-LC in main path (BPF series-section). ``Z = sL + 1/(sC)``; impedance dips at ω₀.
+    - ``("shunt_lc_parallel", {"L": ..., "C": ...})``: parallel-LC to GND (BPF shunt-section). ``Y = sC + 1/(sL)``; admittance dips at ω₀, blocking signal flow into the shunt branch in-band so it passes to the next series element.
+    - ``("series_lc_parallel", {"L": ..., "C": ...})``: parallel-LC in main path (BSF series-section). ``Z = sL / (s²LC + 1)``; impedance peaks at ω₀.
+    - ``("shunt_composite_trap", {"L_s": ..., "C_s": ..., "L_p": ..., "C_p": ...})``: series-LC (L_s, C_s) in series with a parallel-LC tank (L_p ∥ C_p), the whole branch to GND. The image of an elliptic LPF trap under the BPF/BSF transform. ``Z = sL_s + 1/(sC_s) + sL_p/(s²L_pC_p + 1)``; the branch shorts at the two mapped transmission zeros. The roots of ``u²·L_sC_sL_pC_p − u·(L_sC_s + L_pC_p + L_pC_s) + 1 = 0`` in ``u = ω²``.
 
     Returns S of shape (npoints, 2, 2).
     """
@@ -158,13 +158,13 @@ def ladder_sparams_from_components(
             mat = _abcd_shunt_y(y)
         elif kind == "series_lc_parallel":
             # Parallel LC in main signal path: Z = sL/(s²LC+1). Peaks to
-            # ∞ at ω₀ (anti-resonant — blocks in-band), goes to ~sL at DC
+            # ∞ at ω₀ (anti-resonant: blocks in-band), goes to ~sL at DC
             # and ~1/(sC) at high frequency.
             # Floor the denominator *before* dividing, mirroring the
             # shunt_lc_trap branch above. Clamping the quotient afterwards
             # (|z| > ceiling) cannot catch the anti-resonant bin: there
             # s²LC+1 → 0 with numerator → 0 too, so the quotient is NaN,
-            # and `abs(NaN) > ceiling` is False — the clamp silently misses
+            # and `abs(NaN) > ceiling` is False. The clamp silently misses
             # and the NaN propagates into the S-matrix.
             y_parallel = 1.0 / _inductor_impedance(s_axis, params) + 1.0 / _capacitor_impedance(
                 s_axis, params
@@ -177,7 +177,7 @@ def ladder_sparams_from_components(
         elif kind == "shunt_composite_trap":
             # Series-LC in series with a parallel-LC tank, to ground. Two
             # floors: the tank denominator (its anti-resonance is a pole of
-            # the branch impedance — benign, Y → 0) and |Z| itself (the two
+            # the branch impedance: benign, Y → 0) and |Z| itself (the two
             # branch resonances are shorts to ground, Y → ∞), mirroring the
             # shunt_lc_trap / series_lc_parallel handling above.
             floor = 1e-30
@@ -212,7 +212,7 @@ def ladder_sparams_from_components(
         # det is multiplicative over the cascade. Evaluating `a*d - b*c`
         # numerically instead overflows once the ladder gets long (a 9th-order
         # BSF does it), yielding inf → the isfinite guard below rewrote S12 to
-        # 0 while S21 stayed finite — a silent reciprocity violation.
+        # 0 while S21 stayed finite. A silent reciprocity violation.
         s12 = s21
         s22 = (-a + b / z0 - c * z0 + d) / denom
 
@@ -269,22 +269,22 @@ def components_dict_to_elements(
 
     Topology cases:
 
-    - **Butterworth / Chebyshev** — components are ``L1, C2, L3, C4, ...``
+    - **Butterworth / Chebyshev**: components are ``L1, C2, L3, C4, ...``
       (``series_first``) or ``C1, L2, C3, L4, ...`` (``shunt_first``).
       Indices encode position; we walk in numeric order.
 
-    - **Elliptic** — components are ``L1, L2+C2 (trap), L3, L4+C4 (trap), L5, ...``.
+    - **Elliptic**: components are ``L1, L2+C2 (trap), L3, L4+C4 (trap), L5, ...``.
       ``Lk + Ck`` pairs at even ``k`` form shunt LC traps; lone ``Lk`` are series.
       Under ``kind="bandpass"`` / ``"bandstop"`` each trap instead appears as
-      the four-key group ``{Lk_s, Ck_s, Lk, Ck}`` — a shunt composite branch
+      the four-key group ``{Lk_s, Ck_s, Lk, Ck}``. A shunt composite branch
       (series-LC + parallel tank in series, to ground).
 
     The ``transmission_zeros`` flag selects which interpretation to apply:
 
-    - ``None`` (default) — auto-infer from the components dict using
+    - ``None`` (default): auto-infer from the components dict using
       :func:`infer_transmission_zeros`. **This is the recommended default.**
-    - ``True`` — force elliptic (trap) interpretation
-    - ``False`` — force Butterworth / Chebyshev interpretation
+    - ``True``: force elliptic (trap) interpretation
+    - ``False``: force Butterworth / Chebyshev interpretation
 
     If an explicit flag disagrees with what auto-inference would have
     chosen, a :class:`RuntimeWarning` is emitted recommending the user
@@ -320,7 +320,7 @@ def components_dict_to_elements(
     sorted_names = sorted(components.keys(), key=_idx)
     elements: list[tuple[ElementType, dict[str, float]]] = []
 
-    # Bandpass: each LPF reactive maps to an LC pair — except an elliptic
+    # Bandpass: each LPF reactive maps to an LC pair: except an elliptic
     # LPF trap, whose L and C transform separately into a FOUR-element
     # composite shunt branch {Lk_s, Ck_s} (series pair) + {Lk, Ck} (tank).
     # series-first ⇒ odd-k = series-LC-series (BPF series section),
@@ -356,13 +356,13 @@ def components_dict_to_elements(
                 )
                 seen.update({l_s_key, c_s_key, l_key, c_key})
             elif l_key in components and c_s_key in components and in_main_path:
-                # series-LC pair in main path — BPF series section
+                # series-LC pair in main path: BPF series section
                 elements.append(
                     ("series_lc_series", {"L": components[l_key], "C": components[c_s_key]})
                 )
                 seen.update({l_key, c_s_key})
             elif l_key in components and c_key in components and not in_main_path:
-                # parallel-LC pair to ground — BPF shunt section
+                # parallel-LC pair to ground: BPF shunt section
                 elements.append(
                     ("shunt_lc_parallel", {"L": components[l_key], "C": components[c_key]})
                 )
@@ -410,12 +410,12 @@ def components_dict_to_elements(
                     )
                 )
             elif l_key in components and c_s_key in components and in_main_path:
-                # parallel-LC in main path — BSF series section
+                # parallel-LC in main path: BSF series section
                 elements.append(
                     ("series_lc_parallel", {"L": components[l_key], "C": components[c_s_key]})
                 )
             elif l_key in components and c_key in components and not in_main_path:
-                # series-LC to ground — BSF shunt section (== existing trap kind)
+                # series-LC to ground: BSF shunt section (== existing trap kind)
                 elements.append(("shunt_lc_trap", {"L": components[l_key], "C": components[c_key]}))
             else:
                 raise ValueError(

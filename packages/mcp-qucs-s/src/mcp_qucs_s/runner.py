@@ -46,7 +46,7 @@ QUCS_GUI_BINARIES = ("qucs-s",)
 
 
 def find_qucs_gui() -> Path | None:
-    """Locate the Qucs-S GUI, for diagnostics only — it cannot simulate."""
+    """Locate the Qucs-S GUI, for diagnostics only. It cannot simulate."""
     for cand in QUCS_GUI_BINARIES:
         p = shutil.which(cand)
         if p:
@@ -124,7 +124,7 @@ def run_qucs(
 ) -> QucsRunResult:
     """Invoke qucsator headlessly: ``qucsator -i in.net -o out.dat``.
 
-    Takes a qucsator *netlist*, not the GUI's ``.sch`` file — the Qucs GUI
+    Takes a qucsator *netlist*, not the GUI's ``.sch`` file. The Qucs GUI
     netlists a schematic before handing it to the engine. Generate one
     with :func:`mcp_qucs_s.netlist.generate_ladder_netlist`.
     """

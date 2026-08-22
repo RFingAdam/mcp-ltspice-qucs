@@ -5,7 +5,7 @@ all: all 33 tools were exercised only through their underlying module
 functions, so the envelope wrapper, the ``Annotated``/``Field`` schemas,
 and the tool registration itself were entirely untested.
 
-These tests cover the contract every tool shares — an agent calling a
+These tests cover the contract every tool shares. An agent calling a
 tool with bad input must get a usable ``status="error"`` envelope naming
 the tool, not a traceback and not a message naming something it never
 called.

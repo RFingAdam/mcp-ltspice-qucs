@@ -1,7 +1,7 @@
 """Tests verifying that vendor catalogues are genuinely distinct, not aliases.
 
 Background: prior versions had `JOHANSON_L = COILCRAFT_0402HP.copy()` and
-`TDK_MLG = COILCRAFT_0402HP.copy()` — these aliases mislead users into
+`TDK_MLG = COILCRAFT_0402HP.copy()`. These aliases mislead users into
 thinking they have multi-vendor coverage when in fact only one set of
 parasitic data backed all three. The aliases were replaced with
 distinct nominal datasheet values for the Johanson L-07W and TDK
@@ -32,14 +32,14 @@ def test_value_lists_or_srfs_differ(a: str, b: str):
     values_b = set(list_vendor_parts(b))
 
     if values_a != values_b:
-        return  # different value sets — automatically distinct
+        return  # different value sets: automatically distinct
 
     # Same value set; SRFs at common values must differ for at least one entry.
     common = values_a & values_b
     assert any(
         lookup_part(a, v, kind="L").srf_hz != lookup_part(b, v, kind="L").srf_hz for v in common
     ), (
-        f"Vendors {a!r} and {b!r} have identical value lists AND identical SRFs — they are effectively the same catalogue."
+        f"Vendors {a!r} and {b!r} have identical value lists AND identical SRFs. They are effectively the same catalogue."
     )
 
 
@@ -77,6 +77,6 @@ def test_no_two_inductor_catalogues_are_identical_objects():
     ids_seen = set()
     for cat in catalogues:
         assert id(cat) not in ids_seen, (
-            "Two vendor catalogues share the same dict object — modifying one would mutate all."
+            "Two vendor catalogues share the same dict object: modifying one would mutate all."
         )
         ids_seen.add(id(cat))

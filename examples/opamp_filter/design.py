@@ -148,7 +148,7 @@ def _write_report(path, design, chosen, rejection_at_nyquist) -> None:
     if chosen is not None:
         lines.append("## Op-amp choice")
         lines.append("")
-        lines.append(f"**{chosen.part_number}** ({chosen.vendor}) — {chosen.typical_use}")
+        lines.append(f"**{chosen.part_number}** ({chosen.vendor}): {chosen.typical_use}")
         lines.append("")
         lines.append(f"- Family: {chosen.family}")
         lines.append(

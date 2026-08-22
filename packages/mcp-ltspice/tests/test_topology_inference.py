@@ -50,15 +50,15 @@ class TestInferTransmissionZeros:
         assert infer_transmission_zeros(ELLIPTIC_LIKE) is True
 
     def test_only_odd_indices_returns_false(self):
-        # Lone L1, L3, L5 — no traps
+        # Lone L1, L3, L5. No traps
         assert infer_transmission_zeros({"L1": 1e-9, "L3": 2e-9, "L5": 1e-9}) is False
 
     def test_even_index_lone_l_returns_false(self):
-        # L2 alone (no matching C2) — not a trap
+        # L2 alone (no matching C2). Not a trap
         assert infer_transmission_zeros({"L1": 1e-9, "L2": 2e-9, "L3": 1e-9}) is False
 
     def test_even_index_lone_c_returns_false(self):
-        # C2 alone (no matching L2) — Butterworth-ish shunt cap
+        # C2 alone (no matching L2): Butterworth-ish shunt cap
         assert infer_transmission_zeros({"L1": 1e-9, "C2": 2e-12, "L3": 1e-9}) is False
 
 
@@ -147,5 +147,5 @@ class TestSpRegression:
         s_correct = ladder_sparams_from_components(elements_correct, f, z0=50.0)
         s_wrong = ladder_sparams_from_components(elements_wrong, f, z0=50.0)
         # The two interpretations should produce visibly different S21 magnitudes
-        # somewhere in the sweep (definitionally — different topologies).
+        # somewhere in the sweep (definitionally: different topologies).
         assert not np.allclose(s_correct[:, 1, 0], s_wrong[:, 1, 0], rtol=0.1)

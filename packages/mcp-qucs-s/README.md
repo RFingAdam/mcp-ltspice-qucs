@@ -25,9 +25,9 @@ Simulator tools return a clear error envelope when their backend is absent.
 
 ## Backends
 
-- **qucsator-RF** — native S-parameter and noise analysis, parsed to
+- **qucsator-RF**: native S-parameter and noise analysis, parsed to
   Touchstone or structured noise parameters.
-- **Xyce** — harmonic balance, intermodulation metrics, and P1dB sweeps.
+- **Xyce**: harmonic balance, intermodulation metrics, and P1dB sweeps.
 
 Both drivers reject non-zero exits and stale, empty, or malformed output.
 Each invocation runs in an isolated workspace and emits a manifest.

@@ -185,10 +185,10 @@ def build_design_report_pdf(
         _add_summary_page(pdf, d, artifacts)
 
         for p in artifacts["schematics"]:
-            _add_image_page(pdf, p, f"Schematic — {p.stem}")
+            _add_image_page(pdf, p, f"Schematic: {p.stem}")
 
         for p in artifacts["responses"]:
-            _add_image_page(pdf, p, f"Response — {p.stem}")
+            _add_image_page(pdf, p, f"Response: {p.stem}")
 
         for p in artifacts["others"]:
             _add_image_page(pdf, p, p.stem)

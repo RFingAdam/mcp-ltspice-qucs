@@ -61,7 +61,7 @@ class ParasiticInductor:
     """Inductor with shunt parasitic capacitance (sets SRF) and series ESR."""
 
     L_h: float
-    Cp_f: float  # parasitic shunt capacitance — sets SRF
+    Cp_f: float  # parasitic shunt capacitance: sets SRF
     Rs_ohm: float  # series ESR (DC + AC)
     srf_hz: float
 
@@ -71,7 +71,7 @@ class ParasiticCapacitor:
     """Capacitor with series parasitic inductance (ESL → SRF) and ESR."""
 
     C_f: float
-    Ls_h: float  # series ESL — sets SRF
+    Ls_h: float  # series ESL: sets SRF
     Rs_ohm: float
     srf_hz: float
 
@@ -346,7 +346,7 @@ for L_nh, Cp_pf, Rs_ohm, srf_ghz in [
 # Nominal values from the TDK MLK1005S datasheet (product.tdk.com).
 # Value range extends below 1 nH where 0402HP / Johanson L-07W don't go;
 # SRFs at the smallest values are very high. First-order parasitic
-# estimates only — production designs should pull a real S-parameter file.
+# estimates only: production designs should pull a real S-parameter file.
 TDK_MLG: dict[float, ParasiticInductor] = {}
 for L_nh, Cp_pf, Rs_ohm, srf_ghz in [
     (0.6, 0.10, 0.025, 18.0),
@@ -403,8 +403,8 @@ def register_vendor_table(
     """Register (or replace) a runtime vendor table under ``namespace``.
 
     Replaces any existing table for the namespace outright, which gives
-    re-registering a directory clean refresh semantics — new files appear,
-    deleted ones disappear — without leaking stale entries.
+    re-registering a directory clean refresh semantics: new files appear,
+    deleted ones disappear: without leaking stale entries.
     """
     if namespace in _VENDOR_TABLES:
         raise ValueError(
@@ -828,7 +828,7 @@ def lookup_part_with_srf_margin(
     C → higher SRF (parasitic series L is roughly fixed).
 
     ``max_value_drift_pct`` (default ``None``) bounds the substitution.
-    A candidate whose value drifts beyond the bound is skipped — so the
+    A candidate whose value drifts beyond the bound is skipped, so the
     engineer doesn't get a part with a wildly different inductance
     silently substituted just to chase SRF.
 
@@ -933,7 +933,7 @@ def substitute_real_components(
         Highest spec target frequency. Required when ``srf_margin > 0``
         unless ``spec`` is provided.
     spec
-        ``FilterSpec`` dict — if given, ``max_spec_freq_hz`` is auto-derived
+        ``FilterSpec`` dict. If given, ``max_spec_freq_hz`` is auto-derived
         as ``max(passband.f_stop, *stopband_targets[*].freq)``.
     max_value_drift_pct
         Bound (default 25 %) on how far the SRF-aware substitution may

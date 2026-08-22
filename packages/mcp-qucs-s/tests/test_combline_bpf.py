@@ -3,13 +3,13 @@ N-line TEM machinery of ``multiconductor``.
 
 Combline: all lines shorted at the SAME end, a lumped capacitor from
 each open end to ground, resonator length θ0 < 90° (default 45°). The
-capacitor tunes the shorted stub — ``C = Y_r·cot(θ0)/ω0`` — and pure
+capacitor tunes the shorted stub: ``C = Y_r·cot(θ0)/ω0``, and pure
 TEM combline genuinely needs it (at θ0 = 90° the structure has no
 passband). Everything is derived, not recalled:
 
 - Pair split: keeping both top ends, the coupling block is the
   SAME-end (−j·cotθ) one, so det = 0 gives the exact transcendental
-  ``ωC = (Y_r ± y_m)·cot(θ(ω))`` — the − root is f_l, the + root f_h.
+  ``ωC = (Y_r ± y_m)·cot(θ(ω))``. The − root is f_l, the + root f_h.
 - Slope parameter of the loaded resonator:
   ``b = (Y_r/2)(cotθ0 + θ0·csc²θ0)`` (Matthaei's b_j), giving the tap
   ``θ_t = arcsin(sinθ0·√(b/(G0·Qe)))`` which reduces to the
@@ -163,7 +163,7 @@ def test_design_self_reports_achieved_metrics() -> None:
 
 
 def test_response_is_a_bandpass_with_clean_upper_stopband() -> None:
-    """The 45° combline's next resonance branch sits near 4·f0 — the
+    """The 45° combline's next resonance branch sits near 4·f0. The
     stopband from 1.5·f0 to 3·f0 must stay deep (the topology's selling
     point vs edge-coupled, whose spurious sits at 2·f0)."""
     d = _design()

@@ -98,8 +98,8 @@ def test_check_coex_matrix_identifies_halow_2f0_collision() -> None:
     """HaLow 2H = 1830 MHz lands inside LTE B3 DL (1805-1880).
 
     The previous version of this test pointed at B25 DL (1930-1995),
-    which 2H misses entirely — its own comment conceded there would be
-    no collision — and then asserted only that the response was a dict
+    which 2H misses entirely. Its own comment conceded there would be
+    no collision, and then asserted only that the response was a dict
     with the expected keys. A logic inversion that reported collisions
     everywhere, or none at all, passed it.
     """
@@ -123,7 +123,7 @@ def test_check_coex_matrix_reports_nothing_for_a_clean_pair() -> None:
 
     2H = 1830 and 3H = 2745 both sit outside 1930-1995, so the matrix
     must be empty. Note n_aggressors counts TX entries, not collisions,
-    so it stays 1 either way — which is why asserting on it proved
+    so it stays 1 either way, which is why asserting on it proved
     nothing.
     """
     rx = [{"name": "LTE_B25_DL", "f_range_hz": [1930e6, 1995e6], "sensitivity_dbm": -97}]

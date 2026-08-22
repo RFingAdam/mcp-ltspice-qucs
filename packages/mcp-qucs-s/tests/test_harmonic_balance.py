@@ -1,7 +1,7 @@
 """Harmonic balance via Xyce (issue #24).
 
-The headline test drives a *behavioural cubic* — ``V(out) = a1·V(in) +
-a3·V(in)³`` — because that is the one nonlinearity whose third-order
+The headline test drives a *behavioural cubic*: ``V(out) = a1·V(in) +
+a3·V(in)³``, because that is the one nonlinearity whose third-order
 intercept has a closed form:
 
     A_IIP3 = sqrt(4·a1 / (3·a3))
@@ -44,7 +44,7 @@ F1, F2 = 0.99e9, 1.01e9
 
 
 # ---------------------------------------------------------------------------
-# Pure helpers — no simulator needed
+# Pure helpers. No simulator needed
 # ---------------------------------------------------------------------------
 
 

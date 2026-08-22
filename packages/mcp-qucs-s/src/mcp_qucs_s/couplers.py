@@ -168,7 +168,7 @@ def _coupled_line(
     ]
     if kind == "lange":
         notes.append(
-            "Lange coupler uses 4 interdigitated fingers — typical lambda/4 "
+            "Lange coupler uses 4 interdigitated fingers: typical lambda/4 "
             "section length scales by ~0.5 vs straight coupled lines for the "
             "same effective coupling."
         )

@@ -52,7 +52,7 @@ def test_shunt_capacitor_lowpass_behavior() -> None:
     s = ladder_sparams_from_components([("shunt_c", {"C": c})], f, z0=z0)
     s21_db = 20 * np.log10(np.abs(s[:, 1, 0]))
     # The -3dB freq for a single shunt C between matched terminations is
-    # 1/(π Z0 C) (not 2π) — verify via direct calc instead and just assert
+    # 1/(π Z0 C) (not 2π): verify via direct calc instead and just assert
     # monotonicity / loss > 0
     assert s21_db[0] < 0
 

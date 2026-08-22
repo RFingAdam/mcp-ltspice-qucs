@@ -5,7 +5,7 @@ plus a matplotlib backend lock) and renders user-facing artifacts, so
 it is the most likely thing to break on a dependency bump or a headless
 machine. These tests render real designs to both formats, verify every
 refdes and formatted value appears in the SVG text (a file-size check
-would miss silent mislabeling), and confirm headless operation — the
+would miss silent mislabeling), and confirm headless operation. The
 suite runs with no DISPLAY in CI already, and the DISPLAY-less
 assertion below makes that explicit rather than incidental.
 """
@@ -30,7 +30,7 @@ def elliptic_components() -> dict[str, float]:
 
 
 def test_runs_headless(tmp_path, monkeypatch) -> None:
-    """Rendering must work with no DISPLAY at all — delete it and render,
+    """Rendering must work with no DISPLAY at all: delete it and render,
     rather than asserting the environment happens to be headless (which
     would fail on any developer machine with X running)."""
     monkeypatch.delenv("DISPLAY", raising=False)

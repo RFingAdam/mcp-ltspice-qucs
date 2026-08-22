@@ -131,7 +131,7 @@ def test_run_simulation_ltspice_smoke(tmp_path) -> None:
 
 
 def test_nonzero_returncode_with_raw_file_is_success(tmp_path) -> None:
-    """rc=1 but the .raw exists — this is the Wine case, and it must pass."""
+    """rc=1 but the .raw exists. This is the Wine case, and it must pass."""
     raw = tmp_path / "sim.raw"
     raw.write_text("stub", encoding="utf-8")
     _check_produced_artifact(
@@ -144,7 +144,7 @@ def test_nonzero_returncode_with_raw_file_is_success(tmp_path) -> None:
 
 
 def test_zero_returncode_without_raw_file_is_failure(tmp_path) -> None:
-    """rc=0 but nothing was produced — still a failure, not a silent pass."""
+    """rc=0 but nothing was produced: still a failure, not a silent pass."""
     with pytest.raises(RuntimeError, match="did not produce"):
         _check_produced_artifact(
             tmp_path / "missing.raw",
@@ -336,7 +336,7 @@ def test_refdes_index_parses_and_rejects() -> None:
 #
 # Recent LTspice releases open a modal "Anonymously Share LTspice Usage Data"
 # dialog on first launch in a Wine prefix. It blocks -b batch mode forever,
-# and the raw symptom is a bare subprocess.TimeoutExpired with an empty log —
+# and the raw symptom is a bare subprocess.TimeoutExpired with an empty log:
 # giving the operator nothing to go on. These pin the detection and that the
 # timeout is translated into an actionable error.
 # ---------------------------------------------------------------------------

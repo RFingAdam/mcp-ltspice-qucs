@@ -260,7 +260,7 @@ def _refdes_index(name: str) -> int:
 def _needs_wine(exe: Path, os_name: str | None = None) -> bool:
     """True when ``exe`` is a Windows binary we must launch through Wine.
 
-    On native Windows a ``.exe`` runs directly — requiring Wine there
+    On native Windows a ``.exe`` runs directly: requiring Wine there
     would make LTspice unusable on the platform it ships for.
 
     ``os_name`` defaults to the real platform and exists so tests can
@@ -291,7 +291,7 @@ def ltspice_first_run_pending(exe: Path) -> bool:
     Recent LTspice releases open a modal *"Anonymously Share LTspice Usage
     Data"* dialog the first time they run in a given Wine prefix. It appears
     even under ``-b``, and because batch mode has no one to click it, the
-    process blocks until the caller's timeout expires — with an empty log and
+    process blocks until the caller's timeout expires: with an empty log and
     no ``.raw``, which looks nothing like a consent prompt. Answering it once
     writes ``LTspice.ini``, so the file's absence is a reliable preflight
     signal.
@@ -319,7 +319,7 @@ def _first_run_hint(exe: Path) -> str:
 def _to_wine_path(wine: Path, path: Path) -> str:
     """Translate a POSIX path to its Windows form via ``winepath -w``.
 
-    Falls back to the POSIX string if the translation fails — that is no
+    Falls back to the POSIX string if the translation fails. That is no
     worse than not trying, and the artifact check will surface the real
     problem with the full command in the message.
     """
@@ -345,7 +345,7 @@ def _check_produced_artifact(
 ) -> None:
     """Enforce the success policy: the artifact, not the return code.
 
-    A nonzero return code is warned about but tolerated — LTspice under
+    A nonzero return code is warned about but tolerated: LTspice under
     Wine exits 1 on successful runs. A missing ``.raw`` is fatal; the
     caller deleted any stale one first, so its absence means this run
     genuinely produced nothing.
@@ -434,8 +434,8 @@ def _asc_to_ngspice_netlist(asc_path: Path) -> Path:
 
     Netlisting is driven by the schematic's geometry (see
     :mod:`mcp_ltspice.asc_netlist`), not by guessing each element's position
-    from its refdes letter. The old approach assumed a lowpass ladder — a
-    lone ``C`` was taken to be a shunt cap, a lone ``L`` a series inductor —
+    from its refdes letter. The old approach assumed a lowpass ladder. A
+    lone ``C`` was taken to be a shunt cap, a lone ``L`` a series inductor,
     so a highpass ladder was silently netlisted as its dual and ngspice
     returned S-parameters for a circuit that was never designed (issue #32).
 

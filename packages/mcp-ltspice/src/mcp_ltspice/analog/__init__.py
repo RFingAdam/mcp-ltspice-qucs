@@ -2,9 +2,9 @@
 
 Closed-form designs for the most common 2nd-order topologies:
 
-- :mod:`.sallen_key` — Sallen-Key (low-pass / high-pass / band-pass)
-- :mod:`.mfb` — Multiple-Feedback (low-pass / high-pass / band-pass)
-- :mod:`.cascade` — Higher-order filters via cascaded 2nd-order stages
+- :mod:`.sallen_key`: Sallen-Key (low-pass / high-pass / band-pass)
+- :mod:`.mfb`: Multiple-Feedback (low-pass / high-pass / band-pass)
+- :mod:`.cascade`: Higher-order filters via cascaded 2nd-order stages
 """
 
 from mcp_ltspice.analog.cascade import (

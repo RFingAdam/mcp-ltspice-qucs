@@ -2,8 +2,8 @@
 
 ``cascade_networks`` used :func:`numpy.intersect1d` to find a common grid,
 which demands exact float equality. Two instruments essentially never emit
-bit-identical grids, so real inputs fell into the fallback branch — "use
-network 1's grid and interpolate the others" — which **extrapolates** the
+bit-identical grids, so real inputs fell into the fallback branch: "use
+network 1's grid and interpolate the others", which **extrapolates** the
 other networks past the end of their measured data, silently.
 ``deembed_network`` raised in the same situation, and the inconsistency was
 undocumented.

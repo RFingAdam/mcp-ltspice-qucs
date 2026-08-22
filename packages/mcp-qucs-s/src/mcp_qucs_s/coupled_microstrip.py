@@ -11,7 +11,7 @@ permittivity follow from the capacitance with and without dielectric:
 
     εre = C/C_air,   Z0 = 1/(c·√(C·C_air))
 
-Accuracy is a few percent over 0.1 ≤ W/h ≤ 10, 0.1 ≤ S/h ≤ 5 — the
+Accuracy is a few percent over 0.1 ≤ W/h ≤ 10, 0.1 ≤ S/h ≤ 5. The
 integration tests hold it against qucsator's Kirschning MCOUPLED model.
 Synthesis inverts the analysis numerically for (W, S).
 """

@@ -1,6 +1,6 @@
 """Distributed-element filter synthesis (issue #27).
 
-First topology: the stepped-impedance LPF (Pozar §8.6) — a lumped LPF
+First topology: the stepped-impedance LPF (Pozar §8.6). A lumped LPF
 prototype realised as alternating short sections of very-high and
 very-low impedance line:
 
@@ -13,7 +13,7 @@ returned notes rather than rejected (Pozar's own worked example runs one
 section to 46°).
 
 Input is a lumped components dict as produced by the ``mcp-ltspice``
-synthesis tools — the same composition contract as
+synthesis tools. The same composition contract as
 :func:`mcp_qucs_s.richards.lumped_to_distributed`.
 
 References:
@@ -48,7 +48,7 @@ def stepped_impedance_lpf(
 ) -> dict[str, Any]:
     """Map a lumped LPF ladder to stepped-impedance microstrip sections.
 
-    ``z_high`` / ``z_low`` are the section impedances — ``z_high`` as high
+    ``z_high`` / ``z_low`` are the section impedances: ``z_high`` as high
     as fabrication allows (narrow trace), ``z_low`` as low as practical
     (wide trace); the further apart, the better the approximation.
     Returns a dict with the ordered section list (role, impedance,
@@ -130,7 +130,7 @@ def tline_cascade_sparams(
 
     ``sections`` is an ordered source-to-load list of
     ``(z0_ohm, electrical_length_deg_at_f_ref)`` pairs; each section's
-    phase scales linearly with frequency, ``θ(f) = θ_ref · f / f_ref`` —
+    phase scales linearly with frequency, ``θ(f) = θ_ref · f / f_ref``:
     exactly the model qucsator uses for ``TLIN`` (probe-verified: vacuum
     velocity, so physical length only fixes θ at one frequency, which is
     all the cascade needs).
@@ -183,8 +183,8 @@ def coupled_line_bpf(
 ) -> dict[str, Any]:
     """Edge-coupled (parallel coupled-line) BPF synthesis (Pozar §8.7).
 
-    ``g`` is the full prototype vector ``g0..g_{N+1}`` — exactly what the
-    ``mcp-ltspice`` synthesis tools return as ``g_coefficients`` — so an
+    ``g`` is the full prototype vector ``g0..g_{N+1}``: exactly what the
+    ``mcp-ltspice`` synthesis tools return as ``g_coefficients``, so an
     order-N filter yields N+1 quarter-wave coupled sections via the
     J-inverter constants (Pozar 8.121):
 
@@ -196,7 +196,7 @@ def coupled_line_bpf(
     Each section's (W, S) comes from the Garg-Bahl inversion and its
     physical length is a quarter-wave at f₀ using the mean of the two
     mode permittivities. This is the electrical core of the hairpin
-    filter as well — a hairpin is this filter with the resonators
+    filter as well. A hairpin is this filter with the resonators
     folded; the fold's slide factor is not modelled here.
     """
     if len(g) < 3:
@@ -249,7 +249,7 @@ def coupled_line_bpf(
         "notes": [
             "Each section is λ/4 at f0; physical length uses the mean of the "
             "even/odd effective permittivities (the two modes travel at "
-            "different speeds — the classic edge-coupled spurious-response "
+            "different speeds. The classic edge-coupled spurious-response "
             "mechanism at 2·f0).",
             "Hairpin realisation: fold each resonator into a U; the coupled "
             "sections keep these (W, S, L) but the fold adds a slide factor "
@@ -326,7 +326,7 @@ def hairpin_bpf(
     substrate: Substrate,
     bend_mm: float | None = None,
 ) -> dict[str, Any]:
-    """Hairpin BPF — the folded edge-coupled filter (Cristal-Frankel).
+    """Hairpin BPF. The folded edge-coupled filter (Cristal-Frankel).
 
     Builds on :func:`coupled_line_bpf`: each half-wave resonator (line2
     of coupled section i joined to line1 of section i+1) is folded into
@@ -334,13 +334,13 @@ def hairpin_bpf(
     MLIN at the mean arm width; default 3× that width ≈ arm spacing of
     2W plus two corners) adds electrical length θ_b to every resonator.
     To keep each resonator at exactly 180° at f₀, every coupled section
-    is shortened to θ = 90° − θ_b/2 — exact when one bend length serves
+    is shortened to θ = 90° − θ_b/2: exact when one bend length serves
     all resonators, which is what is done here.
 
     Shortening the sections below 90° weakens the J-inverter couplings
     slightly (the classic hairpin bandwidth-shrink trade); corner
     discontinuities of the U and cross-arm self-coupling of the fold are
-    NOT modeled — they are the residual a field solver would refine.
+    NOT modeled. They are the residual a field solver would refine.
     """
     base = coupled_line_bpf(g, f0_hz, fractional_bandwidth, z0=z0, substrate=substrate)
     sections = base["sections"]
@@ -359,7 +359,7 @@ def hairpin_bpf(
     theta_section = 90.0 - theta_b / 2.0
     if theta_section < 30.0:
         raise ValueError(
-            f"bend_mm={bend_mm:.2f} mm is {theta_b:.1f}° at f0 — shortening the "
+            f"bend_mm={bend_mm:.2f} mm is {theta_b:.1f}° at f0: shortening the "
             f"coupled sections to {theta_section:.1f}° leaves too little coupled "
             "length to realise the filter. Use a shorter bend or a thinner substrate."
         )
@@ -394,7 +394,7 @@ def hairpin_bpf(
         "Folded edge-coupled (hairpin-line) design: every coupled section is "
         f"shortened to {theta_section:.2f}° so each resonator's "
         "arm + bend + arm totals exactly 180° at f0. The shortened sections "
-        "weaken the couplings slightly — the classic hairpin bandwidth trade.",
+        "weaken the couplings slightly. The classic hairpin bandwidth trade.",
         "Unmodeled residuals: the U's two corner discontinuities (bend "
         "capacitance) and cross-arm self-coupling between the folded arms of "
         "one resonator. Refine with a field solver if the layout is tight.",
@@ -412,15 +412,15 @@ def interdigital_bpf(
     z_resonator_ohm: float = 70.0,
 ) -> dict[str, Any]:
     """Interdigital BPF: N coupled λ/4 resonators, alternately shorted,
-    tapped input/output — designed on the exact same-velocity TEM array
+    tapped input/output: designed on the exact same-velocity TEM array
     model of :mod:`mcp_qucs_s.multiconductor`.
 
     Design identities (standard coupled-resonator, no table lookups):
 
-    - ``k_{i,i+1} = Δ/√(g_i·g_{i+1})`` — realised by inverting the
+    - ``k_{i,i+1} = Δ/√(g_i·g_{i+1})``: realised by inverting the
       *closed-form* interdigital pair-resonance split for the mutual
       admittance ``y_m`` (``cosθ = ±y_m/Y_r``).
-    - ``Qe = g0·g1/Δ`` — realised by tapping the end resonators at
+    - ``Qe = g0·g1/Δ``: realised by tapping the end resonators at
       ``θ_t = arcsin(√(π·Y_r/(4·G0·Qe)))`` from the shorted end, from
       the shorted-λ/4 slope parameter ``b = (π/4)·Y_r`` (isolated-
       resonator approximation; the achieved response is what the exact
@@ -431,7 +431,7 @@ def interdigital_bpf(
     otherwise the Δ / Z_r combination is unrealizable and this raises.
 
     Physical (W, S) per adjacent pair comes from the Garg-Bahl inversion
-    of ``Z0e = 1/(Y_r − y_m)``, ``Z0o = 1/(Y_r + y_m)`` — a first-cut
+    of ``Z0e = 1/(Y_r − y_m)``, ``Z0o = 1/(Y_r + y_m)``. A first-cut
     per-pair mapping (an interior line is shared by two pairs and the
     quasi-TEM even/odd velocities differ); EM-refine for hardware.
     """
@@ -465,7 +465,7 @@ def interdigital_bpf(
         if stub <= 0.0:
             raise ValueError(
                 f"Unrealizable: resonator {i + 1}'s stub admittance goes non-positive "
-                f"({stub:.4g} S) — the bandwidth is too wide for {z_resonator_ohm:.0f} Ω "
+                f"({stub:.4g} S). The bandwidth is too wide for {z_resonator_ohm:.0f} Ω "
                 "resonators. Narrow Δ or lower z_resonator_ohm."
             )
         y_stub.append(stub)
@@ -476,7 +476,7 @@ def interdigital_bpf(
             raise ValueError(
                 f"Unrealizable tap: Qe={qe:.2f} is below the end-fed minimum "
                 f"π·Y_r/(4·G0) = {math.pi * y_r / (4.0 * g0_load):.2f} for "
-                f"{z_resonator_ohm:.0f} Ω resonators — the bandwidth is too wide."
+                f"{z_resonator_ohm:.0f} Ω resonators. The bandwidth is too wide."
             )
         return math.degrees(math.asin(math.sqrt(arg)))
 
@@ -559,7 +559,7 @@ def interdigital_bpf(
         "ports": ports,
         "notes": [
             f"Tapped feed at {tap_in:.2f}° from the shorted end (slope-parameter "
-            "formula, isolated-resonator approximation — see 'achieved' for the "
+            "formula, isolated-resonator approximation. See 'achieved' for the "
             "response the exact array model actually delivers).",
             "Physical (W, S) is a first-cut per-pair Garg-Bahl mapping: an interior "
             "line is shared by two pairs (widths averaged by construction here since "
@@ -570,8 +570,8 @@ def interdigital_bpf(
         ],
     }
 
-    # Self-report what the design actually achieves on the exact model —
-    # the tapped-feed approximation degrades ripple vs the prototype, and
+    # Self-report what the design actually achieves on the exact model.
+    # The tapped-feed approximation degrades ripple vs the prototype, and
     # an MCP consumer should see that number, not assume the spec.
     from mcp_qucs_s.multiconductor import segmented_array_sparams
 
@@ -613,16 +613,16 @@ def combline_bpf(
 ) -> dict[str, Any]:
     """Combline BPF: N coupled lines shorted at the SAME end, each tuned
     by a lumped capacitor at the open end, resonator length θ0 < 90°
-    (default 45°) — on the exact TEM array model.
+    (default 45°): on the exact TEM array model.
 
     - Tuning: ``C = Y_r·cot(θ0)/ω0`` per resonator (pure TEM combline
-      genuinely needs the caps — at θ0 = 90° there is no passband).
+      genuinely needs the caps: at θ0 = 90° there is no passband).
     - Couplings hit ``k = Δ/√(g_i·g_{i+1})`` by inverting the exact pair
       transcendental ``ωC = (Y_r ± y_m)·cot(θ(ω))``
       (:func:`mcp_qucs_s.multiconductor.combline_pair_split`).
     - Tapped feed from the loaded resonator's slope parameter
       ``b = (Y_r/2)(cotθ0 + θ0·csc²θ0)``:
-      ``θ_t = arcsin(sinθ0·√(b/(G0·Qe)))`` — reduces to the interdigital
+      ``θ_t = arcsin(sinθ0·√(b/(G0·Qe)))``: reduces to the interdigital
       formula at θ0 = 90°.
     - Upper stopband is the topology's selling point: the next resonance
       branch needs cotθ > 0 again, so a 45° combline is clean to ≈ 4·f0
@@ -665,7 +665,7 @@ def combline_bpf(
         if k >= pair_k(0.95 * y_r):
             raise ValueError(
                 f"Unrealizable coupling k={k:.3f} for {z_resonator_ohm:.0f} Ω "
-                f"combline resonators at θ0={theta0_deg:.0f}° — narrow Δ."
+                f"combline resonators at θ0={theta0_deg:.0f}°: narrow Δ."
             )
         y_mutual.append(float(brentq(lambda ym, kt=k: pair_k(ym) - kt, 1e-9 * y_r, 0.95 * y_r)))
 
@@ -677,7 +677,7 @@ def combline_bpf(
         if stub <= 0.0:
             raise ValueError(
                 f"Unrealizable: resonator {i + 1}'s stub admittance goes non-positive "
-                f"({stub:.4g} S) — the bandwidth is too wide for {z_resonator_ohm:.0f} Ω "
+                f"({stub:.4g} S). The bandwidth is too wide for {z_resonator_ohm:.0f} Ω "
                 "resonators. Narrow Δ or lower z_resonator_ohm."
             )
         y_stub.append(stub)
@@ -688,7 +688,7 @@ def combline_bpf(
         arg = math.sin(t0) * math.sqrt(slope_b / (g0_load * qe))
         if arg > 1.0:
             raise ValueError(
-                f"Unrealizable tap: Qe={qe:.2f} needs arcsin({arg:.2f}) — the "
+                f"Unrealizable tap: Qe={qe:.2f} needs arcsin({arg:.2f}). The "
                 "bandwidth is too wide for a tapped combline at this Z_resonator."
             )
         return math.degrees(math.asin(arg))
@@ -774,7 +774,7 @@ def combline_bpf(
             "upper stopband is clean well past 2·f0 (the edge-coupled spurious "
             "frequency).",
             f"Tapped feed at {tap_in:.2f}° from the short (loaded-resonator "
-            "slope parameter, isolated-resonator approximation — see 'achieved').",
+            "slope parameter, isolated-resonator approximation. See 'achieved').",
             "Physical (W, S) is a first-cut per-pair Garg-Bahl mapping; loading "
             "caps are ideal lumped elements (chip caps or screw tuners in "
             "hardware). EM-refine before hardware.",

@@ -77,7 +77,7 @@ class TestMicrostripLossScalingLaws:
         fr4 = Substrate(er=4.2, h_mm=1.58, t_um=17.4, tan_d=0.02)
         duroid = Substrate(er=2.2, h_mm=1.58, t_um=17.4, tan_d=0.0009)
         f = 10e9
-        # Use the same width on both — we're comparing α_d sensitivity to
+        # Use the same width on both. We're comparing α_d sensitivity to
         # tan_d, not to εr. (Yes, εr also scales α_d slightly; the
         # dominant factor is still the 22× tan_d ratio.)
         ad_fr4 = analyze_microstrip(3.05, fr4, freq_hz=f)["alpha_d_db_per_mm"]

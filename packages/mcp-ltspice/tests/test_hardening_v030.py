@@ -2,7 +2,7 @@
 
 Each test pins behaviour that a five-agent code review identified as
 under-tested or recently bug-fixed. Single file so the regression
-contract is visible at a glance — these are not unit tests of any one
+contract is visible at a glance. These are not unit tests of any one
 module, they are *contract tests* enforcing properties the codebase
 must continue to honour.
 """
@@ -64,7 +64,7 @@ class TestSrfAuditUnauditedSurfacing:
 
 
 # ---------------------------------------------------------------------------
-# B1: HPF / BPF / BSF responses verified at orders 3, 5, 7, 9 — not just the
+# B1: HPF / BPF / BSF responses verified at orders 3, 5, 7, 9. Not just the
 # lowest order. A topology / fit bug at higher orders is a real regression.
 # ---------------------------------------------------------------------------
 
@@ -112,7 +112,7 @@ def test_bsf_response_across_orders(order):
 
 
 # ---------------------------------------------------------------------------
-# B2: Narrow and wide fractional bandwidth for BPF — classical LPF→BPF
+# B2: Narrow and wide fractional bandwidth for BPF: classical LPF→BPF
 # breaks at the regime extremes. f_0 stays where it should.
 # ---------------------------------------------------------------------------
 
@@ -138,7 +138,7 @@ def test_bpf_fractional_bandwidth_extremes(f_low, f_high, label):
 
 
 # ---------------------------------------------------------------------------
-# B3: Vendor parasitic substitution — Coilcraft 0402HP 4.7 nH SRF is in the
+# B3: Vendor parasitic substitution: Coilcraft 0402HP 4.7 nH SRF is in the
 # documented neighbourhood. We test the value, not just presence.
 # ---------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-"""Tests for tool namespacing — both flat and namespaced names work, both
+"""Tests for tool namespacing. Both flat and namespaced names work, both
 point to the same implementation, and every category is represented.
 
 The underscore-separated names are the portable canonical surface. Dotted
@@ -63,7 +63,7 @@ def test_all_categories_present():
 
 
 def test_no_duplicate_namespaced_names():
-    """Aliases must be unique — no two flat names map to the same namespaced one."""
+    """Aliases must be unique. No two flat names map to the same namespaced one."""
     namespaced_values = list(server.NAMESPACE_ALIASES.values())
     duplicates = {n for n in namespaced_values if namespaced_values.count(n) > 1}
     assert not duplicates, (
@@ -88,8 +88,8 @@ def test_alias_format_dotted():
 def test_alias_count_matches_flat_count_among_registered_pairs():
     """For every flat tool covered by NAMESPACE_ALIASES that is actually
     callable on the server module, both the flat and namespaced names
-    must appear in the registry. (Skipped tools — e.g. those gated on
-    optional vendor catalogues — would produce a registration mismatch.)
+    must appear in the registry. (Skipped tools: e.g. those gated on
+    optional vendor catalogues: would produce a registration mismatch.)
     """
     names = _registered_tool_names()
     for flat_name, ns_name in server.NAMESPACE_ALIASES.items():

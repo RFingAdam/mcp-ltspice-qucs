@@ -1,10 +1,10 @@
 """Power-supply design tools.
 
-- :mod:`.ldo` — Linear regulator analysis (PSRR, ripple, dropout, efficiency)
-- :mod:`.buck` — Buck (step-down) SMPS sizing (L, Cout, switching freq, ripple)
-- :mod:`.boost` — Boost (step-up) SMPS sizing
-- :mod:`.loop` — Control-loop bode + phase margin analysis
-- :mod:`.emc` — Pre-compliance: Pi output filter, DM input filter,
+- :mod:`.ldo`: Linear regulator analysis (PSRR, ripple, dropout, efficiency)
+- :mod:`.buck`: Buck (step-down) SMPS sizing (L, Cout, switching freq, ripple)
+- :mod:`.boost`: Boost (step-up) SMPS sizing
+- :mod:`.loop`: Control-loop bode + phase margin analysis
+- :mod:`.emc`: Pre-compliance: Pi output filter, DM input filter,
   conducted-emissions prediction with CISPR limits, RC snubber, CM choke
   selection
 """

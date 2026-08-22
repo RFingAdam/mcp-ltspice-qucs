@@ -7,16 +7,16 @@ to extract from a transient FFT but falls straight out of an HB solve.
 
 What this module drives:
 
-- **One tone** — harmonic content at ``k·f0``, i.e. harmonic distortion.
-- **Two tones** — the intermodulation products, from which IM3, OIP3 and
+- **One tone**: harmonic content at ``k·f0``, i.e. harmonic distortion.
+- **Two tones**. The intermodulation products, from which IM3, OIP3 and
   IIP3 follow. Third-order products at ``2f1−f2`` and ``2f2−f1`` land just
   outside the tone pair and are the ones that fall in-band in a real radio.
-- **Power sweeps** — gain compression, giving P1dB.
+- **Power sweeps**: gain compression, giving P1dB.
 
 Xyce specifics, established against Xyce 7.10.0 rather than from the manual:
 
 - ``.HB f1 [f2]`` sets the fundamentals, and ``.OPTIONS HBINT NUMFREQ=n[,n]``
-  the harmonic count — with **one entry per tone**. A single ``NUMFREQ`` with
+  the harmonic count: with **one entry per tone**. A single ``NUMFREQ`` with
   two tones aborts the run with "The size of numFreq does not match the
   number of tones in .hb!".
 - ``.PRINT HB_FD`` writes ``<netlist>.HB.FD.prn``, a **two-sided** spectrum
@@ -63,7 +63,7 @@ def dbm_to_source_amplitude(dbm: float, z0: float = 50.0) -> float:
     """Peak source voltage delivering ``dbm`` of *available* power into ``z0``.
 
     Available power from a source of peak amplitude ``V`` behind ``z0`` is
-    ``V²/(8·z0)`` — the factor of 8 covers both the peak-to-RMS conversion and
+    ``V²/(8·z0)``. The factor of 8 covers both the peak-to-RMS conversion and
     the halving across the matched divider. Getting this wrong shifts every
     reported dBm by a constant, which is invisible in a spectrum plot but
     wrecks IIP3.
@@ -131,8 +131,8 @@ def build_hb_netlist(
 ) -> str:
     """Wrap a DUT netlist in tone sources, a matched load and a ``.HB`` analysis.
 
-    ``dut_lines`` are raw SPICE lines — devices, ``.SUBCKT``/``.MODEL`` cards,
-    whatever the circuit needs — referring to ``in_node`` and ``out_node``.
+    ``dut_lines`` are raw SPICE lines: devices, ``.SUBCKT``/``.MODEL`` cards,
+    whatever the circuit needs: referring to ``in_node`` and ``out_node``.
     Sources, termination and analysis directives are added here so the caller
     cannot get the ``NUMFREQ``-per-tone rule wrong.
     """
@@ -414,7 +414,7 @@ def sweep_compression(
     """Sweep drive level and locate the 1 dB gain-compression point.
 
     Small-signal gain is taken from the lowest drive level swept, so that
-    point must genuinely be in the linear region — otherwise P1dB is measured
+    point must genuinely be in the linear region: otherwise P1dB is measured
     against an already-compressed reference and reads high.
     """
     if len(input_powers_dbm) < 2:

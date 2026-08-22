@@ -44,7 +44,7 @@ def _check_q_warning(q: float, max_q: float = 10.0) -> list[str]:
     if q > max_q:
         return [
             f"Q={q:.1f} is high for Sallen-Key. Component sensitivity "
-            f"scales as Q² — consider Multiple-Feedback (MFB) above Q=10."
+            f"scales as Q²: consider Multiple-Feedback (MFB) above Q=10."
         ]
     return []
 

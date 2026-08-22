@@ -50,7 +50,7 @@ def test_compute_stability_returns_k_factor(lpf_s2p) -> None:
     assert "delta_mag" in res
     assert "mu_factor" in res
     # A passive lossless filter sits at the K=1 stability boundary in its
-    # passband — verify the K-factor array exists and is real-valued.
+    # passband: verify the K-factor array exists and is real-valued.
     import numpy as np
 
     k = np.asarray(res["k_factor"])
@@ -76,7 +76,7 @@ def test_s21_scalar_and_array_helpers_agree(lpf_s2p) -> None:
     s21_db_at interpolates the complex phasor then takes the magnitude;
     s21_db_array takes the magnitude first. Measured against a dense-grid
     ground truth they track each other to <0.1 dB, but nothing pinned
-    that — and s21_db_at is what check_rejection_at uses to decide
+    that: and s21_db_at is what check_rejection_at uses to decide
     stopband pass/fail, so a divergence would silently move compliance
     verdicts.
     """

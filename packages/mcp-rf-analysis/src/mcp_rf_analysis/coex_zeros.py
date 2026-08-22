@@ -3,11 +3,11 @@
 Given a TX passband and the harmonic orders to protect against, choose
 where an elliptic filter's finite transmission zeros should go. The
 optimal zero for a harmonic landing ``[n·f_lo, n·f_hi]`` is the
-severity-weighted centroid of its victim-band overlap intervals —
+severity-weighted centroid of its victim-band overlap intervals:
 
     TZ = Σ sᵢ·wᵢ·midᵢ / Σ sᵢ·wᵢ
 
-over the intersections of each victim band with the landing — not the
+over the intersections of each victim band with the landing. Not the
 landing's geometric centre, which is suboptimal whenever victims
 overlap the landing asymmetrically.
 
@@ -15,7 +15,7 @@ Victim bands come from the caller (with optional severity weights) and,
 optionally, from this package's GNSS and FCC-restricted band tables.
 Trap-index hints follow the mcp-ltspice elliptic convention: the
 synthesis fitter consumes sorted-ascending ω_z, so the lowest zero is
-trap 2, the next trap 4, and so on — the output composes directly with
+trap 2, the next trap 4, and so on. The output composes directly with
 ``place_transmission_zero``.
 
 This lives in mcp-rf-analysis (the issue sketched mcp-ltspice) because
@@ -220,7 +220,7 @@ def place_zeros_for_coex(
             )
         else:
             lines.append(
-                f"- {tag}: no victim overlap — spare zero at the landing centre "
+                f"- {tag}: no victim overlap: spare zero at the landing centre "
                 f"{assigned['target_freq_hz'] / 1e6:.2f} MHz (fallback); "
                 f"trap hint L{assigned['trap_index_hint']}/C{assigned['trap_index_hint']}."
             )
@@ -232,7 +232,7 @@ def place_zeros_for_coex(
                 for s, on in (("GNSS", include_gnss), ("FCC-restricted", include_fcc_restricted))
                 if on
             )
-            + " — pass them explicitly with a severity to re-weight."
+            + ": pass them explicitly with a severity to re-weight."
         )
 
     return {

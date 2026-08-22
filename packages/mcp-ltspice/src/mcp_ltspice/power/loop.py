@@ -60,7 +60,7 @@ def type2_compensator(
 
     rfb = rfb_kohm * 1e3
     # For a Type-II inverting compensator, the gain at midband is the
-    # plant inverse — we'll use rfb as a normalisation (user can scale)
+    # plant inverse. We'll use rfb as a normalisation (user can scale)
     cz = 1.0 / (2 * math.pi * rfb * f_zero)
     cp = cz / (k**2 - 1) if k != 1 else cz / 1e-6
 
@@ -86,7 +86,7 @@ def type2_compensator(
     return CompensatorDesign(
         topology="type2",
         crossover_hz=crossover_hz,
-        phase_margin_deg=90 - phase_boost_deg,  # rough — assumes plant adds 0 here
+        phase_margin_deg=90 - phase_boost_deg,  # rough: assumes plant adds 0 here
         components={"R_fb": rfb, "C_z": cz, "C_p": cp},
         transfer_function_hz=f.tolist(),
         transfer_function_db=h_db.tolist(),

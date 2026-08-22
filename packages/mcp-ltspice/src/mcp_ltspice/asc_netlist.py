@@ -3,7 +3,7 @@
 The previous ngspice netlister inferred each element's *position* from its
 refdes letter: a lone ``C{n}`` was assumed to be a shunt capacitor, a lone
 ``L{n}`` a series inductor. That is only ever true of a lowpass ladder. Hand
-it a highpass (series C, shunt L) and it silently emitted the dual network —
+it a highpass (series C, shunt L) and it silently emitted the dual network:
 ngspice ran happily and returned S-parameters for a circuit nobody had
 designed (issue #32). ``z0`` was hardcoded to 50 Ω on top of that, so a 75 Ω
 design was simulated at 50 Ω.
@@ -16,7 +16,7 @@ netlister that is correct for any topology, including schematics this package
 did not generate, and lets the port impedance be read from the terminating
 resistors actually present rather than assumed.
 
-Diagonal wires are not supported — LTspice draws orthogonal wires in normal
+Diagonal wires are not supported: LTspice draws orthogonal wires in normal
 use, and treating a diagonal as a connector would invent nodes.
 """
 
@@ -197,7 +197,7 @@ def build_nodes(sch: AscSchematic) -> dict[Point, str]:
 
     for seg in sch.wires:
         uf.union((seg[0], seg[1]), (seg[2], seg[3]))
-        # A pin or flag touching the middle of a wire joins that wire's node —
+        # A pin or flag touching the middle of a wire joins that wire's node:
         # LTspice draws a junction dot for exactly this case.
         for p in points:
             if _on_segment(p, seg):

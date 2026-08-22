@@ -21,7 +21,7 @@ def _call(tool_name: str, /, **kwargs):
     return fn(**kwargs)
 
 
-# run_harmonic_balance is no longer scaffolded — it is implemented against
+# run_harmonic_balance is no longer scaffolded. It is implemented against
 # Xyce and validated in test_harmonic_balance.py, including IIP3 against a
 # closed-form cubic. Only its missing-Xyce path belongs in this file now.
 HB_DUT = ["Rin in 0 50", "Bnl out 0 V={1.0*V(in) + 10.0*V(in)*V(in)*V(in)}"]

@@ -1,4 +1,4 @@
-"""Boost (step-up) SMPS component sizing — CCM mode."""
+"""Boost (step-up) SMPS component sizing: CCM mode."""
 
 from __future__ import annotations
 
@@ -61,11 +61,11 @@ def design_boost(
     notes = []
     if duty > 0.8:
         notes.append(
-            f"Duty cycle {duty * 100:.1f}% is high — large step-up ratio. "
+            f"Duty cycle {duty * 100:.1f}% is high: large step-up ratio. "
             f"Consider a 2-stage boost or a SEPIC for efficiency."
         )
     if i_peak > 8.0:
-        notes.append(f"Peak inductor current {i_peak:.1f} A is high — check I_sat rating.")
+        notes.append(f"Peak inductor current {i_peak:.1f} A is high. Check I_sat rating.")
 
     return BoostDesign(
         v_in_v=v_in_v,

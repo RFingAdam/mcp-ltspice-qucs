@@ -51,7 +51,7 @@ def lisn_impedance(freq_hz: float, lisn: LISNModel | None = None) -> complex:
 # Per CISPR 32:2015 Table A.1:
 #   0.15-0.50 MHz : 66 → 56 dBµV log-linear (decreasing)
 #   0.50-5.00 MHz : 56 dBµV (constant)
-#   5.00-30.0 MHz : 60 dBµV (constant — step up at 5 MHz)
+#   5.00-30.0 MHz : 60 dBµV (constant: step up at 5 MHz)
 # The (5e6, 56) → (5.001e6, 60) pair encodes the step discontinuity
 # so log-linear interpolation does not silently average across it.
 _CISPR22_CLASS_B_QP = [
@@ -63,7 +63,7 @@ _CISPR22_CLASS_B_QP = [
 ]
 
 
-# FCC Part 15B Class B (US), dBµV — same shape as CISPR Class B
+# FCC Part 15B Class B (US), dBµV: same shape as CISPR Class B
 _FCC_15B_CLASS_B = [
     (150e3, 66.0),
     (500e3, 56.0),

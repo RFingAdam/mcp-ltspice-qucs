@@ -12,8 +12,8 @@ so they never read a real ``.raw``.
 
 :func:`assert_fully_connected` closes that gap *without needing a simulator*,
 so CI catches a regression here even though it has neither LTspice nor
-ngspice. It reimplements LTspice's connectivity rule — a pin connects to
-whatever shares its coordinate — using pin offsets read from the stock
+ngspice. It reimplements LTspice's connectivity rule. A pin connects to
+whatever shares its coordinate: using pin offsets read from the stock
 symbol library and the rotation convention verified against LTspice itself.
 """
 
@@ -94,7 +94,7 @@ def assert_fully_connected(asc_path: Path) -> None:
     """Fail if any component pin is electrically floating.
 
     A pin counts as connected when its coordinate coincides with another
-    pin, a wire endpoint, or a net label — exactly the cases LTspice treats
+    pin, a wire endpoint, or a net label: exactly the cases LTspice treats
     as a node. A pin matching none of those becomes an ``NC_*`` net.
     """
     parsed = parse_asc(asc_path)
@@ -119,13 +119,13 @@ def assert_fully_connected(asc_path: Path) -> None:
                 floating.append(f"{inst} pin at {c}")
 
     assert not floating, (
-        "Schematic has floating pins — LTspice will netlist these as NC_* "
+        "Schematic has floating pins: LTspice will netlist these as NC_* "
         "nodes and the AC analysis will yield zero points:\n  " + "\n  ".join(floating)
     )
 
 
 # ---------------------------------------------------------------------------
-# Structural tests — no simulator required, so these run everywhere.
+# Structural tests. No simulator required, so these run everywhere.
 # ---------------------------------------------------------------------------
 
 
@@ -155,7 +155,7 @@ def test_elliptic_trap_topology_has_no_floating_pins(tmp_path) -> None:
 
     A different placement path from the plain ladder, so it needs its own
     cover. Verified against LTspice, which netlists this as
-    ``L2 N002 P001`` / ``C2 P001 0`` — a series-LC shunt to ground.
+    ``L2 N002 P001`` / ``C2 P001 0``. A series-LC shunt to ground.
     """
     comps = {"L1": 7.9e-9, "L2": 5.0e-9, "C2": 6.3e-12, "L3": 7.9e-9}
     asc = generate_lpf_asc(comps, tmp_path / "ell.asc", topology="lpf_t_elliptic")

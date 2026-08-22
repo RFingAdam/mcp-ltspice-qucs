@@ -3,14 +3,14 @@
 Mirrors the pattern used in :mod:`mcp_ltspice.vendor_models` for
 passives, but applied to active devices (op-amps, MOSFETs, BJTs,
 diodes, voltage references). Each model captures the parameters that
-matter for first-order design choices — full SPICE subcircuits for
+matter for first-order design choices: full SPICE subcircuits for
 the actual simulator are referenced via vendor part number.
 
-- :mod:`.opamps` — small-signal op-amps (TI OPA / LM, ADI ADA / OPA)
-- :mod:`.mosfets` — power N-FETs and P-FETs (ON Semi NTM / NTR, Vishay)
-- :mod:`.bjts` — small-signal BJTs (Diodes 2N3904 / 2N3906, ON BC547)
-- :mod:`.diodes` — schottky / signal / TVS / zener
-- :mod:`.references` — voltage references (TI REF, ADI ADR)
+- :mod:`.opamps`: small-signal op-amps (TI OPA / LM, ADI ADA / OPA)
+- :mod:`.mosfets`: power N-FETs and P-FETs (ON Semi NTM / NTR, Vishay)
+- :mod:`.bjts`: small-signal BJTs (Diodes 2N3904 / 2N3906, ON BC547)
+- :mod:`.diodes`: schottky / signal / TVS / zener
+- :mod:`.references`: voltage references (TI REF, ADI ADR)
 """
 
 from mcp_ltspice.vendors.bjts import BJTModel, list_bjts, lookup_bjt

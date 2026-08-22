@@ -1,7 +1,7 @@
 # Touchstone interop
 
 The cross-server exchange format. **Frequencies are always Hz on the
-wire** — display-friendly units (MHz, GHz) appear in human-facing
+wire**: display-friendly units (MHz, GHz) appear in human-facing
 messages, never in stored data.
 
 ## API

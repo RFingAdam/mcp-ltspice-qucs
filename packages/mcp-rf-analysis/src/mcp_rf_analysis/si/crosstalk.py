@@ -2,10 +2,10 @@
 
 First-order analytical estimates from the standard coupled-line theory.
 For more accuracy, use a 2.5D field solver (the openEMS MCP has tools
-for that) — these closed forms are for early architecture decisions.
+for that). These closed forms are for early architecture decisions.
 
 Refs:
-- E. Bogatin, "Signal and Power Integrity — Simplified", §10
+- E. Bogatin, "Signal and Power Integrity: Simplified", §10
 """
 
 from __future__ import annotations

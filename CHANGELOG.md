@@ -11,24 +11,24 @@ grouped by package.
 
 Nothing yet.
 
-## [0.6.1] — 2026-07-24
+## [0.6.1]: 2026-07-24
 
-### Fixed — dependency security audit
+### Fixed: dependency security audit
 
 - v0.6.0's tag-triggered `release-validation` workflow ran for the first
   time and found 47 disclosed CVEs across 10 locked transitive
   dependencies: `cryptography`, `idna`, `joserfc`, the `mcp` SDK,
   `pillow`, `pydantic-settings`, `pyjwt`, `pymdown-extensions`,
   `python-multipart`, and `urllib3`. All ten are bumped to their patched
-  versions within the existing dependency bounds — no `pyproject.toml`
+  versions within the existing dependency bounds. No `pyproject.toml`
   constraint changed, including the tight `fastmcp>=3.4.4,<3.5` pin.
   `pip-audit` now reports zero known vulnerabilities. No API or behavior
   change; the full test suite was re-verified against the upgraded `mcp`
   SDK (1.27.0 → 1.28.1) with zero regressions.
 
-## [0.6.0] — 2026-07-24
+## [0.6.0]: 2026-07-24
 
-### Fixed — simulator run isolation and stale-artifact rejection
+### Fixed: simulator run isolation and stale-artifact rejection
 
 - Qucsator and Xyce harmonic-balance invocations now execute in unique
   per-run workspaces. A failed process can no longer satisfy the run with a
@@ -42,7 +42,7 @@ Nothing yet.
   return code, status, and published artifacts. Qucs-S MCP results now expose
   the manifest path.
 
-### Fixed — S-parameter comparison on mismatched frequency grids
+### Fixed: S-parameter comparison on mismatched frequency grids
 
 - `compare_sparameters` now compares the union of both measured grids inside
   their common frequency span instead of using exact frequency intersection.
@@ -52,7 +52,7 @@ Nothing yet.
   versus `-179°` is 2° rather than 358°. Results include the overlap,
   interpolation policy, and original input ranges.
 
-### Fixed — single-source package and server versions
+### Fixed: single-source package and server versions
 
 - Package `__version__` attributes and FastMCP server metadata now derive
   from installed distribution metadata. The `v0.5.0` packages no longer
@@ -62,13 +62,13 @@ Nothing yet.
 - Updated stale architecture, envelope, Qucs implementation-status, and bug
   template text.
 
-### Added — shared simulation workspace contract
+### Added: shared simulation workspace contract
 
 - `rf-mcp-common` now provides `SimulationWorkspace`, SHA-256 artifact
   hashing, a minimal subprocess environment, and backend-version probing for
   reuse by the LTspice/ngspice runners and future durable job API.
 
-### Fixed — documentation contract and capability boundaries
+### Fixed: documentation contract and capability boundaries
 
 - Corrected current tool names, signatures, counts, examples, license text,
   package relationships, Qucs-S implementation status, and backend coverage.
@@ -81,7 +81,7 @@ Nothing yet.
 - The generated tool catalog now reports primary and alias counts and supports
   `--check`; CI and workspace tests fail when it drifts from live registries.
 
-### Fixed — true two-excitation SPICE S-parameter extraction
+### Fixed: true two-excitation SPICE S-parameter extraction
 
 - The public `extract_sparameters` tool now accepts a source `.asc`, validates
   the `V1`/`Rs1`/`RL1` matched-port fixture, constructs a port-2 excitation,
@@ -95,7 +95,7 @@ Nothing yet.
   workspace. The legacy single-sweep helper now requires an explicit
   `assume_reciprocal_symmetric=True` opt-in.
 
-### Added — model-preserving passive realization
+### Added: model-preserving passive realization
 
 - Every selected passive now carries a `ComponentModel` record with provider,
   immutable source reference, model kind, pin map, operating-range fields,
@@ -111,7 +111,7 @@ Nothing yet.
   manifests and extraction provenance. Changing a supplied library changes
   both its checksum and the simulated response.
 
-### Fixed — topology, transforms, and engineering summaries
+### Fixed: topology, transforms, and engineering summaries
 
 - Sweep, optimization, Monte Carlo, comparison, and validation now carry
   explicit filter kind/topology, reject unsupported combinations, and include
@@ -126,7 +126,7 @@ Nothing yet.
 - The schematic renderer accepts only package-generated LC fixtures it can
   reconstruct exactly. Arbitrary `.asc` content fails explicitly.
 
-### Added — confined execution, budgets, capabilities, and durable jobs
+### Added: confined execution, budgets, capabilities, and durable jobs
 
 - Simulator input dependency trees are imported into immutable,
   checksum-addressed workspaces. Include/path/symlink escapes are rejected,
@@ -141,7 +141,7 @@ Nothing yet.
   parse/validate, submit, progress, cancel, retry, recovery, listing, and
   bounded artifact reads.
 
-### Fixed — MCP contracts and release engineering
+### Fixed: MCP contracts and release engineering
 
 - Error envelopes become structured protocol `ToolError` failures, and every
   tool carries safety annotations. Underscore names are canonical; 59 dotted
@@ -157,7 +157,7 @@ Nothing yet.
 - Tag validation audits exported requirements, builds strict docs/contracts,
   emits an SPDX SBOM, and creates build-provenance attestations.
 
-### Added — auditable component provenance
+### Added: auditable component provenance
 
 - Catalog records distinguish generic technology models from orderable MPNs
   and include provider, source document/revision/retrieval time, license,
@@ -166,7 +166,7 @@ Nothing yet.
   deterministic user-model indexing and refresh. User filenames are never
   promoted to claimed manufacturer part numbers.
 
-### Added — bounded general circuit workbench
+### Added: bounded general circuit workbench
 
 - Added versioned `CircuitDocument` 1.0 with explicit pin-to-net connectivity,
   ports, analyses, dependencies, provenance, drawing geometry, transformations,
@@ -183,7 +183,7 @@ Nothing yet.
   `artifact://` resources. The live catalog now contains 140 primary tools
   (76 LTspice, 29 Qucs-S, 35 RF analysis) plus 59 deprecated LT aliases.
 
-### Added — constrained component search and generic IR optimization
+### Added: constrained component search and generic IR optimization
 
 - Component search now applies hard value, package, availability/orderability,
   Q/SRF, tolerance, rating, bias, temperature, model-kind, and provider
@@ -200,18 +200,18 @@ Nothing yet.
   Fixed models cannot be nominally retuned; explicit instance parameters and
   generic lumped approximations can be.
 
-### Fixed — `validate_against_spice` no longer emits a fabricated two-port
+### Fixed: `validate_against_spice` no longer emits a fabricated two-port
 
 - The general two-sweep S-parameter fix above closed the fabrication in the
   public `extract_sparameters`/`simulate_realized_filter` tools, but
   `validate_against_spice`'s `output_spice_s2p` still wrote the single-sweep
-  network that mirrors S22 from S11 and S12 from S21 — silently wrong for any
+  network that mirrors S22 from S11 and S12 from S21: silently wrong for any
   asymmetric or non-reciprocal ladder. It now runs the same honest two-sweep
   extraction for the emitted file; the fast |S21| verdict still comes from
   the cheap single sweep. The tool description and `output_spice_s2p` field
   now disclose the two-sweep method and its V1+Rs1/RL1 fixture requirement.
 
-### Added — durable simulation jobs for `mcp-qucs-s`
+### Added: durable simulation jobs for `mcp-qucs-s`
 
 - `mcp-qucs-s` gains the same simulate-through-IR job pipeline as
   `mcp-ltspice`: `circuit_validate`, `simulation_submit`, `job_get`,
@@ -226,7 +226,7 @@ Nothing yet.
   unsandboxed on the immutable per-run workspace snapshot the adapter's `run`
   creates; only submit trusted local inputs.
 
-## [0.5.0] — 2026-07-23
+## [0.5.0]: 2026-07-23
 
 The release that emptied the issue tracker. Drivers exist for ngspice,
 LTspice, qucsator-RF, and Xyce; required CI validates ngspice while the
@@ -238,7 +238,7 @@ catalog-snapped analytical design; mypy runs with zero disabled error codes;
 and CI covers Linux (3.11–3.13) plus native Windows discovery.
 Highlights below, in reverse-merge order.
 
-### CI — windows-latest job for native simulator discovery (#40)
+### CI: windows-latest job for native simulator discovery (#40)
 
 A `windows-latest` job now runs the suite on real `nt`: it asserts
 `_needs_wine()` is `False` for a native `.exe` without the `os_name`
@@ -247,24 +247,24 @@ candidates with no `WINEPREFIX`, and shakes out Windows `Path`
 semantics across the tests (LTspice itself is proprietary and not
 installed; simulator-gated tests skip cleanly). First Windows landmine
 fixed on the way: the render server-tool test used `/proc/...` as an
-"unwritable" path, which Windows would happily create — replaced with a
+"unwritable" path, which Windows would happily create: replaced with a
 file-as-parent-directory, which fails on every platform.
 
-### Chore — mypy ratchet complete: zero disabled error codes (#37)
+### Chore: mypy ratchet complete: zero disabled error codes (#37)
 
 The last three deferred type-completeness codes are re-enabled and
 their 54 accumulated errors fixed: `no-any-return` (numpy/JSON returns
 wrapped in `float()`/`int()` or precisely `cast(...)`), `type-arg`
 (bare `dict`/`list`/`ndarray` generics parameterized with the real
-types), and `no-untyped-call` (all 10 were genuinely third-party —
-schemdraw element constructors and matplotlib's `PdfPages.savefig` —
+types), and `no-untyped-call` (all 10 were genuinely third-party:
+schemdraw element constructors and matplotlib's `PdfPages.savefig`:
 handled by a targeted two-module `[[tool.mypy.overrides]]`, not per-line
 ignores). The global `disable_error_code` list is now empty: type
 correctness AND completeness are both enforced. Also fixed
 `test_runs_headless` from #58 to delete `DISPLAY` and render, instead
 of asserting the environment happens to be headless.
 
-### Tests — EMC closed-form anchors + schematic_render coverage (#34, #36)
+### Tests: EMC closed-form anchors + schematic_render coverage (#34, #36)
 
 - `predict_radiated_emissions_loop` is now pinned to the textbook
   far-field small-loop expression (Ott's `E = 131.6e-16·f²·A·I/r`;
@@ -283,7 +283,7 @@ of asserting the environment happens to be headless.
   size check would miss), the .asc round-trip, and both server tools'
   ok/error envelopes.
 
-### Added — synthesize_for_coex_target closed loop (#14, mcp-ltspice)
+### Added: synthesize_for_coex_target closed loop (#14, mcp-ltspice)
 
 One MCP call now closes the loop the engineer used to orchestrate by
 hand: place transmission zeros on the victim-weighted harmonic
@@ -298,7 +298,7 @@ Realism handled explicitly rather than hidden:
 
 - The SRF spec targets the highest *placed zero* with the issue's 1.2
   margin, degrading gracefully (1.2 → 1.0 → unchecked) with the margin
-  used reported per iteration — a 14 nH 0402 with SRF ≥ 3.3 GHz does
+  used reported per iteration. A 14 nH 0402 with SRF ≥ 3.3 GHz does
   not exist, and a turn-key loop should say so, not die.
 - Zeros default to the dominant 2H/3H PA products (4H/5H sit ≥ 50 dBc
   down pre-filter and their broad FCC landings would otherwise both
@@ -310,10 +310,10 @@ Realism handled explicitly rather than hidden:
   ΔC/N₀ model automatically.
 
 This is the one place mcp-ltspice depends on mcp-rf-analysis
-(one-directional, no cycle). Tests drive the real pipeline end to end —
+(one-directional, no cycle). Tests drive the real pipeline end to end:
 real synthesis fits, real vendor tables, real matrix, no mocks.
 
-### Added — GNSS-specific desense in check_coex_matrix (#15, mcp-rf-analysis)
+### Added: GNSS-specific desense in check_coex_matrix (#15, mcp-rf-analysis)
 
 RX entries may now set `victim_type: "gnss"`, switching that victim to
 the GNSS-specific model with the industry ΔC/N₀ (dB-Hz) metric instead
@@ -336,12 +336,12 @@ of a generic blocking margin:
   Generic victims are unchanged. All model points are pinned by
   hand-computed tests (I₀ = N₀ → exactly 3.010 dB, etc.).
 
-### Added — place_zeros_for_coex (#12, mcp-rf-analysis)
+### Added: place_zeros_for_coex (#12, mcp-rf-analysis)
 
 Restricted-band-aware transmission-zero placement: for each harmonic
 landing `[n·f_lo, n·f_hi]`, the optimal elliptic-filter zero is the
-**severity-weighted centroid of the victim-band overlap intervals** —
-`TZ = Σ s·w·mid / Σ s·w` — not the landing's geometric centre (which is
+**severity-weighted centroid of the victim-band overlap intervals**:
+`TZ = Σ s·w·mid / Σ s·w`. Not the landing's geometric centre (which is
 suboptimal whenever victims overlap the landing asymmetrically; the
 hand-pinned reference case moves the zero from 1800.0 to 1811.48 MHz).
 Victims come from the caller with optional severity weights, plus
@@ -356,9 +356,9 @@ rationale, plus `unprotected_victims` / `victims_not_at_risk` lists.
 Implemented in **mcp-rf-analysis** (`coex_zeros.py`) rather than
 mcp-ltspice as issue #12 sketched: the band data and harmonic lookups
 live here, and mcp-ltspice carries no runtime dependency on this
-package — the trap-hint contract is the composition point instead.
+package: the trap-hint contract is the composition point instead.
 
-### Added — combline BPF (#27 complete, mcp-qucs-s)
+### Added: combline BPF (#27 complete, mcp-qucs-s)
 
 `synthesize_combline_bpf` finishes the #27 distributed-filter set:
 N coupled lines shorted at the same end, each tuned by a lumped
@@ -376,25 +376,25 @@ design self-reports `achieved` metrics like the interdigital tool.
 
 Validation: qucsator graph netlist (TLIN + TLIN4P + C) matches the
 exact solver at numerical precision; on the 2 GHz / 10% / 0.5 dB N=3
-design — 11.39 mm resonators (half the interdigital length), 1.137 pF
+design: 11.39 mm resonators (half the interdigital length), 1.137 pF
 loading caps, band centre 1.994 GHz, BW 11.7%, and the topology's
 selling point confirmed: first upper spurious at 3.75·f0 with the
 1.5–3·f0 stopband below −39 dB (edge-coupled spurs at 2·f0).
 
-### Added — interdigital BPF on exact N-line TEM machinery (#27, mcp-qucs-s)
+### Added: interdigital BPF on exact N-line TEM machinery (#27, mcp-qucs-s)
 
 The N-conductor obstacle (a physical line cannot sit in two `MCOUPLED`
 elements) is bypassed exactly: a same-velocity TEM array's 2N-port
 Y-matrix is **linear** in the characteristic-admittance matrix, so a
 tridiagonal array decomposes into ordinary TLIN stubs plus floating
-TLIN4P connector lines — probe-verified to reproduce the CTLIN coupled
+TLIN4P connector lines: probe-verified to reproduce the CTLIN coupled
 section at 0.0000 mdB. New `multiconductor` module:
 
-- `segmented_array_sparams` — exact S-parameters of stacked commensurate
+- `segmented_array_sparams`: exact S-parameters of stacked commensurate
   array segments with per-line short/open/port terminations and interior
   tap ports (validated against the closed-form coupled section at 1e-9
   and against the qucsator graph netlist at 0.0001 mdB).
-- `interdigital_pair_k` / `mutual_for_k` — the interdigitally-terminated
+- `interdigital_pair_k` / `mutual_for_k`. The interdigitally-terminated
   pair's resonance split is closed form (`cosθ = ±y_m/Y_r`), giving the
   coupling coefficient without book tables.
 
@@ -405,7 +405,7 @@ TEM model; the tap angle comes from the shorted-λ/4 slope parameter
 combinations (stub admittance ≤ 0, Qe below the end-fed minimum) are
 rejected with explanations. The design **self-reports** its achieved
 response (`achieved`: band centre, −3 dB bandwidth, worst in-band return
-loss) computed on the exact model — the tapped-feed isolated-resonator
+loss) computed on the exact model. The tapped-feed isolated-resonator
 approximation degrades ripple vs the prototype (measured: band centre
 2.003 GHz on a 2 GHz/10% design, BW 11.8%, worst in-band S11 −5.9 dB)
 and an MCP consumer should see that number, not assume the spec.
@@ -414,13 +414,13 @@ and an MCP consumer should see that number, not assume the spec.
 Physical per-pair (W, S) via the existing Garg-Bahl inversion, flagged
 first-cut.
 
-### Added — hairpin microstrip BPF (#27, mcp-qucs-s)
+### Added: hairpin microstrip BPF (#27, mcp-qucs-s)
 
 `synthesize_hairpin_bpf` folds the edge-coupled filter into the
 Cristal-Frankel hairpin-line. The fold is a circuit-graph no-op apart
 from the U-bend connector: each half-wave resonator (the two arm halves
 the diagonal MCOUPLED chain already joins) gains the bend's electrical
-length θ_b, so every coupled section is shortened to 90° − θ_b/2 — with
+length θ_b, so every coupled section is shortened to 90° − θ_b/2: with
 one bend length (an MLIN at the mean arm width, default 3×W) this keeps
 every resonator at exactly 180° at f₀ in closed form. Zero bend
 degenerates to the edge-coupled design bit-for-bit.
@@ -429,12 +429,12 @@ Validated in real qucsator via the new `generate_hairpin_netlist`
 (MCOUPLED cascade + bend MLINs at the internal junctions): with a 2 mm
 bend (8.1° at 2 GHz) the compensated design centres at 1.976 GHz
 (−1.2%, matching the unfolded filter's −1.1%) with 9.0% bandwidth,
-while the *uncompensated* variant sags to 1.891 GHz (−5.5%) — the
+while the *uncompensated* variant sags to 1.891 GHz (−5.5%). The
 differential test proves the compensation mechanism rather than just
 plausibility. Corner discontinuities and cross-arm self-coupling are
 documented as the field-solver residual.
 
-### Added — edge-coupled (parallel coupled-line) microstrip BPF (#27, mcp-qucs-s)
+### Added: edge-coupled (parallel coupled-line) microstrip BPF (#27, mcp-qucs-s)
 
 `synthesize_coupled_line_bpf` implements the coupled-section BPF core
 that hairpin / interdigital / combline all build on. Input is the LPF
@@ -466,9 +466,9 @@ Validation, probe-verified against qucsator-RF 1.0.7:
   Rogers-class laminate the Pozar design centres at 1.979 GHz (−1.1% vs
   design), −3 dB bandwidth 9.4% vs the 10% spec, −1.76 dB midband loss.
   On FR-4 the measured 4.05 dB midband loss matches the classical
-  4.343·Σg/(Δ·Qu) estimate — real dielectric loss, noted in the tests.
+  4.343·Σg/(Δ·Qu) estimate: real dielectric loss, noted in the tests.
 
-### Added — stepped-impedance microstrip LPF (#27, first distributed topology, mcp-qucs-s)
+### Added: stepped-impedance microstrip LPF (#27, first distributed topology, mcp-qucs-s)
 
 `synthesize_stepped_impedance_lpf` maps a lumped LPF ladder (the same
 composition contract as `lumped_to_distributed`) to alternating high-Z /
@@ -476,7 +476,7 @@ low-Z microstrip sections per Pozar §8.6: series L → high-Z section with
 `βl = ω_c·L/Z_h`, shunt C → low-Z section with `βl = ω_c·C·Z_l`, widths
 and lengths from the existing Hammerstad-Jensen synthesis. Sections
 exceeding the `βl < 45°` short-line approximation are flagged in notes.
-The math is pinned to Pozar 4e Example 8.6 — the six electrical lengths
+The math is pinned to Pozar 4e Example 8.6. The six electrical lengths
 (11.86°, 33.76°, 44.27°, 46.12°, 32.41°, 12.36°) and the section widths
 (11.27 mm / 0.430 mm vs the published 11.3 mm / 0.428 mm) reproduce the
 book design.
@@ -485,7 +485,7 @@ Validation plumbing, all probe-verified against qucsator-RF 1.0.7:
 
 - `generate_ladder_netlist` gains a `series_tline` element (ideal line;
   qucsator's `TLIN` propagates at c, so the emitter encodes electrical
-  length as `L = θ/360 · c/f_ref` — established with a λ/4-inverter probe
+  length as `L = θ/360 · c/f_ref`: established with a λ/4-inverter probe
   netlist that returned |S11| = 0.6000 exactly).
 - New `generate_microstrip_ladder_netlist` emits a shared `SUBST` card
   plus an `MLIN` cascade (Hammerstad model, Kirschning dispersion), so
@@ -493,21 +493,21 @@ Validation plumbing, all probe-verified against qucsator-RF 1.0.7:
 - New `tline_cascade_sparams` computes the analytical ideal-line cascade;
   it matches the qucsator TLIN netlist to numerical precision (< 1 µdB).
 - End-to-end on the Pozar example: analytical −3 dB at 2.418 GHz (−3.3%
-  vs design — the known approximation shift), real-microstrip MLIN run
+  vs design. The known approximation shift), real-microstrip MLIN run
   −3 dB at 2.398 GHz (−4.1%) with 21 dB stopband at 4 GHz, matching the
   published response.
 
 Remaining #27 topologies (hairpin, interdigital, combline) ship
 separately.
 
-### Added — elliptic band-pass / band-stop synthesis (#26, mcp-ltspice + mcp-qucs-s)
+### Added: elliptic band-pass / band-stop synthesis (#26, mcp-ltspice + mcp-qucs-s)
 
 `synthesize_lc_bpf` and `synthesize_lc_bsf` now accept
 `filter_type="elliptic"` (odd order ≥ 3), completing the elliptic family
 started by the HPF in the previous release. The Pozar §8.5 band transforms
 act on each L and C of the LPF prototype *separately*, so every shunt
-series-LC trap becomes a **four-element composite branch** — a series-LC in
-series with a parallel-LC tank, to ground — that shorts at the two images
+series-LC trap becomes a **four-element composite branch**. A series-LC in
+series with a parallel-LC tank, to ground. That shorts at the two images
 of the prototype zero: `ω = ω₀(√(b²+1) ± b)` with `b = ω_z·Δ/2` (BPF,
 notch pairs straddling the passband) or `b = Δ/(2ω_z)` (BSF, pairs inside
 the notch; the main-path tanks add a zero at ω₀ itself).
@@ -535,10 +535,10 @@ branch:
 Elliptic BPF/BSF designs are always `series_first` (the prototype
 extraction is T-form only); a `shunt_first` request is coerced.
 
-### Added — register_user_vendor_dir (#11, mcp-ltspice)
+### Added: register_user_vendor_dir (#11, mcp-ltspice)
 
-Engineers routinely have third-party or measured `.s2p` files — Würth, AVX,
-TDK, distributor exports, in-house lab data — that live on no public URL and
+Engineers routinely have third-party or measured `.s2p` files: Würth, AVX,
+TDK, distributor exports, in-house lab data. That live on no public URL and
 so could not be used as substitution candidates without hand-editing `.asc`
 files or forking the curated table.
 
@@ -546,9 +546,9 @@ files or forking the curated table.
 `.lib`) models and registers them under a namespace, after which
 `substitute_real_components(inductor_vendor="<namespace>", ...)` uses them
 like any curated series. Each part's kind, value and SRF are recovered from
-the **measured reactance** — via `Z = 2·Z0·(1−S21)/S21` for the
+the **measured reactance**: via `Z = 2·Z0·(1−S21)/S21` for the
 series-through fixture that is standard for two-terminal parts, not from
-`Z11` (singular for a series element) — and cross-checked against the
+`Z11` (singular for a series element), and cross-checked against the
 filename shorthand (`part_L_3n3.s2p` → 3.3 nH). Value is averaged over the
 extracted L/C rather than the reactance, since a capacitor's reactance goes
 as 1/f and averaging it directly biases the result. A file whose measurement
@@ -560,10 +560,10 @@ refreshes the index; and namespaces cannot shadow a curated catalogue.
 component kind instead of classifying it from one sampled entry, so a user
 directory holding both inductors and capacitors resolves correctly.
 
-### Added — validate_against_spice (#16, mcp-ltspice)
+### Added: validate_against_spice (#16, mcp-ltspice)
 
-The whole pipeline — synthesise, place zeros, substitute real vendor parts,
-optimise, Monte Carlo — can run end to end on the closed-form ladder without
+The whole pipeline: synthesise, place zeros, substitute real vendor parts,
+optimise, Monte Carlo: can run end to end on the closed-form ladder without
 a single SPICE run. That is the right default for a fast inner loop, but it
 silently drops everything a real simulation captures (vendor `.lib`
 subcircuits, DC-bias/temperature behaviour, ground and supply
@@ -573,20 +573,20 @@ yield could be an artefact of the lumped-element approximation.
 `validate_against_spice` closes the loop: it runs the schematic through a
 real simulator, extracts the S-parameters, computes the analytical response
 for the same components, and returns a per-region |S21| divergence plus a
-verdict — `agree`, `minor_disagreement`, `disagree`, or `spice_unavailable`.
+verdict: `agree`, `minor_disagreement`, `disagree`, or `spice_unavailable`.
 Passband and stopband are separated by the analytical response itself, each
 judged against its own threshold. A passband disagreement adds an explicit
 warning that the analytical margin should not be trusted. With no simulator
 installed it returns the analytical response and `spice_unavailable` rather
 than failing, so it is safe to call unconditionally.
 
-### Added — elliptic high-pass synthesis (#26, partial: HPF)
+### Added: elliptic high-pass synthesis (#26, partial: HPF)
 
 `synthesize_lc_hpf("elliptic", ...)` now works; it previously raised
 `NotImplementedError`. An elliptic HPF is the frequency mirror of an
 elliptic LPF: the LPF→HPF map `ω → ω_c²/ω` inverts each prototype element
-into its dual — a series inductor becomes a series capacitor, and a shunt
-series-LC trap stays a shunt series-LC trap with L and C swapped — so a
+into its dual. A series inductor becomes a series capacitor, and a shunt
+series-LC trap stays a shunt series-LC trap with L and C swapped, so a
 finite zero at `ω_z` moves to `ω_c²/ω_z`, landing in the lower stopband.
 
 Validated at orders 5/7/9: equiripple passband above `ω_c` that mirrors the
@@ -599,11 +599,11 @@ across the band.
 Elliptic BPF and BSF remain unimplemented and #26 stays open for them.
 The bandpass/bandstop transforms turn each shunt trap into a four-element
 composite branch (a series-LC in series with a parallel-LC tank) with no
-existing element type or `.asc` netlister support — a materially larger
+existing element type or `.asc` netlister support. A materially larger
 change than the HPF mirror, and not worth rushing into a subtly-wrong
 filter.
 
-### Added — Qucs-S noise parameters (#25, mcp-qucs-s)
+### Added: Qucs-S noise parameters (#25, mcp-qucs-s)
 
 `extract_noise_parameters` was the last scaffolded tool in the suite. It now
 runs a real noise analysis and returns the four classical noise parameters
@@ -629,11 +629,11 @@ either would produce plausible-but-wrong numbers:
 - **Noise temperature is per-component, not an analysis setting.**
   `.SP … Temp="16.85"` does not change device noise. Qucs defaults
   components to 26.85 °C, where a 10 dB pad correctly reads 10.13 dB
-  — `1 + (L−1)·T/T₀`. `build_noise_netlist` therefore applies the IEEE
+ : `1 + (L−1)·T/T₀`. `build_noise_netlist` therefore applies the IEEE
   reference 16.85 °C to resistor lines by default, leaving any explicit
   `Temp` alone and never rewriting non-resistor device cards.
 
-### Added — harmonic balance via Xyce (#24, mcp-qucs-s)
+### Added: harmonic balance via Xyce (#24, mcp-qucs-s)
 
 `run_harmonic_balance` was scaffolded: it detected Xyce and then returned
 `error("not yet implemented")`. It now runs a real analysis.
@@ -653,7 +653,7 @@ a behavioural cubic `V(out) = a1·V(in) + a3·V(in)³` the third-order
 intercept is exactly `A = sqrt(4·a1/(3·a3))`, and the computed IIP3 matches
 it to **0.001 dB**. IM3 tracks the textbook 3:1 slope (30.00 dB per 10 dB
 of drive) and the intercept does not drift with drive level. A diode pair
-is the more realistic-looking test circuit but a poor validator — its I-V
+is the more realistic-looking test circuit but a poor validator. Its I-V
 is exponential, not cubic, so its products never follow a 3:1 slope.
 
 Three Xyce behaviours found the hard way and now documented in
@@ -666,7 +666,7 @@ Three Xyce behaviours found the hard way and now documented in
 - `.PRINT HB_FD` emits a **two-sided** spectrum, so a positive-frequency
   bin folds to twice its printed magnitude (DC does not).
 
-### Fixed — documentation (docs/installation.md)
+### Fixed: documentation (docs/installation.md)
 
 The Xyce section pointed at "pre-built debs" from Sandia. Those do not
 exist: Sandia's Linux binaries are RHEL 8 RPMs that explicitly do not run
@@ -675,12 +675,12 @@ Replaced with the verified source build (Trilinos 14.4 + Xyce 7.10, ~17 min
 on 8 cores), including the GCC-15 incompatibility that otherwise fails the
 Trilinos build at ~30%.
 
-### Fixed — three silent-correctness bugs (#31, #32, #35)
+### Fixed: three silent-correctness bugs (#31, #32, #35)
 
 - **`.asc` I/O assumed UTF-8/LF (#31).** LTspice XVII writes UTF-16LE with a
   BOM, so `read_components` decoded mojibake, matched no `SYMBOL` line, and
   returned `{}` as though the schematic held no parts. Worse,
-  `update_component` then rewrote the file as UTF-8/LF — silently
+  `update_component` then rewrote the file as UTF-8/LF: silently
   re-encoding a user-authored schematic it had never successfully read.
   Encoding and line endings are now detected and preserved byte-for-byte
   outside the edited line; an undecodable file raises `AscDecodeError`
@@ -692,14 +692,14 @@ Trilinos build at ~30%.
   S-parameters for a circuit nobody designed. `z0` was hardcoded to 50 Ω
   besides. New `mcp_ltspice.asc_netlist` netlists from schematic *geometry*
   using the same coordinate rules LTspice applies, which is correct for any
-  topology — including schematics this package did not generate — and reads
+  topology: including schematics this package did not generate, and reads
   the port impedance off the terminating resistors. On a generated lowpass
   it reproduces LTspice's own netlist node for node. Unknown symbol kinds
   raise `NotImplementedError` naming the symbol instead of being skipped.
 - **`cascade_networks` extrapolated silently (#35).** It found the common
   grid with `numpy.intersect1d`, which needs exact float equality; two
   instruments never produce bit-identical grids, so real inputs hit the
-  fallback that resampled every other network onto network 1's grid —
+  fallback that resampled every other network onto network 1's grid:
   extrapolating past the end of their measured data with no warning.
   `deembed_network` raised in the same situation. Both now share one
   documented policy in `common_frequency_grid`: restrict to the overlap of
@@ -707,7 +707,7 @@ Trilinos build at ~30%.
   ranges are disjoint, and report any trimming through the envelope's
   `warnings`.
 
-### Fixed — Qucs-S could not be driven at all (mcp-qucs-s)
+### Fixed: Qucs-S could not be driven at all (mcp-qucs-s)
 
 Running qucsator-RF 1.0.7 for the first time showed the Qucs-S backend was
 unreachable end to end, for three independent reasons.
@@ -733,7 +733,7 @@ unreachable end to end, for three independent reasons.
 
 Elements are specified by explicit position (`series_l` vs `shunt_l`)
 rather than inferred from the refdes letter, so highpass and bandstop
-ladders netlist correctly — the failure mode behind #32 in the ngspice
+ladders netlist correctly. The failure mode behind #32 in the ngspice
 netlister, deliberately not repeated here.
 
 Verified against real qucsator output: lowpass **and** highpass ladders
@@ -746,7 +746,7 @@ the format the simulator actually writes.
 netlist, not the GUI's `.sch`, and the old name sent users looking for the
 wrong file.
 
-### Fixed — generated schematics were electrically disconnected (mcp-ltspice)
+### Fixed: generated schematics were electrically disconnected (mcp-ltspice)
 
 Found by running the pipeline against real LTspice 26.0.2 (Wine) and
 ngspice 44.2 for the first time. Both simulator paths were broken
@@ -756,7 +756,7 @@ then failed, so no user could get S-parameters out of either.
 - **`generate_lpf_asc` never emitted a single `WIRE`.** The `_wire`
   helper was dead code, and LTspice determines connectivity purely from
   coordinates, so it netlisted every component onto its own `NC_*` nodes
-  — no filter at all. The AC analysis returned `No. Points: 0` and a
+ . No filter at all. The AC analysis returned `No. Points: 0` and a
   692-byte `.raw`, which the artifact-presence success policy accepted.
   Extraction then died with "No plots found in the RAW file". Symbols
   are now placed by solving for the anchor that puts their pins on the
@@ -768,7 +768,7 @@ then failed, so no user could get S-parameters out of either.
   exact under the port convention the function already assumed. This
   also removes a sign-convention trap: SPICE orients a device's current
   by netlist node order, and LTspice emits `Rs1 p1 N001` for our
-  schematic, so its `I(Rs1)` runs *out* of port 1 — pinning S11 at 0 dB
+  schematic, so its `I(Rs1)` runs *out* of port 1: pinning S11 at 0 dB
   for a perfectly matched filter. When the trace is present it is now
   used only as a consistency check, warning if magnitudes disagree.
 - **`get_trace` raises instead of returning `None`**, so the "Missing
@@ -786,20 +786,20 @@ simulator installed**; the end-to-end tests now compare against theory
 instead of asserting `raw_path.is_file()`, which a zero-point stub
 satisfied.
 
-### Fixed — LTspice first run blocks batch mode under Wine (mcp-ltspice)
+### Fixed: LTspice first run blocks batch mode under Wine (mcp-ltspice)
 
 Recent LTspice releases open a modal "Anonymously Share LTspice Usage
 Data" dialog the first time they run in a Wine prefix. It appears even
 under `-b`, so batch runs hang until the caller's timeout with an empty
-log and no `.raw` — the symptom points nowhere near a consent prompt.
+log and no `.raw`. The symptom points nowhere near a consent prompt.
 `run_simulation` now warns up front when `LTspice.ini` is absent from
 the prefix, and converts the resulting `TimeoutExpired` into a
 `RuntimeError` naming the dialog and giving both remedies.
 
-### Fixed — documentation (docs/installation.md)
+### Fixed: documentation (docs/installation.md)
 
 - The Qucs-S build recipe cloned without `--recurse-submodules`, so
-  qucsator-RF — the actual simulation engine — was never built; the
+  qucsator-RF: the actual simulation engine: was never built; the
   result surfaces much later as "Qucs-S not installed". Also adds the
   missing `flex`, `bison`, `gperf` and `dos2unix` build deps (`gperf`
   fails at cmake time, `dos2unix` only at ~78% of the build) and
@@ -807,7 +807,7 @@ the prefix, and converts the resulting `TimeoutExpired` into a
 - Documents the LTspice first-run dialog and the `wineboot -u` /
   `msiexec /qn` silent-install path.
 
-### Fixed — simulator portability (mcp-ltspice)
+### Fixed: simulator portability (mcp-ltspice)
 
 Reported by [@cr4i50n](https://github.com/cr4i50n) in
 [#28](https://github.com/RFingAdam/mcp-ltspice-qucs/pull/28) and
@@ -831,10 +831,10 @@ trying to run the LTspice server on their own machine.
   it now warns.
 - **New `MCP_LTSPICE_SIMULATOR`** (`ltspice` | `ngspice`) pins simulator
   selection for ngspice-only deployments. Read by `detect_simulator()`
-  and `run_simulation()` — deliberately *not* by `find_ltspice()`, which
+  and `run_simulation()`: deliberately *not* by `find_ltspice()`, which
   must keep reporting what is actually installed.
 
-### Fixed — correctness (all packages)
+### Fixed: correctness (all packages)
 
 Surfaced by enabling mypy, which had never actually run (see below).
 
@@ -861,7 +861,7 @@ Surfaced by enabling mypy, which had never actually run (see below).
   `list_gnss_bands`, and `list_ism_bands` now raise with the available
   values, matching `list_5gnr_bands` / `list_halow_channels`.
 - **`list_spec_templates` used `.suffix` on a `Traversable`**, which
-  only exists for filesystem-backed packages — `AttributeError` when
+  only exists for filesystem-backed packages: `AttributeError` when
   zip-installed.
 - **`richards.py` / `runner.py` called `.group()` on a possibly-`None`
   regex match**, crashing on any refdes without a digit.
@@ -871,7 +871,7 @@ Surfaced by enabling mypy, which had never actually run (see below).
   turning a partial Qucs-S `.dat` into a bare `KeyError`. Both loaders
   now share a checked path that also rejects ragged component arrays.
 
-### Fixed — CI and tooling
+### Fixed: CI and tooling
 
 - **CI had been red since 2026-05-13.** `tests/test_workspace_smoke.py`
   failed both `ruff format --check` and `ruff check`, and never ran: the
@@ -880,7 +880,7 @@ Surfaced by enabling mypy, which had never actually run (see below).
   module named conftest" before reaching any source file, and CI hid
   that with `|| true`. Both fixed; the suppression is gone and the
   workspace is clean under the enforced rule set.
-- **The docs site never deployed** — GitHub Pages was not enabled, so
+- **The docs site never deployed**: GitHub Pages was not enabled, so
   the `deploy` job failed on every push while `build` passed.
 - **Fork PRs never got CI.** Approval was required for all first-time
   contributors, so neither #28 nor #29 was ever validated.
@@ -890,14 +890,14 @@ Surfaced by enabling mypy, which had never actually run (see below).
   needed the binary. Now uses `get_closest_marker`.
 - `uv.lock` was left stale by the v0.4.0 version bump.
 
-### Added — tests (458 → 533)
+### Added: tests (458 → 533)
 
 - **`mcp-rf-analysis` had no server-layer tests at all**; all 33 tools
   are now swept for the shared envelope contract, with the tool list
   discovered by introspection so new tools are covered automatically.
 - **`mcp-qucs-s` had no `conftest.py`**, so its registered `qucs` marker
-  gated nothing. Added, plus `xyce`. `sparams.py` — the only module that
-  runs once Qucs-S is installed, and one that needs no binary to test —
+  gated nothing. Added, plus `xyce`. `sparams.py`. The only module that
+  runs once Qucs-S is installed, and one that needs no binary to test:
   went from zero tests to full parse / round-trip / malformed-input
   coverage.
 - **`check_coex_matrix`'s only test asserted nothing.** It was named for
@@ -909,25 +909,25 @@ Surfaced by enabling mypy, which had never actually run (see below).
   path translation and its fallback, native-Windows invocation, the
   simulator pin, and both halves of the artifact-vs-returncode policy.
 
-## [0.4.0] — 2026-05-13
+## [0.4.0]: 2026-05-13
 
 ### Changed
 - **License: Apache-2.0 → AGPL-3.0-or-later** (all four workspace
   packages: mcp-ltspice, mcp-qucs-s, mcp-rf-analysis, rf-mcp-common).
   Aligns with the eng-mcp-suite toolkit-wide AGPL move (the AGPL
   closes the "wrap as a paid SaaS without contributing back" gap by
-  extending copyleft to network use). Underlying tools — Qucs-S (GPL),
-  LTspice (proprietary), scikit-rf (BSD) — are runtime-invoked, not
+  extending copyleft to network use). Underlying tools: Qucs-S (GPL),
+  LTspice (proprietary), scikit-rf (BSD): are runtime-invoked, not
   redistributed by these wrappers, so the wrapper's AGPL license is
   independent of theirs. See the
   [LICENSE_SUMMARY](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md)
   for the toolkit-wide rationale.
 
-(no changes yet — next stream picks up from the v0.3.0 roadmap)
+(no changes yet: next stream picks up from the v0.3.0 roadmap)
 
-## [0.3.0] — 2026-05-06
+## [0.3.0]: 2026-05-06
 
-### Correctness — silent failures resolved (all packages)
+### Correctness: silent failures resolved (all packages)
 
 A five-agent code review identified six silent-failure paths the v0.2.0
 correctness-honesty pass missed. All are fixed; the user-visible impact:
@@ -979,7 +979,7 @@ correctness-honesty pass missed. All are fixed; the user-visible impact:
   values that vary across editions.
 - HPF / BPF / BSF response now verified at orders 3, 5, 7, 9 (was only 3
   and 5 before). BPF additionally checked at narrow (Δ ≈ 0.01) and wide
-  (Δ ≈ 0.67) fractional bandwidth — the regimes where classical LPF→BPF
+  (Δ ≈ 0.67) fractional bandwidth. The regimes where classical LPF→BPF
   formulas break down.
 - Vendor parasitic substitution: `lookup_part("coilcraft_0402hp", 4.7e-9)`
   now pinned to return an SRF in the documented 4–8 GHz neighbourhood,
@@ -1009,23 +1009,23 @@ correctness-honesty pass missed. All are fixed; the user-visible impact:
 
 458 passed, 4 simulator-gated skips, 0 failures (was 427 / 4 / 0 in 0.2.0).
 
-## [0.2.0] — 2026-04-28
+## [0.2.0]: 2026-04-28
 
-### Filter synthesis — HPF / BPF / BSF (`mcp-ltspice`)
+### Filter synthesis: HPF / BPF / BSF (`mcp-ltspice`)
 
 Closes the biggest user-visible gap in filter coverage. Three new top-level synthesis functions backed by classical Pozar §8.5 frequency transformations from the LPF prototype:
 
-- **`synthesize_lc_hpf`** (`filter.synthesize_lc_hpf`) — high-pass via series-L → series-C and shunt-C → shunt-L. Component count equals the LPF prototype's. -3 dB at the specified cutoff (Butterworth) or equiripple edge (Chebyshev).
-- **`synthesize_lc_bpf`** (`filter.synthesize_lc_bpf`) — band-pass via series-L → series-LC tank, shunt-C → shunt-LC tank. Component count doubles. f₀ = √(f_low · f_high), Δ = (f_high − f_low) / f₀; each LC pair resonates at f₀ exactly.
-- **`synthesize_lc_bsf`** (`filter.synthesize_lc_bsf`) — band-stop via series-L → series parallel-LC (anti-resonant), shunt-C → shunt series-LC (resonant). Used to notch a specific band (LO leakage, image rejection).
+- **`synthesize_lc_hpf`** (`filter.synthesize_lc_hpf`): high-pass via series-L → series-C and shunt-C → shunt-L. Component count equals the LPF prototype's. -3 dB at the specified cutoff (Butterworth) or equiripple edge (Chebyshev).
+- **`synthesize_lc_bpf`** (`filter.synthesize_lc_bpf`): band-pass via series-L → series-LC tank, shunt-C → shunt-LC tank. Component count doubles. f₀ = √(f_low · f_high), Δ = (f_high − f_low) / f₀; each LC pair resonates at f₀ exactly.
+- **`synthesize_lc_bsf`** (`filter.synthesize_lc_bsf`): band-stop via series-L → series parallel-LC (anti-resonant), shunt-C → shunt series-LC (resonant). Used to notch a specific band (LO leakage, image rejection).
 
 Currently supports Butterworth and Chebyshev I across all three. Elliptic HPF/BPF/BSF needs a separate transformation for finite transmission zeros and is on the roadmap.
 
 **Analytical S-parameter analysis is wired up for all four kinds** (LPF, HPF, BPF, BSF). `components_dict_to_elements` extended with a `kind` parameter (`"lowpass"`, `"highpass"`, `"bandpass"`, `"bandstop"`). Three new ABCD element types added to support BPF/BSF resonator topologies:
 
-- `series_lc_series` — series-LC in main path (BPF series section). `Z = sL + 1/(sC)` — dips at f₀.
-- `shunt_lc_parallel` — parallel-LC to ground (BPF shunt section). `Y = sC + 1/(sL)` — dips at f₀.
-- `series_lc_parallel` — parallel-LC in main path (BSF series section). `Z = sL/(s²LC+1)` — peaks at f₀.
+- `series_lc_series`: series-LC in main path (BPF series section). `Z = sL + 1/(sC)`: dips at f₀.
+- `shunt_lc_parallel`: parallel-LC to ground (BPF shunt section). `Y = sC + 1/(sL)`: dips at f₀.
+- `series_lc_parallel`: parallel-LC in main path (BSF series section). `Z = sL/(s²LC+1)`: peaks at f₀.
 
 The existing `shunt_lc_trap` kind (series-LC to ground; elliptic LPF trap) doubles as the BSF shunt section. Verified BPF response: -3 dB at band edges, deep stopband > 50 dB one decade out. Verified BSF response: > 60 dB notch at f₀, lossless passband one decade out.
 
@@ -1040,62 +1040,62 @@ The existing `shunt_lc_trap` kind (series-LC to ground; elliptic LPF trap) doubl
 
 `monte_carlo_analysis` gains a `trace=True` flag that emits a JSONL file (one record per trial: seed, sampled components, metrics, pass/fail status, failures list). Lets engineers do offline sensitivity / root-cause analysis of yield loss without re-running MC. Default path is `mc_trace_<base_seed>.jsonl` in cwd; override via `trace_path`.
 
-`monte_carlo_analysis(transmission_zeros=...)` default changed from `True` to `None` — now auto-infers topology from the components dict (matches the `components_dict_to_elements` behaviour added earlier in this Unreleased stream). Old code passing `True`/`False` continues to work unchanged.
+`monte_carlo_analysis(transmission_zeros=...)` default changed from `True` to `None`: now auto-infers topology from the components dict (matches the `components_dict_to_elements` behaviour added earlier in this Unreleased stream). Old code passing `True`/`False` continues to work unchanged.
 
 ### Tests
 
 30 new tests across `test_hpf_bpf_bsf_synthesis.py`, `test_substrate_presets.py`, `test_mc_trace.py`. Total pass count 421 (+30 vs. prior 391 baseline), 0 regressions.
 
-### `mcp-ltspice` — power-supply EMC pre-compliance toolkit
+### `mcp-ltspice`: power-supply EMC pre-compliance toolkit
 
 Five new tools fill the gap between SMPS sizing (existing buck / boost / LDO) and a real product passing conducted-emissions:
 
-- **`design_pi_output_filter`** (`power.design_pi_output_filter`) — Pi-section LC output filter (C-L-C, 3rd-order LPF) sized for an attenuation target at a given frequency. Returns L, C_in, C_out, resonant frequency, achieved attenuation at f_target / f_sw, plus a damping-resistor recipe and BOM notes (inductor saturation, MLCC DC-bias derating).
-- **`design_dm_input_filter`** (`power.design_dm_input_filter`) — 2nd-order differential-mode LC input filter sized for a conducted-emissions target. Includes the Middlebrook stability check (|Z_out_filter| < |Z_in_converter| / safety_factor) so the filter doesn't destabilise the converter's loop, and surfaces a damping-branch recipe (R_d, C_d) per Erickson & Maksimović §10.4.
-- **`predict_conducted_emissions`** (`power.predict_conducted_emissions`) — harmonic decomposition of a trapezoidal switching waveform with two-sinc envelope (duty-cycle and edge-rate cutoffs), LISN-loaded prediction, CISPR 22 / 32 Class A or B limit overlay (QP or AVG detector). Returns per-harmonic frequency / emission / limit / margin arrays plus a worst-margin pass/fail summary.
-- **`design_rc_snubber`** (`power.design_rc_snubber`) — RC snubber for switch-node ringing. Inputs: parasitic loop inductance, switch C_oss, peak voltage, switching frequency. Returns R, C, ring frequency, achieved damping factor, and per-cycle dissipation. Standard recipe: C_snub = C_oss, R_snub = √(L_par/C_oss) × 2ζ.
-- **`design_cm_choke`** (`power.design_cm_choke`) — common-mode choke selection from a curated catalogue (Würth WE-CMB, TDK ZJYS / ACT, Murata DLW). Filters by DC current rating, target CM impedance at design frequency, and DM-leakage cap. Returns ranked candidate list plus the highest-margin pick.
+- **`design_pi_output_filter`** (`power.design_pi_output_filter`): Pi-section LC output filter (C-L-C, 3rd-order LPF) sized for an attenuation target at a given frequency. Returns L, C_in, C_out, resonant frequency, achieved attenuation at f_target / f_sw, plus a damping-resistor recipe and BOM notes (inductor saturation, MLCC DC-bias derating).
+- **`design_dm_input_filter`** (`power.design_dm_input_filter`): 2nd-order differential-mode LC input filter sized for a conducted-emissions target. Includes the Middlebrook stability check (|Z_out_filter| < |Z_in_converter| / safety_factor) so the filter doesn't destabilise the converter's loop, and surfaces a damping-branch recipe (R_d, C_d) per Erickson & Maksimović §10.4.
+- **`predict_conducted_emissions`** (`power.predict_conducted_emissions`): harmonic decomposition of a trapezoidal switching waveform with two-sinc envelope (duty-cycle and edge-rate cutoffs), LISN-loaded prediction, CISPR 22 / 32 Class A or B limit overlay (QP or AVG detector). Returns per-harmonic frequency / emission / limit / margin arrays plus a worst-margin pass/fail summary.
+- **`design_rc_snubber`** (`power.design_rc_snubber`): RC snubber for switch-node ringing. Inputs: parasitic loop inductance, switch C_oss, peak voltage, switching frequency. Returns R, C, ring frequency, achieved damping factor, and per-cycle dissipation. Standard recipe: C_snub = C_oss, R_snub = √(L_par/C_oss) × 2ζ.
+- **`design_cm_choke`** (`power.design_cm_choke`): common-mode choke selection from a curated catalogue (Würth WE-CMB, TDK ZJYS / ACT, Murata DLW). Filters by DC current rating, target CM impedance at design frequency, and DM-leakage cap. Returns ranked candidate list plus the highest-margin pick.
 
 All five register under both their flat names and `power.*` namespaced aliases. Tests in `test_power_emc.py` (31 cases) cover return-shape, math correctness (resonance / attenuation / dissipation scaling), CISPR class / detector relationships, and edge cases.
 
-### `mcp-qucs-s` — implementation status corrections
+### `mcp-qucs-s`: implementation status corrections
 
 Earlier `[Unreleased]` notes claimed "Implemented all 4 simulator-driven tools with graceful degradation." This is corrected to the actual status:
 
 - **Implemented (4 closed-form synthesis tools, no Qucs-S install required):**
-  - `synthesize_microstrip_line` — Hammerstad-Jensen W/L from Z₀
-  - `analyze_microstrip_tool` — Z₀ / ε_eff / wavelength from W
-  - `synthesize_coupler` — branch-line / rat-race / coupled-line / Lange (single-line approximation; coupled-line gap synthesis pending)
-  - `lumped_to_distributed` — Richards transformation + Kuroda identities
+  - `synthesize_microstrip_line`: Hammerstad-Jensen W/L from Z₀
+  - `analyze_microstrip_tool`: Z₀ / ε_eff / wavelength from W
+  - `synthesize_coupler`: branch-line / rat-race / coupled-line / Lange (single-line approximation; coupled-line gap synthesis pending)
+  - `lumped_to_distributed`: Richards transformation + Kuroda identities
 - **Implemented (2 simulator-driven tools, require Qucs-S):**
-  - `run_sp_analysis` — Qucs-S `.dat` parser + Touchstone exporter
-  - `export_touchstone` — Run + export `.s2p` in one call
-- **Scaffolded — return `error("not yet implemented")` envelope (Tier-6 roadmap):**
-  - `run_harmonic_balance` — detects Xyce, but Xyce-netlist generation and harmonic-content parsing (IM3 / IIP3 / 1 dB compression) are pending
-  - `extract_noise_parameters` — detects Qucs-S, but noise-analysis dataset parser (Fmin / Γopt / Rn / NF50) is pending
+  - `run_sp_analysis`: Qucs-S `.dat` parser + Touchstone exporter
+  - `export_touchstone`. Run + export `.s2p` in one call
+- **Scaffolded: return `error("not yet implemented")` envelope (Tier-6 roadmap):**
+  - `run_harmonic_balance`: detects Xyce, but Xyce-netlist generation and harmonic-content parsing (IM3 / IIP3 / 1 dB compression) are pending
+  - `extract_noise_parameters`: detects Qucs-S, but noise-analysis dataset parser (Fmin / Γopt / Rn / NF50) is pending
 
-Both scaffolded tools previously returned `ok()` envelopes with a `"note: scaffolded"` field — calling agents could mistake this for success. They now return `error()` envelopes with clear "not yet implemented" messages.
+Both scaffolded tools previously returned `ok()` envelopes with a `"note: scaffolded"` field: calling agents could mistake this for success. They now return `error()` envelopes with clear "not yet implemented" messages.
 
-- The README's tool table previously listed `synthesize_microstrip_filter` (stepped-impedance / hairpin / interdigital filter realisations) — the tool was never implemented. The row has been removed; filter synthesis in the distributed domain is on the Tier-6 roadmap.
+- The README's tool table previously listed `synthesize_microstrip_filter` (stepped-impedance / hairpin / interdigital filter realisations). The tool was never implemented. The row has been removed; filter synthesis in the distributed domain is on the Tier-6 roadmap.
 
 ### Architecture hygiene (`mcp-ltspice`)
 
-- Vendor catalogue: `JOHANSON_L` and `TDK_MLG` were `COILCRAFT_0402HP.copy()` — alias-only, not real data. Replaced with measured tables for the Johanson L-07W series (0402) and TDK MLK1005S series.
+- Vendor catalogue: `JOHANSON_L` and `TDK_MLG` were `COILCRAFT_0402HP.copy()`: alias-only, not real data. Replaced with measured tables for the Johanson L-07W series (0402) and TDK MLK1005S series.
 - `compare_filter_orders` now accepts `srf_margin` and `max_value_drift_pct` and passes them through to the inner `substitute_real_components` call. Previous behaviour ran the comparison with legacy semantics, so winners could differ from a final design that enabled SRF gating.
 - Tool namespacing: every flat tool name now has a namespaced alias (`filter.*` / `analog.*` / `power.*` / `digital.*` / `vendor.*` / `sim.*` / `coex.*`). Old names continue to work but emit a one-shot `DeprecationWarning` per process pointing to the namespaced equivalent. Removal in a later major release.
 
 ### Correctness fixes (`mcp-ltspice`)
 
-- `components_dict_to_elements(components, transmission_zeros=...)` — the `transmission_zeros` flag now defaults to `None` (auto-infer from the components dict) instead of `False`. Prior default silently produced wrong S-parameters when an elliptic ladder was passed without the flag set explicitly. Explicit `False` on elliptic-shape components now emits a `RuntimeWarning`.
-- `place_transmission_zero` and `trap_lc_for_freq` — the `preserve_ratio: bool` parameter is replaced by `mode: Literal["preserve_ratio", "hold_l", "hold_c"]`. The old API with `preserve_ratio=False` and both `l_existing` and `c_existing` provided fell through none of the conditional branches and silently substituted `L=1 nH` — that bug is fixed. Legacy `preserve_ratio` calls continue to work via a deprecation shim.
-- Elliptic synthesis (`synthesize_lc_lpf` filter_type="elliptic") — the reported `transmission_zeros_hz` field was inconsistent with the actual `1/(2π√(L_k C_k))` of the synthesised trap pairs at certain orders. Root cause: `_fit_lc_to_prototype` was an unconstrained least-squares fit over (L, C) pairs that drifted the L·C product away from the target trap resonance. Fix: each trap now has only `L_trap` as an optimisation variable; `C_trap` is computed as `1/(ω_zk² · L_trap)` so the resonance is pinned exactly to the prototype's transmission zero. New regression test (`test_elliptic_synth_consistency.py`) covers orders 3 / 5 / 7 / 9 across multiple `(fc, ripple, stopband)` combinations and asserts the reported and achieved TZ frequencies agree to within 1 %.
+- `components_dict_to_elements(components, transmission_zeros=...)`. The `transmission_zeros` flag now defaults to `None` (auto-infer from the components dict) instead of `False`. Prior default silently produced wrong S-parameters when an elliptic ladder was passed without the flag set explicitly. Explicit `False` on elliptic-shape components now emits a `RuntimeWarning`.
+- `place_transmission_zero` and `trap_lc_for_freq`. The `preserve_ratio: bool` parameter is replaced by `mode: Literal["preserve_ratio", "hold_l", "hold_c"]`. The old API with `preserve_ratio=False` and both `l_existing` and `c_existing` provided fell through none of the conditional branches and silently substituted `L=1 nH`. That bug is fixed. Legacy `preserve_ratio` calls continue to work via a deprecation shim.
+- Elliptic synthesis (`synthesize_lc_lpf` filter_type="elliptic"). The reported `transmission_zeros_hz` field was inconsistent with the actual `1/(2π√(L_k C_k))` of the synthesised trap pairs at certain orders. Root cause: `_fit_lc_to_prototype` was an unconstrained least-squares fit over (L, C) pairs that drifted the L·C product away from the target trap resonance. Fix: each trap now has only `L_trap` as an optimisation variable; `C_trap` is computed as `1/(ω_zk² · L_trap)` so the resonance is pinned exactly to the prototype's transmission zero. New regression test (`test_elliptic_synth_consistency.py`) covers orders 3 / 5 / 7 / 9 across multiple `(fc, ripple, stopband)` combinations and asserts the reported and achieved TZ frequencies agree to within 1 %.
 
-### Vendor catalogue (`mcp-ltspice`) — Johanson L-07W and TDK MLK1005S replacements
+### Vendor catalogue (`mcp-ltspice`): Johanson L-07W and TDK MLK1005S replacements
 
-The previous `JOHANSON_L = COILCRAFT_0402HP.copy()` and `TDK_MLG = COILCRAFT_0402HP.copy()` aliases were misleading — they suggested broader vendor coverage than the package actually had. Replaced with nominal datasheet-derived tables for:
+The previous `JOHANSON_L = COILCRAFT_0402HP.copy()` and `TDK_MLG = COILCRAFT_0402HP.copy()` aliases were misleading. They suggested broader vendor coverage than the package actually had. Replaced with nominal datasheet-derived tables for:
 
-- **Johanson L-07W series (0402)** — 19 values from 1.0 nH to 39 nH, with SRFs ~10–15 % higher than Coilcraft 0402HP at equal inductance (wirewound construction). Extends the available value range upward.
-- **TDK MLK1005S series (0402)** — 19 values from 0.6 nH to 22 nH, extending the catalogue to sub-nH values that Coilcraft 0402HP doesn't carry.
+- **Johanson L-07W series (0402)**: 19 values from 1.0 nH to 39 nH, with SRFs ~10–15 % higher than Coilcraft 0402HP at equal inductance (wirewound construction). Extends the available value range upward.
+- **TDK MLK1005S series (0402)**: 19 values from 0.6 nH to 22 nH, extending the catalogue to sub-nH values that Coilcraft 0402HP doesn't carry.
 
 These are first-order parasitic estimates suitable for synthesis-time sims; for design-final precision, fetch a real S-parameter file from the vendor (planned via the `vendor.fetch_*` tools on the Tier-3 roadmap).
 
@@ -1117,7 +1117,7 @@ These are first-order parasitic estimates suitable for synthesis-time sims; for 
 
 
 
-## [0.1.0] — 2026-04-22
+## [0.1.0]: 2026-04-22
 
 Initial release of the four-package monorepo.
 
@@ -1132,22 +1132,22 @@ Initial release of the four-package monorepo.
 
 ### `mcp-ltspice` 0.1.0
 - 11 MCP tools covering the full synthesis-through-Monte-Carlo workflow:
-  - `run_simulation` — LTspice (Wine) or ngspice fallback
-  - `extract_sparameters` — `.raw` → `.s2p` via voltage/current method
-  - `synthesize_lc_filter` — Butterworth + Chebyshev I (closed-form g) +
+  - `run_simulation`: LTspice (Wine) or ngspice fallback
+  - `extract_sparameters`: `.raw` → `.s2p` via voltage/current method
+  - `synthesize_lc_filter`: Butterworth + Chebyshev I (closed-form g) +
     Elliptic (scipy `ellipap` + weighted least-squares LC fit)
-  - `place_transmission_zero` — Move shunt-LC notch to a target frequency,
+  - `place_transmission_zero`: Move shunt-LC notch to a target frequency,
     preserve L/C ratio, snap to E24/E96
-  - `find_transmission_zeros` — peak-detect notches in S21
-  - `substitute_real_components` — vendor parasitic tables (Coilcraft
+  - `find_transmission_zeros`: peak-detect notches in S21
+  - `substitute_real_components`: vendor parasitic tables (Coilcraft
     0402HP / 0603CS, Murata GJM C0G, Johanson L, TDK MLG)
-  - `evaluate_filter_spec` — pass/fail per criterion with margin in dB
-  - `optimize_filter` — Nelder-Mead, loss = sum of negative margins,
+  - `evaluate_filter_spec`: pass/fail per criterion with margin in dB
+  - `optimize_filter`: Nelder-Mead, loss = sum of negative margins,
     E24/E96 snap
-  - `monte_carlo_analysis` — joblib parallel Gaussian sampling, yield% +
+  - `monte_carlo_analysis`: joblib parallel Gaussian sampling, yield% +
     per-metric histograms
-  - `stability_check` — Rollett K, |Δ|, Edwards-Sinsky μ
-  - `render_response` — Bode PNG with frequency marker lines
+  - `stability_check`: Rollett K, |Δ|, Edwards-Sinsky μ
+  - `render_response`: Bode PNG with frequency marker lines
 - Analytical ABCD-chain S-parameter computation in `extract.py`
   (no simulator required for synthesis sanity checks)
 - LTspice `.asc` generator + spicelib-based reader/modifier

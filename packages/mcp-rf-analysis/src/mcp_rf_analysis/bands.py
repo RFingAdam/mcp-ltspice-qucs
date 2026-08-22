@@ -94,7 +94,7 @@ def lookup_band_by_freq(freq_hz: float) -> dict[str, list[dict[str, Any]]]:
     """Find all known bands containing ``freq_hz``.
 
     Returns a dict with keys 'lte_ul', 'lte_dl', '5gnr_ul', '5gnr_dl',
-    'gnss', 'ism', 'halow' — each mapping to a list of matching entries.
+    'gnss', 'ism', 'halow'. Each mapping to a list of matching entries.
     """
     matches: dict[str, list[dict[str, Any]]] = {
         "lte_ul": [],

@@ -9,7 +9,7 @@ LDO is the right choice and what bypass network it needs:
 - **Output ripple from a noisy V_in**: V_ripple_out ≈ V_ripple_in / PSRR_lin
 - **Output noise** estimate from the LDO's spec'd noise + bypass cap
 
-Useful as a sanity check before committing a part — answers "do I need
+Useful as a sanity check before committing a part: answers "do I need
 an LDO or an SMPS, and which LDO?" without spinning up a SPICE sim.
 """
 
@@ -77,12 +77,12 @@ def analyze_ldo(
 
     if dissipation > 1.0:
         notes.append(
-            f"Dissipation {dissipation:.2f} W is high — needs heatsink "
+            f"Dissipation {dissipation:.2f} W is high: needs heatsink "
             f"or thermal pad. Consider a buck SMPS for V_in/V_out > 2."
         )
     if efficiency < 50:
         notes.append(
-            f"Efficiency only {efficiency:.0f}% — buck SMPS would be >85% at this V_in/V_out ratio."
+            f"Efficiency only {efficiency:.0f}%: buck SMPS would be >85% at this V_in/V_out ratio."
         )
 
     return LDOAnalysis(
@@ -107,7 +107,7 @@ def required_psrr_for_ripple_target(
 
     Useful when picking between LDO families: e.g. an SMPS upstream
     gives 50 mV pp ripple, you want < 100 µV pp on the rail to feed an
-    ADC reference — required PSRR is 20·log10(50000/100) = 54 dB at
+    ADC reference: required PSRR is 20·log10(50000/100) = 54 dB at
     the SMPS switching frequency.
     """
     if v_ripple_in_mvpp <= 0 or v_ripple_out_uvpp_max <= 0:

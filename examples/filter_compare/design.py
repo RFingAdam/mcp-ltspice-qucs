@@ -61,7 +61,7 @@ def _write_report(path: Path, res) -> None:
         "Generic 5/7/9-order elliptic LPF comparison driven by the",
         "`compare_filter_orders` tool. Spec at `spec.json`.",
         "",
-        f"**Winner: order {res.winner_order}** — {res.winner_rationale}",
+        f"**Winner: order {res.winner_order}**: {res.winner_rationale}",
         "",
         "## Score table",
         "",

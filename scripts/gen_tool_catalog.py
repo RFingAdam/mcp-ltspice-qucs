@@ -63,7 +63,7 @@ def rendered_catalog() -> tuple[str, int]:
         "(`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) "
         "for its primary tools; only primaries are listed here.\n\n"
         "## At a glance\n\n"
-        "*(This section is generated — run `uv run python scripts/gen_tool_catalog.py`\n"
+        "*(This section is generated. Run `uv run python scripts/gen_tool_catalog.py`\n"
         "after adding or changing tools.)*\n\n" + "\n".join(blocks)
     )
     return generated, total

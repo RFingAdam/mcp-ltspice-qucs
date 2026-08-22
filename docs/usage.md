@@ -37,7 +37,7 @@ Register the three servers with Claude Desktop / Code:
 }
 ```
 
-## Step 1 — Synthesize the prototype
+## Step 1: Synthesize the prototype
 
 Ask the assistant:
 
@@ -63,8 +63,8 @@ response.
 ### Registering your own vendor models
 
 The curated catalogues cover a handful of representative RF series. For
-third-party or measured parts — Würth, AVX, TDK, distributor exports, or your
-own lab `.s2p` files — point the MCP at a directory:
+third-party or measured parts: Würth, AVX, TDK, distributor exports, or your
+own lab `.s2p` files: point the MCP at a directory:
 
 ```text
 my_models/
@@ -85,7 +85,7 @@ so the workbench can include and instantiate it verbatim. Afterwards
 `search_component_models` plus `circuit_attach_models` carries the exact
 model into `CircuitDocument`. Re-registering refreshes the index.
 
-## Step 2 — Substitute real parts
+## Step 2: Substitute real parts
 
 > *"Snap the inductors to Coilcraft 0402HP and the caps to Murata GJM C0G."*
 
@@ -118,7 +118,7 @@ For a model-backed workflow, import or construct a `CircuitDocument`, call
 [General circuit workbench](circuit-workbench.md) for the supported file
 subsets and validation contract.
 
-## Step 3 — Evaluate against the spec
+## Step 3: Evaluate against the spec
 
 > *"Evaluate against a generic LPF spec: 0.5 dB passband IL, 14 dB return loss, ≥30/45/60 dB rejection at 2 / 3 / 5 × fc."*
 
@@ -154,7 +154,7 @@ A trimmed response (the bundled `examples/basic_lpf` design):
 | 3 × fc          | ≥ 45 dB  | 48.16 dB | +3.16 dB |
 | 5 × fc          | ≥ 60 dB  | 70.16 dB | +10.16 dB |
 
-## Step 4 — Monte Carlo yield
+## Step 4: Monte Carlo yield
 
 > *"Run 1000 trials at 5% component tolerance and tell me the yield."*
 
@@ -164,9 +164,9 @@ values, `n_runs=1000`, `tolerance_pct=5.0`, and
 yield**. This varies ideal L/C values; it does not include the catalog
 parasitics or vendor model behavior returned in Step 2.
 
-## Step 5 — Confirm it against real SPICE
+## Step 5: Confirm it against real SPICE
 
-Everything up to here runs on the fast closed-form ladder — no simulator
+Everything up to here runs on the fast closed-form ladder. No simulator
 touched. That is the right default for a 1000-trial Monte Carlo loop, but
 before quoting a yield you should confirm the analytical preview actually
 matches what SPICE says the circuit does.
@@ -180,12 +180,12 @@ LTspice/ngspice AC sweep, extracts a reciprocal/symmetric two-port
 approximation, computes the analytical response on the same grid, and
 returns a **verdict**:
 
-- `agree` — SPICE and analytical match within threshold (0.5 dB passband,
+- `agree`: SPICE and analytical match within threshold (0.5 dB passband,
   3 dB stopband by default). The preview tracks this generated schematic.
-- `minor_disagreement` — a marginal or stopband-only miss.
-- `disagree` — they diverge in the passband; the analytical margin is not
+- `minor_disagreement`. A marginal or stopband-only miss.
+- `disagree`. They diverge in the passband; the analytical margin is not
   reliable for this design, and the response carries a warning saying so.
-- `spice_unavailable` — no simulator installed; you still get the
+- `spice_unavailable`. No simulator installed; you still get the
   analytical S2P back rather than an error.
 
 This checks the generated ladder and extraction path. It does not validate

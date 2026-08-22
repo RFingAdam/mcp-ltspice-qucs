@@ -102,7 +102,7 @@ def _comparison_frequency_grid(
     if lo >= hi:
         raise ValueError(
             "Frequency ranges do not overlap, so S-parameters cannot be compared "
-            f"without extrapolation. Ranges — {label_a}: "
+            f"without extrapolation. Ranges: {label_a}: "
             f"{a.f.min():.9g}-{a.f.max():.9g} Hz; {label_b}: "
             f"{b.f.min():.9g}-{b.f.max():.9g} Hz."
         )

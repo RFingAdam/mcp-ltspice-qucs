@@ -1,6 +1,6 @@
 """Reconciliation of SPICE vs the analytical preview (issue #16).
 
-The whole pipeline can run without ever calling SPICE — every ``.s2p`` can
+The whole pipeline can run without ever calling SPICE. Every ``.s2p`` can
 come from the closed-form ladder. This tool exists so a reported yield or
 margin can be backed by an actual simulation. The tests pin the three
 outcomes that matter: a design whose SPICE and analytical responses agree,

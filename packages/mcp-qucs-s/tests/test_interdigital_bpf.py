@@ -6,7 +6,7 @@ elements) is bypassed exactly: a same-velocity TEM array's 2N-port
 Y-matrix is linear in the characteristic-admittance matrix Y_c, so a
 tridiagonal array decomposes into ordinary TLIN stubs (one per line,
 admittance Y_ii − Σ|mutuals|) plus floating TLIN4P connector lines (one
-per coupling, admittance y_m) — probe-verified this session to
+per coupling, admittance y_m): probe-verified this session to
 reproduce the CTLIN coupled section at 0.0000 mdB. That makes arbitrary
 interdigital arrays netlistable in qucsator exactly, and the same
 matrix termination gives an exact analytical solver.
@@ -87,7 +87,7 @@ def test_mutual_for_k_round_trips() -> None:
 
 
 def test_solver_reproduces_the_coupled_bpf_section() -> None:
-    """N=2 array, diagonal ports, others open, no shorts — must equal the
+    """N=2 array, diagonal ports, others open, no shorts: must equal the
     closed-form coupled-section cascade at numerical precision."""
     ze, zo = 70.61, 39.24
     ym = (1.0 / zo - 1.0 / ze) / 2.0
@@ -171,7 +171,7 @@ def test_tap_point_matches_slope_parameter_formula() -> None:
 def test_too_wide_bandwidth_is_rejected() -> None:
     """The interior resonator's stub admittance is Y_r·(1 − r_left −
     r_right); each r solves k(r) = Δ/√(g·g), so the stub crosses zero
-    near Δ ≈ 0.79 on 70 Ω resonators — Δ = 0.85 must be refused."""
+    near Δ ≈ 0.79 on 70 Ω resonators: Δ = 0.85 must be refused."""
     with pytest.raises(ValueError, match=r"[Uu]nrealizable|stub"):
         interdigital_bpf(G_CHEB_05, F0, 0.85, z0=Z0, substrate=ROGERS, z_resonator_ohm=70.0)
 
@@ -187,8 +187,8 @@ def test_physical_dimensions_present_with_notes() -> None:
 
 
 def test_design_self_reports_achieved_metrics() -> None:
-    """The tapped-feed approximation degrades ripple vs the prototype —
-    the design must report what it actually achieves on the exact model
+    """The tapped-feed approximation degrades ripple vs the prototype.
+    The design must report what it actually achieves on the exact model
     instead of implying the spec."""
     a = _design()["achieved"]
     assert a["band_center_hz"] == pytest.approx(F0, rel=0.02)
@@ -243,7 +243,7 @@ def test_netlist_structure(tmp_path) -> None:
 @pytest.mark.qucs
 @pytest.mark.integration
 def test_graph_netlist_matches_exact_solver(tmp_path) -> None:
-    """Both sides are exact models of the same TEM network — agreement
+    """Both sides are exact models of the same TEM network: agreement
     must be at numerical precision."""
     d = _design()
     net = generate_interdigital_netlist(

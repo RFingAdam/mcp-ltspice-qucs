@@ -4,7 +4,7 @@ End-to-end walkthroughs that exercise multiple tools together.
 
 | Example | What it shows |
 |---|---|
-| [Basic LPF](basic-lpf.md) | 5th-order Butterworth low-pass filter at 1 GHz. Synthesis → vendor substitution → spec evaluation → Monte Carlo yield. Generic — no application-specific values. |
+| [Basic LPF](basic-lpf.md) | 5th-order Butterworth low-pass filter at 1 GHz. Synthesis → vendor substitution → spec evaluation → Monte Carlo yield. Generic. No application-specific values. |
 
 ## Running your own designs privately
 

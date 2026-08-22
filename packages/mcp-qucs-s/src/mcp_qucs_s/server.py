@@ -379,7 +379,7 @@ def probe_backend(
         "Submit a durable, cancellable circuit simulation job: compile the "
         "imported artifact, run it, parse the result into a normalized "
         "ResultDataset, and validate it against the analysis. `analysis.kind` "
-        "selects the backend — Qucsator serves 'sparameters'/'noise', Xyce "
+        "selects the backend: Qucsator serves 'sparameters'/'noise', Xyce "
         "serves 'harmonic_balance'. Qucsator and Xyce have no verified OS "
         "sandbox profile, so jobs run unsandboxed on the immutable per-run "
         "workspace snapshot; only use this on trusted local inputs."
@@ -631,7 +631,7 @@ def synthesize_microstrip_line(
         Field(
             description=(
                 "Either a preset name (e.g. 'FR4_0254', 'Rogers4350B_0508', "
-                "'Duroid5880_0508' — see `list_substrate_presets_tool`) OR a "
+                "'Duroid5880_0508'. See `list_substrate_presets_tool`) OR a "
                 "parameter dict {er, h_mm, t_um (default 35), tan_d (default 0.02)}."
             )
         ),
@@ -663,7 +663,7 @@ def synthesize_microstrip_line(
         "Analyze an existing microstrip line: Z0, eps_eff, wavelength. "
         "Hammerstad-Jensen closed form. NOTE: for PCB impedance analysis from "
         "stackup + trace data, prefer a PCB-layout-aware EMC MCP if one is "
-        "available — those tools integrate with the wider PCB analysis "
+        "available. Those tools integrate with the wider PCB analysis "
         "workflow (CPW, stripline, differential, eye-diagram)."
     ),
 )
@@ -1075,8 +1075,8 @@ def run_harmonic_balance(
         list[str],
         Field(
             description=(
-                "Raw SPICE lines for the circuit under test — devices, .SUBCKT "
-                "and .MODEL cards — referring to the in_node and out_node names. "
+                "Raw SPICE lines for the circuit under test: devices, .SUBCKT "
+                "and .MODEL cards: referring to the in_node and out_node names. "
                 "Do not include sources, termination or analysis directives; "
                 "those are added here. Use explicit multiplication in B-source "
                 "expressions (V(in)*V(in)*V(in)); the '^' operator makes Xyce's "
@@ -1099,7 +1099,7 @@ def run_harmonic_balance(
     try:
         if not is_xyce_available():
             return error(
-                "Xyce not installed. Build it from source — see "
+                "Xyce not installed. Build it from source. See "
                 "docs/installation.md. Sandia's Linux binaries are RHEL RPMs "
                 "that do not run on Debian/Ubuntu, and they no longer ship "
                 "open-source builds.",

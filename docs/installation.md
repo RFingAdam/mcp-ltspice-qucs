@@ -77,7 +77,7 @@ Either launch it once interactively and answer the dialog:
 wine ~/.wine/drive_c/Program\ Files/ADI/LTspice/LTspice.exe
 ```
 
-…or pre-seed the setting, which also opts out of telemetry — the better
+…or pre-seed the setting, which also opts out of telemetry. The better
 option for CI and headless boxes:
 
 ```bash
@@ -110,7 +110,7 @@ The runner uses the `LTSPICE_PATH` env var first, then `$PATH`, then the
 standard install locations for Windows, macOS, and Wine (honouring
 `WINEPREFIX` if you use a non-default prefix). If `LTSPICE_PATH` is set
 but doesn't point at a real file, the runner logs a warning and keeps
-looking — it will not silently fall back to ngspice without telling you.
+looking: it will not silently fall back to ngspice without telling you.
 
 ### A note on exit codes
 
@@ -123,14 +123,14 @@ can't be mistaken for a fresh result. ngspice, Qucsator, and Xyce require
 a zero exit and a fresh, non-empty, parseable output artifact; Qucsator
 and Xyce runs also use isolated per-run workspaces and manifests.
 
-If you see `did not produce <file>.raw`, that is a genuine failure — the
+If you see `did not produce <file>.raw`, that is a genuine failure. The
 error carries the exact command, the return code, and the path to the
 full log.
 
 ### Choosing a simulator
 
 `MCP_LTSPICE_SIMULATOR` pins the choice for deployments that want one
-specific engine — most usefully an ngspice-only box that shouldn't pay
+specific engine. Most usefully an ngspice-only box that shouldn't pay
 for Wine at all:
 
 ```bash
@@ -163,7 +163,7 @@ make install
 ```
 
 `flex`, `bison`, `gperf` and `dos2unix` are all build-time requirements of
-qucsator-RF. Missing ones fail late and unhelpfully — `gperf` aborts at
+qucsator-RF. Missing ones fail late and unhelpfully: `gperf` aborts at
 cmake time, `dos2unix` only at ~78% of the build with
 `/bin/sh: 1: dos2unix: not found`.
 
@@ -174,8 +174,8 @@ the one `mcp-qucs-s` invokes. Handing a netlist to the GUI opens a window
 and blocks forever on a headless machine, so discovery deliberately looks
 for `qucsator_rf` / `qucsator` and never falls back to `qucs-s`.
 
-If you have the GUI but no engine — the usual result of cloning without
-`--recurse-submodules` — the server says so explicitly rather than hanging.
+If you have the GUI but no engine. The usual result of cloning without
+`--recurse-submodules`. The server says so explicitly rather than hanging.
 Check with:
 
 ```bash
@@ -200,7 +200,7 @@ provides open-source binaries at all. The GitHub releases carry only
 release-notes PDFs. Build from source:
 
 ```bash
-# Build deps (all in the Ubuntu archive). GCC 13 is required — see below.
+# Build deps (all in the Ubuntu archive). GCC 13 is required. See below.
 sudo apt install cmake g++ gfortran make bison flex libfl-dev \
     libfftw3-dev libsuitesparse-dev libblas-dev liblapack-dev libtool git \
     gcc-13 g++-13 gfortran-13
@@ -252,7 +252,7 @@ Gotchas worth knowing before you start:
 - **Distro Trilinos is unusable.** Ubuntu ships 13.2.0, and the Debian
   packaging does not enable the `EpetraExt` / `Amesos KLU` /
   `COMPLEX_DOUBLE` options Xyce needs.
-- **Don't build in `/tmp`** if it is a tmpfs — the build tree is 7.2 GB.
+- **Don't build in `/tmp`** if it is a tmpfs. The build tree is 7.2 GB.
 - `-j8` rather than `-j16` on a 16 GB box; Kokkos template instantiation
   peaks around 9 GB.
 - Xyce writes its result files **next to the netlist**, not into the working
@@ -270,7 +270,7 @@ uv run pytest -m xyce
 - `.HB` takes one `NUMFREQ` entry **per tone**. A single value with two
   tones aborts with "The size of numFreq does not match the number of tones
   in .hb!". `run_harmonic_balance` handles this for you.
-- Use explicit multiplication in behavioural `B`-source expressions —
+- Use explicit multiplication in behavioural `B`-source expressions:
   `V(in)*V(in)*V(in)`, not `V(in)^3`. The `^` form makes Xyce's HB startup
   transient diverge with "Time step too small".
 - `.PRINT HB_FD` output is a **two-sided** spectrum; single-sided amplitude
@@ -294,7 +294,7 @@ This runs ruff format + ruff check + mypy on every commit.
 ## Troubleshooting
 
 **`ModuleNotFoundError: No module named 'rf_mcp_common'` after first
-`uv sync`** — pass `--all-packages`:
+`uv sync`**: pass `--all-packages`:
 
 ```bash
 uv sync --all-packages
@@ -303,18 +303,18 @@ uv sync --all-packages
 The default `uv sync` only resolves the workspace root's dependencies;
 adding `--all-packages` installs every member into the venv.
 
-**`LTspice did not produce ...raw` from the runner** — the most common
+**`LTspice did not produce ...raw` from the runner**. The most common
 cause on Linux is that Wine's display server tried to pop up the
 LTspice GUI. Check `wine LTspice.exe -b -Run yourfile.asc` directly;
 if you see Wine errors about X11 / display, install `xvfb` and run
 under it (`xvfb-run uv run python ...`).
 
-**`importlib.resources` can't find the `bands/` JSON files** — make
+**`importlib.resources` can't find the `bands/` JSON files**. Make
 sure you `uv sync --all-packages --reinstall-package mcp-rf-analysis`
 after pulling fresh source so the editable install re-discovers the
 bundled resources.
 
-**`File voltage.asy not found` from the ngspice runner** — fixed in
+**`File voltage.asy not found` from the ngspice runner**: fixed in
 0.1.1: the runner now emits ngspice netlists directly from our `.asc`
 generator output, bypassing spicelib's symbol-library lookup which
 needed LTspice installed.

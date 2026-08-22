@@ -460,7 +460,7 @@ def place_zeros_for_coex(
     harmonics: Annotated[list[int], Field(description="Harmonic orders to protect, e.g. [2, 3].")],
     victim_bands: Annotated[
         list[dict[str, Any]],
-        Field(description="[{name, freq_range_hz: [lo, hi], severity?}] — severity defaults to 1."),
+        Field(description="[{name, freq_range_hz: [lo, hi], severity?}]: severity defaults to 1."),
     ],
     n_zeros: Annotated[
         int | None, Field(description="Zero budget; default = one per harmonic.")

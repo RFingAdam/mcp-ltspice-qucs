@@ -3,7 +3,7 @@
 The old netlister read each element's *position* off its refdes letter: a
 lone ``C`` was assumed shunt, a lone ``L`` series. That describes a lowpass
 ladder and nothing else, so a highpass (series C, shunt L) was silently
-netlisted as its dual — ngspice ran without complaint and returned
+netlisted as its dual: ngspice ran without complaint and returned
 S-parameters for a circuit nobody designed. ``z0`` was hardcoded to 50 Ω
 besides, so a 75 Ω design simulated at 50 Ω.
 

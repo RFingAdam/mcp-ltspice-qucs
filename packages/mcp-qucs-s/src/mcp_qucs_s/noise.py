@@ -24,7 +24,7 @@ Noise temperature is a **per-component** property in Qucs, not an analysis
 setting: ``.SP ... Temp="16.85"`` does not change device noise. A passive
 network's noise figure equals its insertion loss only at the IEEE reference
 temperature T₀ = 290 K = 16.85 °C, and Qucs defaults components to
-26.85 °C, so a 10 dB pad reads 10.13 dB out of the box —
+26.85 °C, so a 10 dB pad reads 10.13 dB out of the box:
 ``1 + (L-1)·T/T₀`` with T = 300 K. That is correct physics, not an error.
 """
 
@@ -115,7 +115,7 @@ def build_noise_netlist(
     ``temp_c`` appends ``Temp="…"`` to every ``R:`` line that does not
     already carry one, defaulting to the IEEE reference 16.85 °C so a
     passive network's noise figure equals its loss. Only resistor lines are
-    touched — silently rewriting arbitrary device cards would be worse than
+    touched: silently rewriting arbitrary device cards would be worse than
     leaving them alone. Pass ``None`` to use whatever the DUT declares, and
     set ``Temp`` yourself on active devices.
     """

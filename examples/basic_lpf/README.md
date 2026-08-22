@@ -1,4 +1,4 @@
-# Basic LPF — public example
+# Basic LPF: public example
 
 A generic 5th-order Butterworth low-pass filter at fc = 1 GHz, on
 50 Ω. Demonstrates the full `mcp-ltspice` workflow without revealing
@@ -14,11 +14,11 @@ Takes ~25 seconds (most of it Monte Carlo).
 
 ## What it shows
 
-1. `synthesize_lc_filter` — closed-form Butterworth synthesis
-2. `substitute_real_components` — Coilcraft 0402HP + Murata GJM C0G
-3. `evaluate_filter_spec` — pass/fail per criterion with margin
-4. `render_response` — Bode PNG with frequency markers
-5. `monte_carlo_analysis` — 1000-trial yield analysis at 5% tolerance
+1. `synthesize_lc_filter`: closed-form Butterworth synthesis
+2. `substitute_real_components`: Coilcraft 0402HP + Murata GJM C0G
+3. `evaluate_filter_spec`: pass/fail per criterion with margin
+4. `render_response`: Bode PNG with frequency markers
+5. `monte_carlo_analysis`: 1000-trial yield analysis at 5% tolerance
 
 ## Result
 
@@ -36,9 +36,9 @@ VERDICT: PASS  |  MC yield: 99.0%
 
 ## Outputs (generated each run)
 
-- `basic_lpf.s2p` — analytical Touchstone of the realized filter
-- `basic_lpf.asc` — LTspice schematic
-- `response.png` — S21/S11 Bode plot
+- `basic_lpf.s2p`: analytical Touchstone of the realized filter
+- `basic_lpf.asc`: LTspice schematic
+- `response.png`: S21/S11 Bode plot
 
 These artifacts are checked into the repo as a known-good reference
 for CI.

@@ -29,7 +29,7 @@ Realistic threat models include:
   sandboxing beyond `Path.expanduser().resolve()`. A malicious `.asc`
   can reference external `.SUBCKT` definitions, `.lib` files, or
   `.include` directives that the simulator will load and execute (in
-  the SPICE sense — some simulators support arbitrary expression
+  the SPICE sense. Some simulators support arbitrary expression
   evaluation). **If the `.asc` came from an untrusted agent, user
   upload, or downloaded artifact, run the runner inside a container or
   chroot with no filesystem access outside a per-job working directory.**
@@ -50,8 +50,8 @@ Realistic threat models include:
 
 ## What's *not* in scope
 
-- DoS by passing extremely large `n_runs` to `monte_carlo_analysis` —
-  this is by design; rate-limit at the MCP transport layer if needed.
+- DoS by passing extremely large `n_runs` to `monte_carlo_analysis`.
+  This is by design; rate-limit at the MCP transport layer if needed.
 - Bugs in dependencies (`scipy`, `skrf`, `spicelib`, `fastmcp`,
   `numpy`). Report those upstream.
 

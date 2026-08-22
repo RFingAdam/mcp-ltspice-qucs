@@ -22,7 +22,7 @@ _DEFAULT_TOOL_VERSION = distribution_version("rf-mcp-common")
 class Envelope(BaseModel, Generic[T]):
     """Uniform tool response.
 
-    Tools should never raise to the MCP transport layer — they catch
+    Tools should never raise to the MCP transport layer. They catch
     their own exceptions and convert to ``error()`` envelopes so the
     agent can reason about the failure.
     """

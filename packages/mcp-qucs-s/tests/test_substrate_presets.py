@@ -59,7 +59,7 @@ class TestMicrostripLoss:
         )
 
     def test_fr4_loss_higher_than_rogers(self):
-        """FR-4 has tan_d ~0.020 vs Rogers RO4350B's 0.0037 — same Z₀
+        """FR-4 has tan_d ~0.020 vs Rogers RO4350B's 0.0037: same Z₀
         line should be lossier on FR-4."""
         a_fr4 = analyze_microstrip(
             synthesize_microstrip_line(50.0, 90, 5e9, get_substrate("FR4_0254")).width_mm,

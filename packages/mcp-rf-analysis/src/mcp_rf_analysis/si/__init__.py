@@ -1,8 +1,8 @@
 """Signal-integrity analysis tools.
 
-- :mod:`.tdr` — Time-Domain Reflectometry from S₁₁: impedance vs distance
-- :mod:`.eye` — Eye diagram from S-parameters + PRBS source
-- :mod:`.crosstalk` — NEXT / FEXT estimation between two coupled lines
+- :mod:`.tdr`: Time-Domain Reflectometry from S₁₁: impedance vs distance
+- :mod:`.eye`: Eye diagram from S-parameters + PRBS source
+- :mod:`.crosstalk`: NEXT / FEXT estimation between two coupled lines
 """
 
 from mcp_rf_analysis.si.crosstalk import (

@@ -1,7 +1,7 @@
 """Reconcile a SPICE-simulated response against the analytical preview.
 
-The whole pipeline — synthesise, place zeros, substitute real vendor parts,
-optimise, Monte Carlo — can run end to end on the closed-form
+The whole pipeline: synthesise, place zeros, substitute real vendor parts,
+optimise, Monte Carlo: can run end to end on the closed-form
 ``ladder_sparams_from_components`` path without a single SPICE run. That is
 the right default for a fast inner loop, but it silently drops everything a
 real simulation captures: vendor ``.lib`` subcircuits, DC-bias and
@@ -10,7 +10,7 @@ S-parameters pulled in via ``.include``.
 
 :func:`validate_against_spice` closes that gap. It runs the schematic through
 a real simulator, extracts the S-parameters, computes the analytical
-response for the same components, and reports where the two diverge — so a
+response for the same components, and reports where the two diverge, so a
 reported yield number can be backed by an actual SPICE run rather than a
 lumped-element approximation of one.
 

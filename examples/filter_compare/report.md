@@ -3,7 +3,7 @@
 Generic 5/7/9-order elliptic LPF comparison driven by the
 `compare_filter_orders` tool. Spec at `spec.json`.
 
-**Winner: order 5** — all criteria pass | yield 100% (excellent) | SRF: 5 components flagged (critical) | 7 components
+**Winner: order 5**. All criteria pass | yield 100% (excellent) | SRF: 5 components flagged (critical) | 7 components
 
 ## Score table
 

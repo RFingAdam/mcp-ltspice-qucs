@@ -85,9 +85,9 @@ def test_stopband_target_pass_and_fail(tmp_path) -> None:
                 "rl_min_db": 15,
             },
             "stopband_targets": [
-                # Should easily pass — far in stopband
+                # Should easily pass: far in stopband
                 {"freq": 3e9, "rejection_min_db": 30, "label": "deep stopband"},
-                # Should fail — inside passband; rejection is ~0
+                # Should fail: inside passband; rejection is ~0
                 {"freq": 100e6, "rejection_min_db": 30, "label": "in passband"},
             ],
         }

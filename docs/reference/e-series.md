@@ -1,6 +1,6 @@
 # E-series snap
 
-IEC 60063 preferred numbers — the realizable component value series for
+IEC 60063 preferred numbers. The realizable component value series for
 resistors, capacitors, and inductors. We support **E6 / E12 / E24 /
 E48 / E96 / E192** for snapping continuous-value optimizer output to
 something you can actually buy.

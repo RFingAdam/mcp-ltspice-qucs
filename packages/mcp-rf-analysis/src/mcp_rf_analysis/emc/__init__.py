@@ -1,8 +1,8 @@
 """EMC pre-compliance estimation tools.
 
-- :mod:`.conducted` — conducted-emissions prediction via LISN model;
+- :mod:`.conducted`: conducted-emissions prediction via LISN model;
   CISPR / FCC limit lookup
-- :mod:`.radiated` — radiated-emissions estimate (small-loop and short-
+- :mod:`.radiated`: radiated-emissions estimate (small-loop and short-
   dipole approximations) at 3m / 10m antenna distance
 """
 

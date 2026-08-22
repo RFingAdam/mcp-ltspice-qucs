@@ -6,14 +6,14 @@ series-LC traps. The BPF map ``ω → (1/Δ)(ω/ω₀ − ω₀/ω)`` and the BS
 separately (inductor → series-LC for BPF / parallel-LC for BSF, capacitor
 → the dual), so every LPF trap becomes a FOUR-element shunt branch: a
 series-LC in series with a parallel-LC tank, to ground. That branch shorts
-at two frequencies — the two images of the LPF zero ``ω_z`` under the map,
+at two frequencies. The two images of the LPF zero ``ω_z`` under the map,
 the roots of ``r² ∓ 2b·r − 1 = 0`` in ``r = ω/ω₀`` with ``b = ω_z·Δ/2``
 (BPF) or ``b = Δ/(2·ω_z)`` (BSF): ``ω = ω₀(√(b²+1) ± b)``, geometric
 mirror-pairs about ω₀.
 
 Because the map is exact algebra on the prototype (no fitting), the BPF /
 BSF response must equal the already-validated elliptic LPF response
-composed with the map — that exactness is asserted here, plus the v0.2.0
+composed with the map. That exactness is asserted here, plus the v0.2.0
 math-consistency invariant generalized to composite branches: the reported
 ``transmission_zeros_hz`` must be the roots of
 

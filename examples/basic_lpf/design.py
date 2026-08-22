@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generic 5th-order Butterworth LPF design — public example.
+"""Generic 5th-order Butterworth LPF design: public example.
 
 Synthesizes a textbook 5th-order Butterworth low-pass filter at 1 GHz,
 substitutes Coilcraft 0402HP + Murata GJM C0G real parts, evaluates

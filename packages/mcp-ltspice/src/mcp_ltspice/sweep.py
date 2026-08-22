@@ -1,6 +1,6 @@
 """Parameter sweep, corner analysis, sensitivity analysis.
 
-These tools are universally useful — every other domain (analog,
+These tools are universally useful. Every other domain (analog,
 power, RF, SI) relies on the same "what happens if I vary X" question.
 The implementations here use the analytical S-parameter pipeline so
 they run thousands of evaluations per second without spawning a
@@ -8,12 +8,12 @@ simulator.
 
 Three primitives:
 
-- :func:`parameter_sweep` — vary one or more component values across a
+- :func:`parameter_sweep`: vary one or more component values across a
   user-defined grid and report the spec margin at each point.
-- :func:`corner_analysis` — evaluate at named corners (e.g.
+- :func:`corner_analysis`: evaluate at named corners (e.g.
   worst-case-low / typical / worst-case-high), tabulating which
   criteria fail at each corner.
-- :func:`sensitivity_analysis` — perturb each component by ±δ and
+- :func:`sensitivity_analysis`: perturb each component by ±δ and
   measure ∂margin/∂x for each spec criterion. Ranks components by
   total influence so you know which ones to tighten the tolerance on.
 """

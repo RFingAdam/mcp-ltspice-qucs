@@ -2,7 +2,7 @@
 
 Inverting topology, single op-amp, generally better Q-handling than
 Sallen-Key (good up to Q ≈ 20-25). The MFB output is inverted relative
-to the input — flip the next stage's polarity, or accept it as-is for
+to the input: flip the next stage's polarity, or accept it as-is for
 audio / signal-processing chains where absolute polarity is irrelevant.
 
 Refs:
@@ -121,7 +121,7 @@ def mfb_band_pass(
     *,
     c_pf: float = 100.0,
 ) -> MFBDesign:
-    """Multiple-Feedback BPF — Mancini's classical 3-resistor 2-cap design.
+    """Multiple-Feedback BPF: Mancini's classical 3-resistor 2-cap design.
 
     Equations (Sedra-Smith 17.61):
         ω₀² = (R1 + R3) / (R1 · R2 · R3 · C1 · C2)

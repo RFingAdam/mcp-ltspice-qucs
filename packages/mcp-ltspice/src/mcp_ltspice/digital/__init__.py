@@ -1,7 +1,7 @@
 """Digital + mixed-signal analysis.
 
-- :mod:`.timing` — propagation / setup / hold checks for synchronous logic
-- :mod:`.coupling` — digital-to-analog crosstalk + supply-noise injection
+- :mod:`.timing`: propagation / setup / hold checks for synchronous logic
+- :mod:`.coupling`: digital-to-analog crosstalk + supply-noise injection
 """
 
 from mcp_ltspice.digital.coupling import (

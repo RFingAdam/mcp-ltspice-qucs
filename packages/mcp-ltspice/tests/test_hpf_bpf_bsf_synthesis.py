@@ -135,7 +135,7 @@ class TestBpfSynthesis:
 
     def test_elliptic_is_supported(self):
         """Elliptic BPF shipped with issue #26; the deep coverage lives in
-        test_elliptic_bpf_bsf.py — this is the API smoke check."""
+        test_elliptic_bpf_bsf.py: this is the API smoke check."""
         d = synthesize_lc_bpf("elliptic", order=5, f_low_hz=900e6, f_high_hz=1100e6)
         assert d.transmission_zeros_hz, "an elliptic BPF must report finite zeros"
 
@@ -187,7 +187,7 @@ class TestBsfSynthesis:
         assert d.metadata["kind"] == "bandstop"
 
     def test_each_trap_pair_resonates_at_f0(self):
-        """Same f₀ check as BPF — both BPF and BSF have LC pairs at f₀."""
+        """Same f₀ check as BPF. Both BPF and BSF have LC pairs at f₀."""
         d = synthesize_lc_bsf("butterworth", order=3, f_low_hz=900e6, f_high_hz=1100e6)
         f0 = d.metadata["f_0_hz"]
         for k in [1, 2, 3]:

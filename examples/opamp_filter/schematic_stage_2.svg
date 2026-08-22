@@ -488,7 +488,7 @@ z
     </g>
    </g>
    <g id="text_5">
-    <!-- Stage 2 — Sallen-Key, fc=22.00 kHz, Q=1.307 -->
+    <!-- Stage 2: Sallen-Key, fc=22.00 kHz, Q=1.307 -->
     <g transform="translate(0 15.543125) scale(0.14 -0.14)">
      <defs>
       <path id="DejaVuSans-53" d="M 3425 4513 

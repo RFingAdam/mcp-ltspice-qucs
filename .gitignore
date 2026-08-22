@@ -78,7 +78,7 @@ site/
 credentials.json
 secrets.toml
 
-# Private design experiments — these stay local for review and don't
+# Private design experiments. These stay local for review and don't
 # get pushed. Add a gitkeep'd subfolder under examples/ to share an
 # example you want public.
 examples/halow_lpf/
@@ -86,7 +86,7 @@ examples/halow_lpf.zip
 examples/private/
 examples/_local/
 examples/_archive/
-# Generated bundle PDFs — re-buildable from each example's design.py
+# Generated bundle PDFs: re-buildable from each example's design.py
 examples/**/report.pdf
 
 # pre-commit

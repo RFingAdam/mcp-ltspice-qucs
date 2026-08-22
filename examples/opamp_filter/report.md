@@ -17,7 +17,7 @@
 
 ## Op-amp choice
 
-**THS3491** (TI) — high-speed current-feedback ADC driver
+**THS3491** (TI): high-speed current-feedback ADC driver
 
 - Family: BIPOLAR
 - GBW: 900.0 MHz (need > 2.9)

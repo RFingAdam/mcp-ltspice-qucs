@@ -3,7 +3,7 @@
 ``sparams.py`` had no test coverage at all, despite being the only code
 that runs once a user actually installs Qucs-S: both ``run_sp_analysis``
 and ``export_touchstone`` funnel through ``dat_to_touchstone``. It needs
-no binary to test — the input is a text file.
+no binary to test. The input is a text file.
 """
 
 from __future__ import annotations

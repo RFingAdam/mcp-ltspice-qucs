@@ -4,7 +4,7 @@ Static-timing-style checks for a digital path: launch FF → combinational
 delay → capture FF. Reports setup / hold margins given the standard
 parameters from a digital library datasheet.
 
-These are first-order analytical checks — they don't replace a real
+These are first-order analytical checks. They don't replace a real
 STA tool but they catch the common failure modes early in design.
 """
 
@@ -69,7 +69,7 @@ def check_setup_hold(path: TimingPath) -> SetupHoldResult:
             f"in the data path, or reduce clock skew."
         )
     if setup_slack > 0 and setup_slack < path.clk_period_ns * 0.05:
-        notes.append("Setup slack <5% of clock period — very tight, no margin.")
+        notes.append("Setup slack <5% of clock period: very tight, no margin.")
 
     # Maximum safe clock = current period - setup_slack (if positive)
     if setup_slack > 0:

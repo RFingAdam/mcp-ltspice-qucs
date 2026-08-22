@@ -2,10 +2,10 @@
 
 Two complementary capabilities:
 
-1. **Generate** — produce a ``.asc`` from a synthesized component dict
+1. **Generate**: produce a ``.asc`` from a synthesized component dict
    plus port-mapping metadata, using a small set of known LPF templates.
 
-2. **Read / modify** — wrap ``spicelib.AscEditor`` for component-value
+2. **Read / modify**: wrap ``spicelib.AscEditor`` for component-value
    updates that preserve schematic structure.
 
 Generated schematics follow the convention used by the runner:
@@ -111,8 +111,8 @@ def _wire(x1: int, y1: int, x2: int, y2: int) -> str:
 #
 # LTspice has no netlist section in a .asc: connectivity is purely
 # positional. Two pins are the same node when they share a coordinate, and a
-# wire joins its two endpoints. Emitting symbols without wires — as this
-# module did until the pins below were worked out — produces a schematic that
+# wire joins its two endpoints. Emitting symbols without wires, as this
+# module did until the pins below were worked out: produces a schematic that
 # looks right and netlists as a pile of disconnected ``NC_*`` nodes.
 #
 # Pin offsets are from the stock symbol library (``lib/sym/*.asy``); the R90

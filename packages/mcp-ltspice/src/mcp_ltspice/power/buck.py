@@ -1,6 +1,6 @@
 """Buck (step-down) SMPS component sizing.
 
-First-order analytical design — picks L and Cout from ripple targets,
+First-order analytical design: picks L and Cout from ripple targets,
 duty cycle from V_in/V_out ratio, ESR target from output ripple budget.
 This is what you'd hand-calculate before opening a vendor's design tool;
 it gives you the right ballpark without a spreadsheet.
@@ -75,12 +75,12 @@ def design_buck(
     notes = []
     if duty < 0.1:
         notes.append(
-            f"Duty cycle {duty * 100:.1f}% is low — minimum on-time of the "
+            f"Duty cycle {duty * 100:.1f}% is low: minimum on-time of the "
             f"controller may limit operation. Consider a lower V_in or 2-stage."
         )
     if duty > 0.85:
         notes.append(
-            f"Duty cycle {duty * 100:.1f}% is high — efficiency drops, "
+            f"Duty cycle {duty * 100:.1f}% is high: efficiency drops, "
             f"controllers struggle. Consider an LDO post-regulator instead."
         )
     if i_peak > 5.0:

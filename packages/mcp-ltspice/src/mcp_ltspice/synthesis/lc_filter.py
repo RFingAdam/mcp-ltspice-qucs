@@ -1,4 +1,4 @@
-"""LC ladder filter synthesis — prototype g-coefficients, frequency
+"""LC ladder filter synthesis: prototype g-coefficients, frequency
 and impedance scaling, ladder layout selection.
 
 Supported responses:
@@ -230,7 +230,7 @@ def _fit_lc_to_prototype(
     # Validate convergence. scipy's `least_squares` sets `success=False`
     # when it hits max iterations / NaN residuals / parameters at bounds
     # without progress. Without this check, a bad fit silently returns
-    # whatever the optimiser stopped at — which may bear no resemblance
+    # whatever the optimiser stopped at, which may bear no resemblance
     # to the requested filter response. Cost magnitude is intentionally
     # not thresholded here: low-order elliptics with aggressive stopband
     # targets converge to genuine "best-effort" solutions with high cost
@@ -272,7 +272,7 @@ def _ladder_response_db(
     """Compute |S21|(ω) in dB for an elliptic-style LC ladder.
 
     Element order in ``x``: [R_S, L1, L2_trap, L3, L4_trap, ..., R_L].
-    Trap C values are NOT in ``x`` — they are derived as
+    Trap C values are NOT in ``x``. They are derived as
     ``C_trap_i = 1/(ω_zk[i]² · L_trap_i)`` so each trap's resonance is
     pinned exactly to its target transmission-zero frequency.
     """
@@ -301,7 +301,7 @@ def _ladder_response_db(
             idx += 1
             c_t = 1.0 / (omega_zk[i] ** 2 * l_t)
             # Shunt LC trap: Y = sC / (s²LC + 1). With L*C pinned to
-            # 1/ω_zk², the denominator is (1 - ω²/ω_zk²) — i.e. the trap
+            # 1/ω_zk², the denominator is (1 - ω²/ω_zk²). I.e. the trap
             # resonates exactly at ω_zk.
             y_trap = (s * c_t) / (s**2 * l_t * c_t + 1)
             new_a = a + b * y_trap
@@ -563,8 +563,8 @@ def synthesize_lc_hpf(
     For **elliptic** the same LPF→HPF reactance inversion is applied to the
     prototype's ladder rather than to its g-vector, because an elliptic LPF
     is not an all-pole ladder. Under ``ω → ω_c²/ω`` each element inverts
-    into its dual — a series inductor becomes a series capacitor and a shunt
-    series-LC trap stays a shunt series-LC trap with L and C swapped — so a
+    into its dual. A series inductor becomes a series capacitor and a shunt
+    series-LC trap stays a shunt series-LC trap with L and C swapped, so a
     finite zero at ``ω_z`` maps to a zero at ``ω_c²/ω_z``, which for a
     high-pass lands in the lower stopband. Verified against ngspice: the
     response is the mirror of the elliptic LPF, equiripple passband and all.
@@ -679,7 +679,7 @@ def _synthesize_elliptic_bandxform(
 
     The prototype is series-L sections interleaved with shunt series-LC
     traps. The band transforms act on each L and C *separately*, so a trap
-    becomes a four-element composite shunt branch — series-LC in series
+    becomes a four-element composite shunt branch: series-LC in series
     with a parallel tank, to ground:
 
     - **bandpass** (``ω → (1/Δ)(ω/ω₀ − ω₀/ω)``): every L → series-LC,
@@ -689,7 +689,7 @@ def _synthesize_elliptic_bandxform(
       every C → series-LC. Main path: ``{Lk, Ck_s}`` anti-resonant at ω₀.
       Trap-L → ``{Lk, Ck}``, trap-C → ``{Lk_s, Ck_s}``.
 
-    Each LPF zero ``ω_z`` maps to a geometric mirror-pair about ω₀ —
+    Each LPF zero ``ω_z`` maps to a geometric mirror-pair about ω₀:
     ``ω = ω₀(√(b²+1) ± b)`` with ``b = ω_z·Δ/2`` (BPF) or ``Δ/(2ω_z)``
     (BSF). The reported ``transmission_zeros_hz`` are computed back from
     the *physical* branch values (the v0.2.0 math-consistency invariant);
@@ -805,7 +805,7 @@ def synthesize_lc_bpf(
     For **elliptic** (odd order ≥ 3) the transform is applied to the
     prototype's ladder element-by-element: each shunt trap becomes a
     four-element composite branch ``{Lk_s, Ck_s, Lk, Ck}`` whose two
-    resonances are the images of the LPF zero — see
+    resonances are the images of the LPF zero. See
     :func:`_synthesize_elliptic_bandxform`. Elliptic designs are always
     ``series_first``.
     """
@@ -902,7 +902,7 @@ def synthesize_lc_bsf(
     Series-LC components emitted with ``"_s"`` suffix as in BPF.
 
     For **elliptic** (odd order ≥ 3) each prototype trap becomes a
-    four-element composite shunt branch — see
+    four-element composite shunt branch. See
     :func:`_synthesize_elliptic_bandxform`; the main-path tanks add a
     transmission zero at ω₀ itself. Elliptic designs are always
     ``series_first``.

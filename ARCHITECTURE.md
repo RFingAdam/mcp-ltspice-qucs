@@ -96,8 +96,8 @@ cycle. Otherwise the servers exchange simulation data through:
   pin-to-net graph. Backend adapters compile that graph and normalize output
   without extrapolation; unsupported syntax remains a blocking diagnostic.
 
-This contract means a fourth MCP — say, one wrapping CST Studio or a VNA
-— can drop in without modifying the existing servers, as long as it
+This contract means a fourth MCP (say, one wrapping CST Studio or a VNA)
+can drop in without modifying the existing servers, as long as it
 honors the same Touchstone + Envelope conventions.
 
 ## mcp-ltspice tool flow
@@ -137,11 +137,11 @@ honors the same Touchstone + Envelope conventions.
 
 Two reasons:
 
-1. **Speed** — the optimizer and Monte Carlo run thousands of S-param
+1. **Speed**. The optimizer and Monte Carlo run thousands of S-param
    evaluations. Analytical ABCD-chain math (in `extract.py`) handles
    this in milliseconds; spawning a SPICE process per evaluation would
    be too slow by 4-6 orders of magnitude.
-2. **CI portability** — the analytical path has no external simulator
+2. **CI portability**. The analytical path has no external simulator
    dependency. Required Linux CI installs ngspice. A weekly capability-labelled
    self-hosted matrix runs LTspice, qucsator-RF, and Xyce integrations; local
    tests skip only when their backend is absent.

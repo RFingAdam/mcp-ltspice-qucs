@@ -6,7 +6,7 @@ temperature T0 = 290 K. So a matched 10 dB attenuator must read NF = 10.000
 dB and Fmin = NF, with Γopt = 0.
 
 That only holds at 290 K. Qucs defaults components to 26.85 °C = 300 K,
-where the same pad reads 10.13 dB — which is *also* exactly right, since
+where the same pad reads 10.13 dB, which is *also* exactly right, since
 F = 1 + (L−1)·T/T0. Both are checked, because a plausible-looking noise
 figure is the easiest thing in the world to produce by accident.
 """
@@ -49,7 +49,7 @@ ASYMMETRIC = ['R:R1 _p1 _p2 R="20"', 'R:R2 _p2 gnd R="100"']
 
 
 # ---------------------------------------------------------------------------
-# Netlist construction and parsing — no simulator needed
+# Netlist construction and parsing. No simulator needed
 # ---------------------------------------------------------------------------
 
 

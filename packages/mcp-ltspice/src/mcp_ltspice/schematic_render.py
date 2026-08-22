@@ -8,10 +8,10 @@ synthesis-style component dict (the same one ``synthesize_lc_lpf`` /
 
 Two output flavours:
 
-1. **LC ladder** — LPF/HPF prototype as series-L / shunt-C / shunt-LC-trap
+1. **LC ladder**: LPF/HPF prototype as series-L / shunt-C / shunt-LC-trap
    stages between source / load resistors. Auto-laid-out left to right.
 
-2. **Op-amp filter** — Sallen-Key or MFB 2nd-order section with proper
+2. **Op-amp filter**: Sallen-Key or MFB 2nd-order section with proper
    feedback topology, op-amp triangle, and component labels.
 
 Output is SVG by default (vector, scalable, diff-friendly) with PNG
@@ -180,7 +180,7 @@ def render_lc_ladder_schematic(
 
     # Connect source ground rail to the rest of the bottom rail by
     # using a wire from src_top down to ground (already done by
-    # SourceSin — but we add a ground here to make it explicit).
+    # SourceSin: but we add a ground here to make it explicit).
     d += elm.Line().left().length(0).at(src_top)
 
     if str(out).endswith(".svg"):
@@ -365,7 +365,7 @@ def render_cascaded_lpf_schematic(
 
     Takes the dict that :func:`mcp_ltspice.analog.cascaded_lpf_design`
     returns and emits one schematic per Sallen-Key section, named
-    ``{base_name}_1.svg``, ``{base_name}_2.svg``, ... — plus a
+    ``{base_name}_1.svg``, ``{base_name}_2.svg``, ...: plus a
     matching .png for inline viewing.
 
     First-order tail stages (single-pole RC) are skipped (no schematic
@@ -381,7 +381,7 @@ def render_cascaded_lpf_schematic(
             continue  # 1st-order stage, skip
         comps = stage["components"]
         idx = stage["stage_index"]
-        title = f"Stage {idx} — Sallen-Key, fc={stage['fc_hz'] / 1e3:.2f} kHz, Q={stage['q']:.3f}"
+        title = f"Stage {idx}: Sallen-Key, fc={stage['fc_hz'] / 1e3:.2f} kHz, Q={stage['q']:.3f}"
         for ext in (".svg", ".png"):
             out = out_dir / f"{base_name}_{idx}{ext}"
             render_sallen_key_schematic(

@@ -127,14 +127,14 @@ def analyze_microstrip(
     """Compute Z₀, ε_eff, wavelength, and per-mm loss for a given microstrip width.
 
     Returns a dict with:
-    - ``z0_ohm`` — characteristic impedance
-    - ``er_eff`` — effective dielectric constant
-    - ``w_h_ratio`` — width-to-substrate-height ratio
-    - ``wavelength_eff_mm`` — effective guided wavelength
-    - ``phase_velocity_m_s`` — phase velocity
-    - ``alpha_d_db_per_mm`` — dielectric loss (uses substrate ``tan_d``)
-    - ``alpha_c_db_per_mm`` — conductor loss (default copper σ = 5.8e7 S/m)
-    - ``alpha_total_db_per_mm`` — sum
+    - ``z0_ohm``: characteristic impedance
+    - ``er_eff``: effective dielectric constant
+    - ``w_h_ratio``: width-to-substrate-height ratio
+    - ``wavelength_eff_mm``: effective guided wavelength
+    - ``phase_velocity_m_s``: phase velocity
+    - ``alpha_d_db_per_mm``: dielectric loss (uses substrate ``tan_d``)
+    - ``alpha_c_db_per_mm``: conductor loss (default copper σ = 5.8e7 S/m)
+    - ``alpha_total_db_per_mm``: sum
 
     ``sigma_s_per_m`` defaults to copper. Override for gold (4.1e7),
     aluminium (3.5e7), or measured plating.

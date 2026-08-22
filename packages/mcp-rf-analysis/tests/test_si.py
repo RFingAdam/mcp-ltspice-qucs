@@ -17,7 +17,7 @@ from mcp_rf_analysis.si.tdr import tdr_transform
 
 
 def test_tdr_returns_arrays_for_butterworth_lpf(lpf_s2p) -> None:
-    """A 5th-order LPF reflects strongly above its cutoff — TDR should
+    """A 5th-order LPF reflects strongly above its cutoff: TDR should
     return a sensible Z(distance) profile."""
     res = tdr_from_s11(lpf_s2p, er_eff=4.0)
     assert len(res["distance_mm"]) > 100
@@ -29,7 +29,7 @@ def test_tdr_returns_arrays_for_butterworth_lpf(lpf_s2p) -> None:
 def test_tdr_window_options(lpf_s2p) -> None:
     a = tdr_from_s11(lpf_s2p, window="hann")
     b = tdr_from_s11(lpf_s2p, window="rect")
-    # Rectangular has more sidelobe ripple, hann is smoother — but both
+    # Rectangular has more sidelobe ripple, hann is smoother, but both
     # produce the same number of samples
     assert len(a["impedance_ohm"]) == len(b["impedance_ohm"])
 

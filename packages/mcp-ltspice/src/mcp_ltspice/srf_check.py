@@ -2,7 +2,7 @@
 
 When a stopband target frequency exceeds the self-resonant frequency
 (SRF) of any inductor in the design, the analytical model is not
-predictive — above SRF, an inductor looks capacitive and the lossless
+predictive: above SRF, an inductor looks capacitive and the lossless
 ABCD-chain math diverges from real measurements.
 
 This module flags such mismatches so the user can either:
@@ -62,12 +62,12 @@ def srf_audit(
             part = lookup_part(vendor, value, kind=kind)  # type: ignore[arg-type]
         except (ValueError, KeyError) as exc:
             # Surface as a warning rather than silently dropping the
-            # component from the audit — otherwise an out-of-catalog part
+            # component from the audit: otherwise an out-of-catalog part
             # masquerades as "no concerns".
             unaudited.append(refdes)
             warnings.append(
                 f"{refdes} = {value:.3e} not found in {vendor} catalog "
-                f"({exc.__class__.__name__}: {exc}); SRF unknown — "
+                f"({exc.__class__.__name__}: {exc}); SRF unknown: "
                 f"audit incomplete for this component."
             )
             continue
@@ -85,7 +85,7 @@ def srf_audit(
         if flagged:
             warnings.append(
                 f"{refdes} = {value:.3e} ({vendor}) has SRF "
-                f"{srf / 1e9:.2f} GHz — within {margin_pct}% of the highest "
+                f"{srf / 1e9:.2f} GHz: within {margin_pct}% of the highest "
                 f"spec target ({f_max_target / 1e9:.2f} GHz). Analytical "
                 f"rejection at high frequencies will not match measurement."
             )
@@ -94,7 +94,7 @@ def srf_audit(
     if n_flagged == 0 and not unaudited:
         severity = "ok"
     elif n_flagged == 0 and unaudited:
-        severity = "caution"  # something we couldn't audit — caller should know
+        severity = "caution"  # something we couldn't audit: caller should know
     elif n_flagged <= 2:
         severity = "caution"
     else:

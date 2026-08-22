@@ -4,7 +4,7 @@ Background: when `substitute_real_components` gained `srf_margin` and
 `max_value_drift_pct` parameters, the `compare_filter_orders` wrapper
 didn't grow matching parameters. As a result, the comparison ran with
 legacy semantics (no SRF gating) and could rank a winner whose
-components a final design with SRF gating would actually reject —
+components a final design with SRF gating would actually reject:
 breaking the "comparison reflects the design" promise.
 
 The fix exposes these parameters on `compare_filter_orders` and threads
@@ -80,7 +80,7 @@ def test_compare_runs_with_new_params(srf_margin: float, max_drift: float | None
         zero_targets_hz=[1.6e9],
         ripple_db=0.1,
         stopband_atten_db=40.0,
-        mc_n_runs=20,  # tiny — just smoke
+        mc_n_runs=20,  # tiny: just smoke
         mc_tolerance_pct=2.0,
         srf_margin=srf_margin,
         max_value_drift_pct=max_drift,

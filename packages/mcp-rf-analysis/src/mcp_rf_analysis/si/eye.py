@@ -5,7 +5,7 @@ with a PRBS (or random) bit pattern to build the eye diagram. Returns
 the standard eye metrics: opening (height + width), worst-case ISI,
 and jitter at the eye crossing.
 
-This isn't a full SerDes analyzer — it's a first-order channel-quality
+This isn't a full SerDes analyzer. It's a first-order channel-quality
 check that catches obvious problems before committing the design.
 """
 
@@ -140,7 +140,7 @@ def eye_diagram_from_s2p(
             isi_pp_v=swing_v,
             sample_point_v_top=0.0,
             sample_point_v_bot=0.0,
-            notes=["Eye is closed at sample point — channel destroys signal."],
+            notes=["Eye is closed at sample point: channel destroys signal."],
         )
 
     eye_top = float(high.min())
@@ -167,11 +167,11 @@ def eye_diagram_from_s2p(
     notes: list[str] = []
     if eye_height < 0.5 * swing_v:
         notes.append(
-            f"Eye height {eye_height * 1000:.0f} mV < 50% of swing — "
+            f"Eye height {eye_height * 1000:.0f} mV < 50% of swing: "
             f"channel attenuates / disperses heavily at this rate."
         )
     if eye_width_ui < 0.5:
-        notes.append(f"Eye width {eye_width_ui:.2f} UI < 0.5 UI — significant ISI/jitter.")
+        notes.append(f"Eye width {eye_width_ui:.2f} UI < 0.5 UI: significant ISI/jitter.")
 
     return EyeMetrics(
         bitrate_gbps=bitrate_gbps,

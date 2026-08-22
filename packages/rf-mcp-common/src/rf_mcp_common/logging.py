@@ -64,7 +64,7 @@ def _resolve_level(raw: str | None) -> int | str:
     """Turn the ``RF_MCP_LOG_LEVEL`` value into something setLevel accepts.
 
     ``Logger.setLevel`` only takes an int or an exact uppercase level
-    name, so the natural things to type — ``debug``, ``10`` — both raise
+    name, so the natural things to type: ``debug``, ``10``. Both raise
     ``ValueError``. Since ``get_logger`` runs at module scope in every
     server, that turned a mistyped log level into an import-time crash
     while the operator was trying to debug something else. Normalize what
@@ -90,7 +90,7 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         # stderr, never stdout: these servers speak MCP over stdio, and a
-        # single log line on stdout corrupts the protocol stream — which
+        # single log line on stdout corrupts the protocol stream, which
         # surfaces to the user only as "the server won't connect".
         handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(JsonFormatter())

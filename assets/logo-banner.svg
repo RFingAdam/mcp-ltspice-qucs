@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img"
-     aria-label="mcp-ltspice-qucs — RF filter synthesis, simulation, and coexistence analysis via LTspice, Qucs-S, ngspice, and Xyce">
+     aria-label="mcp-ltspice-qucs: RF filter synthesis, simulation, and coexistence analysis via LTspice, Qucs-S, ngspice, and Xyce">
   <title>mcp-ltspice-qucs</title>
   <defs>
     <linearGradient id="bbg" x1="0" y1="0" x2="0" y2="1">
@@ -16,6 +16,6 @@
   <text x="64" y="130" font-family="ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace" font-size="46" font-weight="700"
         fill="#E8EDF6" letter-spacing="0.5">mcp-ltspice-qucs</text>
   <text x="64" y="172" font-family="ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace" font-size="19" fill="#8FA1BE">RF filter synthesis, simulation, and coexistence</text>
-  <text x="64" y="198" font-family="ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace" font-size="19" fill="#8FA1BE">analysis — LTspice · Qucs-S · ngspice · Xyce</text>
+  <text x="64" y="198" font-family="ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace" font-size="19" fill="#8FA1BE">analysis: LTspice · Qucs-S · ngspice · Xyce</text>
   <text x="64" y="252" font-family="ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace" font-size="14" fill="#3AA1FF">110 MCP tools · 4 simulator backends · validated against all of them</text>
 </svg>

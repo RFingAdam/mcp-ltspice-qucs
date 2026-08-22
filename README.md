@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo-banner.svg" alt="mcp-ltspice-qucs — RF filter and SMPS-EMC design via LTspice, Qucs-S, and scikit-rf" width="100%"/>
+<img src="assets/logo-banner.svg" alt="mcp-ltspice-qucs: RF filter and SMPS-EMC design via LTspice, Qucs-S, and scikit-rf" width="100%"/>
 
 <br/>
 
@@ -11,7 +11,7 @@
 [![MCP](https://img.shields.io/badge/MCP-server-A78BFA.svg)](https://modelcontextprotocol.io)
 [![eng-mcp-suite](https://img.shields.io/badge/eng--mcp--suite-member-22D3EE.svg)](https://github.com/RFingAdam/eng-mcp-suite)
 
-**Design RF filters and switch-mode-power EMC from spec — three FastMCP servers driving LTspice, Qucs-S, and scikit-rf.**
+**Design RF filters and switch-mode-power EMC from spec. Three FastMCP servers driving LTspice, Qucs-S, and scikit-rf.**
 **Iterate at the design-intent layer ("place a zero at 1.85 GHz", "predict conducted emissions against CISPR 32 Class B") from your terminal or AI agent.**
 
 [Quick start](#quick-start) ·
@@ -27,8 +27,8 @@
 
 mcp-ltspice-qucs is a three-server MCP suite plus a shared contracts
 library, all speaking **Touchstone** as the cross-tool exchange format.
-It collapses a typical filter-design loop — hours of LTspice nudging
-component values, swapping SPICE models, re-running, eyeballing S21 —
+It collapses a typical filter-design loop: hours of LTspice nudging
+component values, swapping SPICE models, re-running, eyeballing S21:
 into an agent-driven iteration at the **design intent** layer.
 
 Drive it from any MCP client. `mcp-ltspice` exposes 76 primary tools plus
@@ -159,9 +159,9 @@ Five worked examples ship under [`examples/`](examples/):
 mcp-ltspice-qucs fits in the following [eng-mcp-suite](https://github.com/RFingAdam/eng-mcp-suite)
 workflow bundles:
 
-- **`rf-design`** — closed-form trans-line synthesis (lineforge) +
+- **`rf-design`**: closed-form trans-line synthesis (lineforge) +
   wire-antenna MoM (mcp-nec2-antenna) + circuit/filter sim (this server).
-- **`coexistence-review`** — multi-radio band picking + filter design
+- **`coexistence-review`**: multi-radio band picking + filter design
   against CISPR limits, fed into PCB layout review (mcp-pcb-emcopilot).
 
 See the [suite manifest](https://github.com/RFingAdam/eng-mcp-suite/blob/main/manifest.yaml)
@@ -187,13 +187,13 @@ full boundary statement, decision flow, and cross-MCP workflow examples.
 
 ## Documentation
 
-- **[Getting started](docs/getting-started.md)** — install through first call.
-- **[Tool catalog](docs/tool-catalog.md)** — all 140 primary tools, per-server pages under [`docs/tools/`](docs/tools/).
-- **[Backend matrix](docs/backend-matrix.md)** — runtime readiness and CI validation tiers.
-- **[Migration guide](docs/migration-0.5.md)** — canonical names, error semantics, jobs, and numerical changes.
-- **[Usage example](docs/usage.md)** — practical end-to-end walkthrough.
-- **[Architecture](docs/architecture.md)** — interop contract between servers.
-- **[Suite architecture](docs/suite-architecture.md)** — how this MCP fits in eng-mcp-suite.
+- **[Getting started](docs/getting-started.md)**: install through first call.
+- **[Tool catalog](docs/tool-catalog.md)**. All 140 primary tools, per-server pages under [`docs/tools/`](docs/tools/).
+- **[Backend matrix](docs/backend-matrix.md)**: runtime readiness and CI validation tiers.
+- **[Migration guide](docs/migration-0.5.md)**: canonical names, error semantics, jobs, and numerical changes.
+- **[Usage example](docs/usage.md)**: practical end-to-end walkthrough.
+- **[Architecture](docs/architecture.md)**: interop contract between servers.
+- **[Suite architecture](docs/suite-architecture.md)**: how this MCP fits in eng-mcp-suite.
 - **[Changelog](CHANGELOG.md)**
 
 ---
@@ -234,7 +234,7 @@ Contributions are welcome.
    uv run pytest -q
    uv run ruff check . && uv run ruff format --check .
    ```
-4. **Open a PR** — link the issue, request review.
+4. **Open a PR**: link the issue, request review.
 
 Full contributor guide in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -251,22 +251,22 @@ by these wrappers.
 
 ## Commercial licensing
 
-This project is licensed under AGPL-3.0-or-later. A commercial license —
-for embedding in a closed-source product, hosting as a paid service
-without AGPL's share-back obligations, or proprietary redistribution —
+This project is licensed under AGPL-3.0-or-later. A commercial license
+(for embedding in a closed-source product, hosting as a paid service
+without AGPL's share-back obligations, or proprietary redistribution)
 is available on a case-by-case basis. See [eng-mcp-suite's licensing
 policy](https://github.com/RFingAdam/eng-mcp-suite/blob/main/LICENSE_SUMMARY.md#commercial-licensing)
 or open an issue and tag `@RFingAdam`.
 
 ## Acknowledgments
 
-- **[LTspice](https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html)** — Analog Devices' SPICE simulator.
-- **[Qucs-S](https://ra3xdh.github.io/)** — Quite Universal Circuit Simulator with SPICE-compatible kernels.
-- **[scikit-rf](https://scikit-rf.readthedocs.io/)** — Touchstone and S-parameter library underneath the analysis layer.
-- **The MCP working group** — for the [Model Context Protocol](https://modelcontextprotocol.io) specification.
+- **[LTspice](https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html)**: Analog Devices' SPICE simulator.
+- **[Qucs-S](https://ra3xdh.github.io/)**: Quite Universal Circuit Simulator with SPICE-compatible kernels.
+- **[scikit-rf](https://scikit-rf.readthedocs.io/)**: Touchstone and S-parameter library underneath the analysis layer.
+- **The MCP working group**: for the [Model Context Protocol](https://modelcontextprotocol.io) specification.
 
 <div align="center">
 
-<sub>Part of <a href="https://github.com/RFingAdam/eng-mcp-suite">eng-mcp-suite</a> — built for RF engineers, EMC labs, and AI agents.</sub>
+<sub>Part of <a href="https://github.com/RFingAdam/eng-mcp-suite">eng-mcp-suite</a>: built for RF engineers, EMC labs, and AI agents.</sub>
 
 </div>

@@ -62,7 +62,7 @@ def lumped_to_distributed(
       (i.e. characteristic impedance Z = 1/(ωC))
 
     With ``apply_kuroda=True``, redundant connecting lines are inserted
-    between the stubs to make the design realizable in microstrip — the
+    between the stubs to make the design realizable in microstrip. The
     series stubs become shunt stubs after Kuroda's first identity.
 
     Returns a dict with the ordered element list + notes.
@@ -125,7 +125,7 @@ def lumped_to_distributed(
                 )
         elements = kuroda_elements
         notes.append(
-            "Kuroda identities applied — series short stubs become shunt "
+            "Kuroda identities applied: series short stubs become shunt "
             "open stubs after absorbing connecting lines. Realizable in "
             "microstrip without via short-circuits."
         )

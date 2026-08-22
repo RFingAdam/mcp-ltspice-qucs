@@ -3,21 +3,21 @@
 Five design / prediction tools that fill the gap between the existing
 buck / boost / LDO sizing and a real product passing conducted-emissions:
 
-- :func:`design_pi_output_filter` — Pi-section LC filter (C-L-C) for
+- :func:`design_pi_output_filter`: Pi-section LC filter (C-L-C) for
   additional output-ripple attenuation downstream of the converter's
   built-in Cout. Returns L, Cin, Cout values, predicted attenuation, and
   resonant frequency with a damping recommendation.
-- :func:`design_dm_input_filter` — 2nd-order DM input filter sized for a
+- :func:`design_dm_input_filter`: 2nd-order DM input filter sized for a
   conducted-emissions target. Includes the Middlebrook stability
   criterion check (|Z_out,filter| < |Z_in,converter|) so the filter
   doesn't destabilise the loop.
-- :func:`predict_conducted_emissions` — harmonic decomposition of a
+- :func:`predict_conducted_emissions`: harmonic decomposition of a
   trapezoidal switching waveform, LISN-loaded prediction, CISPR 22 / 32
   Class A / B limit overlay, margin per harmonic.
-- :func:`design_rc_snubber` — RC snubber for switch-node ringing
+- :func:`design_rc_snubber`: RC snubber for switch-node ringing
   (parasitic L_loop with Coss). Returns R, C values, damping factor,
   and dissipation per cycle.
-- :func:`design_cm_choke` — common-mode choke sizing helper. Given DC
+- :func:`design_cm_choke`: common-mode choke sizing helper. Given DC
   current, target CM impedance and frequency, picks from a small
   curated catalogue and reports DM leakage inductance.
 
@@ -75,7 +75,7 @@ def design_pi_output_filter(
     Strategy:
 
     1. Take the converter's existing output cap as ``C_in`` (default 10 µF).
-    2. Pick ``f_target_hz`` as the design point — by default,
+    2. Pick ``f_target_hz`` as the design point: by default,
        ``f_target_hz = f_switching_hz`` (the dominant ripple component).
        Override for harmonic-specific suppression (e.g., 5 × f_sw).
     3. Solve ``L`` so the chosen ``f_resonance`` is one decade below
@@ -94,7 +94,7 @@ def design_pi_output_filter(
     attenuation_target_db
         Minimum attenuation at ``f_target_hz`` (positive dB).
     i_out_a
-        DC output current — used to flag inductor saturation risk.
+        DC output current. Used to flag inductor saturation risk.
     c_in_initial_f
         Existing converter output cap that becomes the filter's input cap.
     cap_voltage_rating_v
@@ -108,7 +108,7 @@ def design_pi_output_filter(
 
     Notes
     -----
-    A bare Pi LC has very high Q at resonance — when the load is reactive,
+    A bare Pi LC has very high Q at resonance. When the load is reactive,
     ringing can amplify supply-step disturbances. The
     ``damping_resistor_advice`` field describes a series-RC across
     ``C_out`` (typical R ≈ √(L/C_out), C_damp ≈ 5-10× C_out).
@@ -174,7 +174,7 @@ def design_pi_output_filter(
         )
     else:
         notes.append(
-            "WARNING: f_0 ≥ f_sw — filter will not attenuate fundamental ripple. "
+            "WARNING: f_0 ≥ f_sw: filter will not attenuate fundamental ripple. "
             "Reduce attenuation_target_db or increase c_in_initial_f."
         )
 
@@ -228,7 +228,7 @@ def design_dm_input_filter(
 
     The Middlebrook criterion checks that the filter's output impedance
     at the converter's resonant frequencies is significantly lower than
-    the converter's input impedance — otherwise the filter destabilises
+    the converter's input impedance: otherwise the filter destabilises
     the converter's control loop. We require
     ``|Z_out,filter| < |Z_in,converter| / safety_factor`` (default 6×,
     i.e. ~16 dB margin) at the filter resonance.
@@ -242,7 +242,7 @@ def design_dm_input_filter(
         Required attenuation at ``f_switching_hz``. Choose 30-50 dB for
         typical CISPR class B compliance with a single-stage filter.
     i_in_a
-        DC input current — used to flag inductor saturation risk.
+        DC input current. Used to flag inductor saturation risk.
     converter_input_impedance_ohm
         Magnitude of the converter's negative-resistance input
         impedance at the loop crossover. For a buck converter at full
@@ -332,7 +332,7 @@ def design_dm_input_filter(
     elif middlebrook_stable is True:
         notes.append(
             f"Middlebrook margin: {middlebrook_margin_db:.1f} dB (≥ "
-            f"{20.0 * math.log10(safety_factor):.1f} dB target) — filter / converter "
+            f"{20.0 * math.log10(safety_factor):.1f} dB target): filter / converter "
             f"interaction is stable."
         )
 
@@ -365,7 +365,7 @@ def design_dm_input_filter(
 # 0.15 – 30 MHz. Class B (residential) is 6 dB tighter than Class A (industrial).
 # Returned in dBµV referred to a 50 Ω LISN.
 _CISPR_22_LIMITS_QP_DBUV: dict[str, list[tuple[float, float, float]]] = {
-    # (f_low_hz, f_high_hz, limit_dbuv) — quasi-peak detector
+    # (f_low_hz, f_high_hz, limit_dbuv): quasi-peak detector
     "class_a": [
         (0.15e6, 0.50e6, 79.0),  # 79 dBµV
         (0.50e6, 30.0e6, 73.0),  # 73 dBµV
@@ -474,7 +474,7 @@ def predict_conducted_emissions(
         ~30 MHz at typical f_sw of 300 kHz).
     filter_attenuation_db_at_f_sw
         Flat attenuation provided by the DM input filter at
-        ``f_switching_hz``. Default 0 (no filter — for un-filtered
+        ``f_switching_hz``. Default 0 (no filter: for un-filtered
         baseline). Pass the value from :func:`design_dm_input_filter`'s
         ``attenuation_at_f_sw_db``.
     filter_attenuation_slope_db_per_decade
@@ -686,7 +686,7 @@ def design_rc_snubber(
     if r_snubber > 100:
         notes.append(
             "Snubber R is high; verify the snubber doesn't significantly slow the "
-            "switch transition (longer t_r) — that would worsen efficiency."
+            "switch transition (longer t_r). That would worsen efficiency."
         )
 
     return RcSnubberDesign(
@@ -717,7 +717,7 @@ class CmChoke:
     package: str
 
 
-# Curated CM choke catalogue — a representative sample of widely-used parts.
+# Curated CM choke catalogue. A representative sample of widely-used parts.
 # Values from public datasheets (Würth WE-CMB, TDK ZJYS series).
 _CM_CHOKE_CATALOGUE: list[CmChoke] = [
     CmChoke("WE-CMB 744232xxx", 11e-3, 22e-6, 0.4, 5000.0, "0805"),
@@ -772,7 +772,7 @@ def design_cm_choke(
     target_freq_hz
         Frequency at which ``target_z_cm_ohm`` is measured. Catalogue
         impedance values are at 1 MHz; we scale linearly with frequency
-        (valid below the choke's self-resonance — typical 10–100 MHz).
+        (valid below the choke's self-resonance: typical 10–100 MHz).
     max_dm_leakage_h
         Cap on DM leakage inductance. Too-high leakage adds DM
         impedance which can interact with downstream filtering.
@@ -832,7 +832,7 @@ def design_cm_choke(
     candidates_ranked = sorted(candidates, key=_score, reverse=True)
     chosen = candidates_ranked[0]
     notes.append(
-        f"Chosen: {chosen.part_number} — L_CM = {chosen.L_cm_h * 1e6:.1f} µH, "
+        f"Chosen: {chosen.part_number}: L_CM = {chosen.L_cm_h * 1e6:.1f} µH, "
         f"L_DM(leakage) = {chosen.L_dm_leakage_h * 1e6:.1f} µH, "
         f"I_DC = {chosen.i_dc_max_a:.1f} A, Z_CM at {target_freq_hz / 1e6:.1f} MHz "
         f"≈ {chosen.z_cm_at_1mhz_ohm * freq_scale:.0f} Ω."

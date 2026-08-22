@@ -49,7 +49,7 @@ def test_parameter_sweep_single_axis(lpf_design) -> None:
         transmission_zeros=False,
     )
     assert result.n_points == 3
-    # All three points should pass — the design is robust to ±5% on L1
+    # All three points should pass. The design is robust to ±5% on L1
     assert result.yield_pct == 100.0
 
 
@@ -199,7 +199,7 @@ def test_sensitivity_identifies_most_influential(lpf_design) -> None:
 
 
 def test_sensitivity_central_difference_is_signed(lpf_design) -> None:
-    """Sensitivities can be positive or negative — increasing L can
+    """Sensitivities can be positive or negative: increasing L can
     improve some criteria and degrade others."""
     design, spec = lpf_design
     result = sensitivity_analysis(

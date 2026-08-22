@@ -1,12 +1,12 @@
 """Stepped-impedance LPF synthesis (issue #27, first distributed topology).
 
 Pozar §8.6: a lumped LPF prototype maps to alternating short sections of
-very-high and very-low impedance line — series L → high-Z section with
+very-high and very-low impedance line: series L → high-Z section with
 ``βl = ω_c·L/Z_h``, shunt C → low-Z section with ``βl = ω_c·C·Z_l``
 (radians at the cutoff). The reference pin is Pozar 4e Example 8.6
 (N=6 Butterworth, f_c = 2.5 GHz, Z_h = 120 Ω, Z_l = 20 Ω on εr = 4.2,
 h = 1.58 mm): the six electrical lengths evaluate to 11.8634°, 33.7618°,
-44.2745°, 46.1195°, 32.4102°, 12.3577° — hard-coded below as literals so
+44.2745°, 46.1195°, 32.4102°, 12.3577°: hard-coded below as literals so
 the test pins the implementation to the published formulas, not to
 itself.
 
@@ -228,7 +228,7 @@ def _run_qucsator(net, dat) -> None:
 @pytest.mark.integration
 def test_ideal_tlin_matches_analytical_cascade(tmp_path) -> None:
     """Both are ideal dispersionless lines, so agreement must be at
-    numerical precision — this validates the emitter length convention
+    numerical precision. This validates the emitter length convention
     and the cascade math against a real solver simultaneously."""
     result = _pozar_design()
     elements = [
@@ -255,7 +255,7 @@ def test_ideal_tlin_matches_analytical_cascade(tmp_path) -> None:
 @pytest.mark.integration
 def test_mlin_realization_cuts_off_near_design(tmp_path) -> None:
     """The synthesized W/L run through qucsator's *real* microstrip model
-    (Hammerstad + Kirschning dispersion) — the −3 dB point must land near
+    (Hammerstad + Kirschning dispersion). The −3 dB point must land near
     the design cutoff and the stopband must hold."""
     result = _pozar_design()
     net = generate_microstrip_ladder_netlist(

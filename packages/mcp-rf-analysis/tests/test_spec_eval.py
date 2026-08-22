@@ -71,7 +71,7 @@ def test_list_spec_templates_finds_bundled() -> None:
 
 
 def test_evaluate_against_spec_template_runs(lpf_s2p) -> None:
-    # Use the FCC 915 MHz template — fixture LPF doesn't pass it (cutoff
+    # Use the FCC 915 MHz template: fixture LPF doesn't pass it (cutoff
     # is 500 MHz so the 902-928 passband is in the stopband), but the
     # evaluator should run and report results coherently.
     result = evaluate_against_spec_template(lpf_s2p, "fcc_part15_247_915mhz")

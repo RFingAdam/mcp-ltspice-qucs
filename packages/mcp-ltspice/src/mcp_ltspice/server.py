@@ -1180,7 +1180,7 @@ def synthesize_lc_hpf_filter(
         "'_s' suffix on series-LC pairs. Elliptic (odd order ≥3) maps each LPF trap "
         "to a four-element composite shunt branch {Lk_s, Ck_s, Lk, Ck} whose two "
         "resonances are the images ω₀(√(b²+1) ± b), b = ω_z·Δ/2, of the prototype "
-        "zero — notch pairs straddling the passband."
+        "zero: notch pairs straddling the passband."
     ),
 )
 def synthesize_lc_bpf_filter(
@@ -3401,7 +3401,7 @@ def register_user_vendor_dir(
 
 
 # ---------------------------------------------------------------------------
-# Tool namespacing — register namespaced aliases alongside the flat names
+# Tool namespacing: register namespaced aliases alongside the flat names
 # ---------------------------------------------------------------------------
 #
 # Categories help LLM agents discover tools by domain. Both the flat name
@@ -3409,7 +3409,7 @@ def register_user_vendor_dir(
 # form is preferred. A future major release will deprecate the flat names.
 
 NAMESPACE_ALIASES: dict[str, str] = {
-    # filter.* — RF / lumped-LC filter design + analysis
+    # filter.*: RF / lumped-LC filter design + analysis
     "synthesize_lc_filter": "filter.synthesize_lc",
     "synthesize_lc_hpf_filter": "filter.synthesize_lc_hpf",
     "synthesize_lc_bpf_filter": "filter.synthesize_lc_bpf",
@@ -3434,14 +3434,14 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "render_lc_ladder_schematic": "filter.render_lc_schematic",
     "render_generated_lc_ladder_asc": "filter.render_schematic",
     "build_design_report_pdf": "filter.build_report_pdf",
-    # analog.* — active-filter / op-amp synthesis
+    # analog.*: active-filter / op-amp synthesis
     "sallen_key_low_pass": "analog.sallen_key_lpf",
     "sallen_key_high_pass": "analog.sallen_key_hpf",
     "sallen_key_band_pass": "analog.sallen_key_bpf",
     "mfb_low_pass": "analog.mfb_lpf",
     "mfb_band_pass": "analog.mfb_bpf",
     "cascaded_lpf_design": "analog.cascaded_lpf",
-    # power.* — SMPS, LDO, control-loop analysis, EMC pre-compliance
+    # power.*: SMPS, LDO, control-loop analysis, EMC pre-compliance
     "analyze_ldo": "power.analyze_ldo",
     "required_psrr_for_ripple": "power.required_psrr",
     "design_buck": "power.design_buck",
@@ -3453,12 +3453,12 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "predict_conducted_emissions": "power.predict_conducted_emissions",
     "design_rc_snubber": "power.design_rc_snubber",
     "design_cm_choke": "power.design_cm_choke",
-    # digital.* — timing, crosstalk, supply-noise injection
+    # digital.*: timing, crosstalk, supply-noise injection
     "check_setup_hold": "digital.check_setup_hold",
     "propagation_delay": "digital.propagation_delay",
     "estimate_digital_to_analog_crosstalk": "digital.digital_to_analog_xtalk",
     "estimate_supply_noise_injection": "digital.supply_noise_injection",
-    # vendor.* — opamp / mosfet / bjt / diode / vref catalogues
+    # vendor.*: opamp / mosfet / bjt / diode / vref catalogues
     "list_opamps": "vendor.list_opamps",
     "lookup_opamp": "vendor.lookup_opamp",
     "find_opamp_for_application": "vendor.find_opamp",
@@ -3471,7 +3471,7 @@ NAMESPACE_ALIASES: dict[str, str] = {
     "lookup_diode": "vendor.lookup_diode",
     "list_references": "vendor.list_references",
     "lookup_reference": "vendor.lookup_reference",
-    # sim.* — simulator runner / S-parameter extraction
+    # sim.*: simulator runner / S-parameter extraction
     "run_simulation": "sim.run",
     "extract_sparameters": "sim.extract_sparameters",
 }

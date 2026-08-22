@@ -20,7 +20,7 @@ def _resolve_mode(
     Precedence:
     - If ``mode`` is given, use it (and warn if ``preserve_ratio`` is also passed).
     - Else if ``preserve_ratio`` is given, map ``True → "preserve_ratio"`` and
-      ``False → "hold_c"`` (most common intent — hold C, recompute L).
+      ``False → "hold_c"`` (most common intent: hold C, recompute L).
     - Else default to ``"preserve_ratio"``.
     """
     if mode is not None and preserve_ratio is not None:
@@ -60,12 +60,12 @@ def trap_lc_for_freq(
 
     Modes:
 
-    - ``"preserve_ratio"`` (default) — both ``l_existing`` and ``c_existing``
+    - ``"preserve_ratio"`` (default). Both ``l_existing`` and ``c_existing``
       are required. Both are scaled by the same factor so the L/C ratio
       (and thus impedance match into the ladder) is preserved.
-    - ``"hold_l"`` — ``l_existing`` is required; ``c_existing`` is ignored
+    - ``"hold_l"``: ``l_existing`` is required; ``c_existing`` is ignored
       if also passed. ``L`` is held fixed and ``C`` is recomputed.
-    - ``"hold_c"`` — ``c_existing`` is required; ``l_existing`` is ignored
+    - ``"hold_c"``: ``c_existing`` is required; ``l_existing`` is ignored
       if also passed. ``C`` is held fixed and ``L`` is recomputed. Often
       preferred when the cap value is already at a catalogue E-series and
       you'd rather drift the inductor.

@@ -10,7 +10,7 @@ mechanisms inject noise:
    the supply network, creating IR + L(di/dt) drops on the rail that
    propagates everywhere.
 
-These are hand-analytical estimates — useful for early architecture
+These are hand-analytical estimates: useful for early architecture
 decisions ("can I run this ADC and that DSP off the same supply?").
 """
 
@@ -98,12 +98,12 @@ def estimate_supply_noise_injection(
     notes = []
     if v_droop_total > 0.05 * delta_v:
         notes.append(
-            f"V_droop {v_droop_total * 1000:.1f} mV exceeds 5% of supply — "
+            f"V_droop {v_droop_total * 1000:.1f} mV exceeds 5% of supply: "
             f"add bulk cap or reduce L by lowering loop area on PDN."
         )
     if v_droop_inductive > v_droop_resistive * 2:
         notes.append(
-            "Inductive droop dominates — reduce supply inductance "
+            "Inductive droop dominates: reduce supply inductance "
             "(more vias to plane, shorter traces) before reducing R."
         )
 

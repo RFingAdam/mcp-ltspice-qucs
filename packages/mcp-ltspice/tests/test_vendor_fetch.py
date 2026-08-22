@@ -3,7 +3,7 @@
 The fixtures are synthesised as ideal series-through S-parameters for a known
 L or C, so the extraction is checked against the exact value that went in:
 a 3.3 nH file must read back 3.3 nH, a 2.2 pF file 2.2 pF. That also pins the
-two conventions worth getting right — the device impedance comes from S21
+two conventions worth getting right. The device impedance comes from S21
 (``Z = 2·Z0·(1−S21)/S21``), not ``Z11`` (which is singular for a series
 element), and the value is averaged over the extracted L/C, not over the
 reactance (which is ∝ 1/f for a capacitor).

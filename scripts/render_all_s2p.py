@@ -75,7 +75,7 @@ def main() -> int:
     for s2p in s2p_files:
         png = s2p.with_suffix(".png")
         # If the script's current name matches the canonical "response.png"
-        # for this folder we still re-render — keep them in sync.
+        # for this folder we still re-render. Keep them in sync.
         try:
             markers = _markers_for(s2p)
             title = f"{s2p.parent.name} / {s2p.stem}"

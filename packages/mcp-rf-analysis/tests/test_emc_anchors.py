@@ -50,7 +50,7 @@ def test_radiated_dimensional_consistency() -> None:
 
 
 def test_radiated_near_field_guard() -> None:
-    """At 10 MHz the radian sphere is λ/2π = 4.77 m — a 3 m measurement
+    """At 10 MHz the radian sphere is λ/2π = 4.77 m. A 3 m measurement
     is inside it, where the far-field formula under-predicts. The
     predictor must refuse, not return a wrong regulatory number."""
     with pytest.raises(ValueError, match=r"[Nn]ear-field"):

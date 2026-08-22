@@ -4,7 +4,7 @@ MCP server exposing **LTspice** (and **ngspice** as a fallback) for
 RF filter synthesis, SMPS-EMC pre-compliance, and analog active-filter
 design. Part of the [mcp-ltspice-qucs](../../README.md) suite.
 
-This is the largest of the three servers — 76 primary tools plus 59
+This is the largest of the three servers: 76 primary tools plus 59
 deprecated categorised aliases
 (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`,
 `sim.*`). The table below is a curated tour, not the full list;
@@ -17,10 +17,10 @@ the canonical surface is `@mcp.tool` registrations in
 
 | Tool | Purpose |
 |---|---|
-| `synthesize_lc_filter` | LC ladder LPF — Butterworth / Chebyshev / Elliptic, T or Pi topology |
+| `synthesize_lc_filter` | LC ladder LPF: Butterworth / Chebyshev / Elliptic, T or Pi topology |
 | `synthesize_lc_hpf_filter` | High-pass via the Pozar §8.5 LPF→HPF transformation |
-| `synthesize_lc_bpf_filter` | Band-pass — series-LC and shunt-LC tanks at f₀ = √(f_low·f_high) |
-| `synthesize_lc_bsf_filter` | Band-stop — anti-resonant series-LC, resonant shunt-LC |
+| `synthesize_lc_bpf_filter` | Band-pass: series-LC and shunt-LC tanks at f₀ = √(f_low·f_high) |
+| `synthesize_lc_bsf_filter` | Band-stop: anti-resonant series-LC, resonant shunt-LC |
 | `place_transmission_zero` | Move a shunt-trap zero to a target frequency, snap to E24/E96 |
 | `find_transmission_zeros` | Peak-detect notches in an S21 trace |
 | `substitute_real_components` | Snap ideal L/C to vendor catalog values and return first-order ESR/ESL/SRF metadata; does not edit the schematic or apply models downstream |
@@ -34,7 +34,7 @@ the canonical surface is `@mcp.tool` registrations in
 | `render_lc_ladder_schematic` | Auto-rendered ladder schematic (PNG / SVG) |
 | `build_design_report_pdf` | Combine response, schematic, MC, BOM into a single PDF |
 
-### Power-supply EMC (`power.*`) — v0.2.0
+### Power-supply EMC (`power.*`): v0.2.0
 
 | Tool | Purpose |
 |---|---|
@@ -65,10 +65,10 @@ the canonical surface is `@mcp.tool` registrations in
 
 ## Backends
 
-- **LTspice** via Wine — runs user-provided and package-generated `.asc`
+- **LTspice** via Wine: runs user-provided and package-generated `.asc`
   files in native batch mode. The separate clean-schematic renderer only
   reconstructs package-generated LC ladders.
-- **ngspice** — fallback used in required CI. Its `.asc` conversion supports
+- **ngspice**: fallback used in required CI. Its `.asc` conversion supports
   the package's stock generated symbols/directives; arbitrary LTspice
   schematics and proprietary models are not guaranteed to translate.
 

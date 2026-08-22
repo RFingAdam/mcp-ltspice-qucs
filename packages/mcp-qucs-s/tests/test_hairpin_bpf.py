@@ -1,13 +1,13 @@
-"""Hairpin BPF synthesis (issue #27) — the folded edge-coupled filter
+"""Hairpin BPF synthesis (issue #27). The folded edge-coupled filter
 (Cristal & Frankel's hairpin-line).
 
 Folding is a circuit-graph no-op apart from the U-bend connector: each
 half-wave resonator (line2 of coupled section i + line1 of section i+1)
 gains the bend's electrical length θ_b, so every coupled section is
 shortened to θ = 90° − θ_b/2, which keeps every resonator at exactly
-180° at f₀ (uniform-bend closed form — one bend length, at the mean arm
+180° at f₀ (uniform-bend closed form. One bend length, at the mean arm
 width, for all resonators). The bend is modeled as an MLIN between the
-internal junctions of the MCOUPLED chain — precisely where the diagonal
+internal junctions of the MCOUPLED chain: precisely where the diagonal
 chaining already joins the arm halves. Corner discontinuities and
 cross-arm EM coupling of the fold are documented as unmodeled.
 
@@ -15,7 +15,7 @@ Validation: with bend length zero the hairpin must reproduce the
 edge-coupled design of PR #51 exactly; with a real bend, the compensated
 filter must stay centred in real qucsator (MCOUPLED + MLIN netlist)
 while the *uncompensated* variant (90° sections plus bends) must centre
-visibly lower — proving the compensation does its job, not just that
+visibly lower: proving the compensation does its job, not just that
 the response looks plausible.
 """
 

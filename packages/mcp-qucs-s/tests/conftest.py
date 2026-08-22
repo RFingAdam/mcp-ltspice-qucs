@@ -33,7 +33,7 @@ def qucs_dat(tmp_path):
     """A minimal well-formed Qucs-S .dat for a 3-point 2-port sweep.
 
     Hand-written rather than captured from a run so the tests exercise
-    the parser without needing Qucs-S installed — which is the whole
+    the parser without needing Qucs-S installed, which is the whole
     point, since this is the only code that runs once a user *does*
     install it.
     """

@@ -1,4 +1,4 @@
-"""Unit conversion helpers — Hz internal, dB / dBm display.
+"""Unit conversion helpers: Hz internal, dB / dBm display.
 
 The cross-tool contract is: **frequencies are always Hz on the wire**.
 Display-friendly units (MHz, GHz) belong in tool responses for human

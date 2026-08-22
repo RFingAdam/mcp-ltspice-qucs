@@ -3,7 +3,7 @@
 Background: when MC yield is below 100 %, you want to know which
 component values dominated the failing trials. The `trace=True` flag
 emits a JSONL record per trial with the seed, sampled component values,
-metric measurements, and pass/fail status — enough for an offline
+metric measurements, and pass/fail status: enough for an offline
 sensitivity / root-cause analysis script to find the culprit.
 """
 
@@ -126,7 +126,7 @@ class TestMcTrace:
     def test_failing_trials_carry_failures_list(self, tmp_path):
         """If we set a tight tolerance to force some failures, the trace records
         should mark those trials as passed=False with a non-empty failures list."""
-        # Tight 10% tolerance — some trials should fail the 14 dB RL spec
+        # Tight 10% tolerance. Some trials should fail the 14 dB RL spec
         out = tmp_path / "trace.jsonl"
         result = monte_carlo_analysis(
             LPF.components,

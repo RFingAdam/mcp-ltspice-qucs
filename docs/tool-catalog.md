@@ -7,7 +7,7 @@ wire; every tool returns the [Envelope](reference/envelope.md) shape.
 
 ## At a glance
 
-*(This section is generated — run `uv run python scripts/gen_tool_catalog.py`
+*(This section is generated. Run `uv run python scripts/gen_tool_catalog.py`
 after adding or changing tools.)*
 
 === "mcp-ltspice (76 tools)"
@@ -181,14 +181,14 @@ Every tool returns:
 }
 ```
 
-Tools never raise to the MCP transport — they catch their own errors
+Tools never raise to the MCP transport. They catch their own errors
 and return `error()` envelopes so the agent can reason about the
 failure. See [Envelope contract](reference/envelope.md) for the full
 spec.
 
 ## See also
 
-- [Touchstone interop](reference/touchstone.md) — the cross-server
+- [Touchstone interop](reference/touchstone.md). The cross-server
   exchange format
-- [E-series snap](reference/e-series.md) — preferred-number rounding for
+- [E-series snap](reference/e-series.md): preferred-number rounding for
   realizable component values

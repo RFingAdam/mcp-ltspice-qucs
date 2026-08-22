@@ -1,8 +1,8 @@
 """Register user-supplied vendor models as substitution candidates.
 
 Even with automated fetchers for the public catalogues, engineers have
-third-party or measured ``.s2p`` files — Würth, AVX, TDK, distributor
-exports, in-house lab data — that live on no public URL. Without a way to
+third-party or measured ``.s2p`` files: Würth, AVX, TDK, distributor
+exports, in-house lab data. That live on no public URL. Without a way to
 register them, the only options are hand-editing ``.asc`` files or forking
 the curated table.
 
@@ -289,7 +289,7 @@ def index_directory(
                         "Filename is not treated as a verified manufacturer part number."
                     ),
                 )
-            else:  # .lib — index by filename only
+            else:  # .lib: index by filename only
                 if name_kind is None or name_value is None:
                     raise ValueError(
                         "cannot determine kind/value from a .lib filename; name it "

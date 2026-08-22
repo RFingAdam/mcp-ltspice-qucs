@@ -5,7 +5,7 @@ CRLF. The old code read every file as UTF-8 with ``errors="replace"``, so a
 UTF-16 schematic decoded to mojibake, matched no ``SYMBOL`` line, and
 ``read_components`` returned ``{}`` as though the file simply had no parts.
 
-``update_component`` then wrote ``"\\n".join(...)`` back as UTF-8 — silently
+``update_component`` then wrote ``"\\n".join(...)`` back as UTF-8: silently
 converting a user-authored schematic to a different encoding and line ending,
 destroying a file it had never successfully read.
 
