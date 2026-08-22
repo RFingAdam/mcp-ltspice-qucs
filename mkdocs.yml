@@ -8,7 +8,7 @@ repo_url: https://github.com/RFingAdam/mcp-ltspice-qucs
 repo_name: RFingAdam/mcp-ltspice-qucs
 edit_uri: edit/main/docs/
 
-copyright: Copyright &copy; 2026 Adam Engelbrecht: Apache-2.0
+copyright: Copyright &copy; 2026 Adam Engelbrecht, Apache-2.0
 
 theme:
   name: material
