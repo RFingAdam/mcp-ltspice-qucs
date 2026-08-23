@@ -249,6 +249,16 @@ AGPL move. Underlying Qucs-S (GPL), LTspice (proprietary), and
 scikit-rf (BSD) are runtime-invoked dependencies, not redistributed
 by these wrappers.
 
+## Trademarks and brand assets
+
+This project is not affiliated with, endorsed by, or sponsored by Analog Devices,
+Inc. or the Qucs project. "LTspice" is a trademark of Analog Devices, Inc. Those
+names are used here only to identify the software this project interoperates with.
+
+The project name and the logo files in this repository are not part of the licensed
+work. The licence above grants no permission to use them, except as needed to describe
+the origin of the work.
+
 ## Commercial licensing
 
 This project is licensed under AGPL-3.0-or-later. A commercial license
