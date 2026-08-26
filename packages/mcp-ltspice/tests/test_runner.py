@@ -393,3 +393,35 @@ def test_timeout_is_reported_with_first_run_guidance(tmp_path, monkeypatch) -> N
     asc.write_text("Version 4\n", encoding="utf-8")
     with pytest.raises(RuntimeError, match="Anonymously Share LTspice Usage Data"):
         runner_mod._run_ltspice(asc, Path("/wine/LTspice.exe"), timeout=120.0)
+
+def test_bubblewrap_probe_binds_the_usr_merge_symlink_paths(monkeypatch):
+    """The probe must bind the same system paths the real sandbox does.
+
+    On usr-merged distributions /bin, /lib and /lib64 are symlinks into /usr.
+    Binding only /usr leaves the ELF interpreter (/lib64/ld-linux-*.so)
+    unreachable inside the namespace, so every dynamically linked binary fails
+    with ENOENT and a perfectly working bubblewrap is reported unavailable.
+    """
+    import subprocess as _subprocess
+
+    from mcp_ltspice import runner as _runner
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = list(argv)
+        return _subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr("mcp_ltspice.runner.shutil.which", lambda name: "/usr/bin/bwrap")
+    monkeypatch.setattr("mcp_ltspice.runner.subprocess.run", fake_run)
+    _runner.bubblewrap_ready.cache_clear()
+    try:
+        assert _runner.bubblewrap_ready() is True
+    finally:
+        _runner.bubblewrap_ready.cache_clear()
+
+    argv = captured["argv"]
+    for system_path in ("/bin", "/lib", "/lib64"):
+        if Path(system_path).exists():
+            assert system_path in argv, f"probe never binds {system_path}"
+    assert argv[-1] == "/usr/bin/true"

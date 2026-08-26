@@ -124,17 +124,26 @@ def bubblewrap_ready() -> bool:
     executable = shutil.which("bwrap")
     if executable is None or os.name == "nt":
         return False
+    # Bind the same system paths the real sandbox does. On usr-merged distros
+    # /bin, /lib and /lib64 are symlinks into /usr; binding only /usr leaves the
+    # ELF interpreter (/lib64/ld-linux-*.so) unreachable, so every dynamically
+    # linked binary fails to exec and the probe reports a working bubblewrap as
+    # unavailable.
+    probe = [
+        executable,
+        "--die-with-parent",
+        "--unshare-net",
+        "--ro-bind",
+        "/usr",
+        "/usr",
+    ]
+    for system_path in ("/bin", "/lib", "/lib64"):
+        if Path(system_path).exists():
+            probe.extend(["--ro-bind", system_path, system_path])
+    probe.append("/usr/bin/true")
     try:
         result = subprocess.run(
-            [
-                executable,
-                "--die-with-parent",
-                "--unshare-net",
-                "--ro-bind",
-                "/usr",
-                "/usr",
-                "/usr/bin/true",
-            ],
+            probe,
             capture_output=True,
             text=True,
             timeout=5.0,
