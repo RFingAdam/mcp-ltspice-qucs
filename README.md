@@ -140,13 +140,13 @@ deprecated compatibility names scheduled for removal in 1.0. Full reference in
 
 | Workflow                 | Headline tools                                                   | Reference                          |
 | ------------------------ | ---------------------------------------------------------------- | ---------------------------------- |
-| LC ladder filter design  | `synthesize_lc_filter` → `place_transmission_zero` → `substitute_real_components` | Butterworth / Chebyshev / Elliptic |
+| LC ladder filter design  | `synthesize_lc_filter` -> `place_transmission_zero` -> `substitute_real_components` | Butterworth / Chebyshev / Elliptic |
 | Active filter design     | `sallen_key_low_pass` / `sallen_key_high_pass` / `sallen_key_band_pass`, `mfb_low_pass` / `mfb_band_pass` | Sallen-Key, MFB                    |
 | SMPS EMC pre-compliance  | `design_pi_output_filter`, `predict_conducted_emissions`, `design_rc_snubber`, `design_cm_choke` | CISPR 22 / CISPR 32                |
 | Microstrip + coupler     | `synthesize_microstrip_line`, `synthesize_coupler` | Hammerstad-Jensen                  |
 | Monte Carlo yield        | `monte_carlo_analysis` (joblib parallel)                         | Gaussian component tolerance       |
 | Distributed filters      | `synthesize_stepped_impedance_lpf`, `synthesize_coupled_line_bpf`, `synthesize_hairpin_bpf`, `synthesize_interdigital_bpf`, `synthesize_combline_bpf` | Pozar §8.6-8.7, exact TEM N-line model |
-| Multi-radio coexistence  | `place_zeros_for_coex` → `synthesize_for_coex_target` → `check_coex_matrix` (GNSS ΔC/N₀) | 3GPP TS 36.101, FCC restricted bands |
+| Multi-radio coexistence  | `place_zeros_for_coex` -> `synthesize_for_coex_target` -> `check_coex_matrix` (GNSS ΔC/N₀) | 3GPP TS 36.101, FCC restricted bands |
 
 Five worked examples ship under [`examples/`](examples/):
 `basic_lpf`, `buck_smps`, `emc_compliance`, `filter_compare`,
@@ -174,11 +174,11 @@ for the full list of sibling MCPs and bundle definitions.
 This suite is **circuit-level + filter-synthesis** focused. Deliberately
 stops at the antenna port and at the schematic-to-layout boundary. For:
 
-- **Antenna design** → [`mcp-nec2-antenna`](https://github.com/RFingAdam/mcp-nec2-antenna)
+- **Antenna design** -> [`mcp-nec2-antenna`](https://github.com/RFingAdam/mcp-nec2-antenna)
   (wire / MoM) or [`mcp-openems`](https://github.com/RFingAdam/mcp-openems) (FDTD).
-- **PCB-level EMC / SI / PI** → [`mcp-pcb-emcopilot`](https://github.com/RFingAdam/mcp-pcb-emcopilot).
-- **Regulatory standards lookup** → [`mcp-emc-regulations`](https://github.com/RFingAdam/mcp-emc-regulations).
-- **Physical-layer testing on real hardware** → a hardware-DUT MCP.
+- **PCB-level EMC / SI / PI** -> [`mcp-pcb-emcopilot`](https://github.com/RFingAdam/mcp-pcb-emcopilot).
+- **Regulatory standards lookup** -> [`mcp-emc-regulations`](https://github.com/RFingAdam/mcp-emc-regulations).
+- **Physical-layer testing on real hardware** -> a hardware-DUT MCP.
 
 See [`docs/related-mcp-servers.md`](docs/related-mcp-servers.md) for the
 full boundary statement, decision flow, and cross-MCP workflow examples.
