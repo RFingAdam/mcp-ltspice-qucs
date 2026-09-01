@@ -1,0 +1,50 @@
+Additional licence grant: benchmark data and fixtures
+====================================================
+
+The software in this repository is licensed under the GNU Affero General
+Public License v3.0. See LICENSE. That licence is unchanged and continues to
+govern all source code here.
+
+As sole copyright holder, and under the relicensing right recorded in CLA.md
+for any outside contribution, I additionally make the files under the
+following paths available under the MIT License, at the recipient's option:
+
+    examples/
+
+Why this grant exists
+---------------------
+These files are ground truth for a public evaluation benchmark. A benchmark
+whose data cannot be redistributed cannot be independently reproduced, and a
+number nobody else can reproduce is not a result. Keeping the server under
+AGPL-3.0 protects the tooling; releasing the data it is measured against
+under MIT lets anyone check the numbers.
+
+Scope
+-----
+This grant covers data, fixtures and example inputs only. It relicenses no
+source code, and it does not affect the AGPL-3.0 obligations that attach to
+running or conveying this server, including the network-use obligation in
+AGPL-3.0 section 13.
+
+
+MIT License
+
+Copyright (c) 2026 Adam Engelbrecht
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

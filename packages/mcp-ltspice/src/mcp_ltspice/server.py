@@ -36,6 +36,7 @@ from mcp_ltspice.analog import (
     sallen_key_low_pass as _sk_lpf,
 )
 from mcp_ltspice.asc_io import (
+    from_ltspice_value,
     generate_lpf_asc,
     generate_port2_excitation_asc,
     read_components,
@@ -401,6 +402,85 @@ def _circuit_optimization_job_handler(
 _JOBS.register("simulation", _simulation_job_handler)
 _JOBS.register("analysis", _analysis_job_handler)
 _JOBS.register("circuit_optimization", _circuit_optimization_job_handler)
+
+
+#: `spec` on every filter tool is validated as `eval.FilterSpec`, whose shape the
+#: MCP schema could not previously express -- the parameter was a bare
+#: `dict[str, Any]`, so a caller saw `{"type": "object"}` and had to guess. They
+#: guessed wrong in predictable ways (`{"kind": ..., "s21_min_at_10ghz_db": ...}`,
+#: `{"fc_hz": ..., "attenuation_target_db": ...}`), and every one of those failed
+#: validation on the missing `passband`. Spelling the contract out here is the fix.
+_FILTER_SPEC_DESC = (
+    "Filter spec. REQUIRED key 'passband': "
+    "{'f_start': Hz, 'f_stop': Hz, 'il_max_db': positive dB, 'rl_min_db': positive dB}. "
+    "OPTIONAL 'stopband_targets': list of "
+    "{'freq': Hz, 'rejection_min_db': positive dB, 'label': str}. "
+    "Example: {'passband': {'f_start': 1e6, 'f_stop': 7e8, 'il_max_db': 1.0, "
+    "'rl_min_db': 15.0}, 'stopband_targets': [{'freq': 2.4e9, "
+    "'rejection_min_db': 30.0, 'label': '2f0'}]}. "
+    "Note there is no 'kind'/'fc_hz'/'attenuation_target_db' key -- filter kind is "
+    "the separate 'kind' argument."
+)
+
+#: refdes -> the list of values to try for it. The Cartesian product of every
+#: listed value is evaluated, so (L1: 5 values) x (C2: 7 values) is 35 points.
+#: NOT a frequency-axis description: `{'freq': {'start': ..., 'stop': ...}}` is
+#: the common wrong guess and raises before anything is simulated.
+_SWEEP_DESC = (
+    "Component value grid: {refdes: [values to try]}, e.g. "
+    "{'L1': [4.7e-9, 5.1e-9], 'C2': [5.6e-12, 6.2e-12]}. Every combination is "
+    "evaluated (Cartesian product). This is NOT a frequency sweep."
+)
+
+#: refdes -> value. Base SI is what the tools want; engineering notation is
+#: accepted because every prompt and datasheet in this domain writes "4.7 nH",
+#: and callers reliably do too. Before `_coerce_components` those strings
+#: reached the arithmetic and raised "unsupported operand type(s) for -:
+#: 'float' and 'str'", which says nothing about what to send instead.
+_COMPONENTS_DESC = (
+    "Component values as {refdes: value}, e.g. {'L1': 4.7e-9, 'C2': 5.6e-12}. "
+    "Base SI units (henries, farads) are preferred. SPICE/engineering strings "
+    "are also accepted -- '4.7n', '5.6pF', '15nH', '1meg'. Note SPICE 'm' means "
+    "MILLI, not mega; use 'meg' for 1e6."
+)
+
+
+def _coerce_components(value: object) -> object:
+    """Accept engineering notation for component values.
+
+    Reuses `asc_io.from_ltspice_value` for the suffix table rather than
+    duplicating it, and additionally tolerates a trailing unit letter (F/H/ohm)
+    that SPICE itself does not write but callers do: '5.6pF' -> 5.6e-12. A value
+    that still will not parse is left untouched, so Pydantic reports it as the
+    ordinary validation error for the field instead of failing here.
+    """
+    if not isinstance(value, dict):
+        return value
+    out: dict[str, object] = {}
+    for name, raw in value.items():
+        if isinstance(raw, str):
+            text = raw.strip()
+            for candidate in (text, text.rstrip("FfHh\u03a9\u2126").strip()):
+                try:
+                    out[name] = from_ltspice_value(candidate)
+                    break
+                except ValueError:
+                    continue
+            else:
+                out[name] = raw
+        else:
+            out[name] = raw
+    return out
+
+
+#: The annotated form every `components` parameter uses.
+#:
+#: `_coerce_components` is called explicitly at the top of each tool body rather
+#: than attached here as a `BeforeValidator`: fastmcp 3.4.4 builds the JSON
+#: schema from the `Field` but does not run Annotated validators, so a
+#: BeforeValidator here looks like protection and silently is not. Verified
+#: against the registered FunctionTool, not assumed.
+_Components = Annotated[dict[str, float], Field(description=_COMPONENTS_DESC)]
 
 
 def _circuit_from_payload(value: dict[str, Any]) -> CircuitDocument:
@@ -1428,7 +1508,7 @@ def place_transmission_zero(
 )
 def evaluate_filter_spec_tool(
     s2p_path: Annotated[str, Field(description="Path to Touchstone .s2p.")],
-    spec: Annotated[dict[str, Any], Field(description="Spec dict (see tool description).")],
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
 ) -> Envelope[dict[str, Any]]:
     timer = Timer()
     try:
@@ -1546,14 +1626,15 @@ def find_transmission_zeros(
     ),
 )
 def substitute_real_components(
-    components: dict[str, float],
+    components: _Components,
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
     srf_margin: Annotated[float, Field(ge=0)] = 0.0,
     max_spec_freq_hz: Annotated[float | None, Field(gt=0)] = None,
-    spec: dict[str, Any] | None = None,
+    spec: Annotated[dict[str, Any] | None, Field(description=_FILTER_SPEC_DESC)] = None,
     max_value_drift_pct: Annotated[float | None, Field(gt=0)] = 25.0,
 ) -> Envelope[dict[str, dict[str, Any]]]:
+    components = _coerce_components(components)
     timer = Timer()
     try:
         return ok(
@@ -1677,7 +1758,7 @@ def circuit_attach_models(
     ),
 )
 def simulate_realized_filter(
-    components: dict[str, float],
+    components: _Components,
     output_s2p: str,
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
@@ -1691,6 +1772,7 @@ def simulate_realized_filter(
     prefer: Annotated[str | None, Field(description="'ltspice' | 'ngspice' | null.")] = None,
     timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
 ) -> Envelope[dict[str, Any]]:
+    components = _coerce_components(components)
     timer = Timer()
     try:
         if f_stop_hz <= f_start_hz:
@@ -1790,7 +1872,7 @@ def list_vendor_parts(vendor: str) -> Envelope[list[float]]:
 )
 def optimize_filter(
     initial_components: dict[str, float],
-    spec: dict[str, Any],
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     tune: list[str] | None = None,
     transmission_zeros: bool | None = None,
     kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
@@ -1857,8 +1939,8 @@ def optimize_filter(
     ),
 )
 def monte_carlo_analysis(
-    components: dict[str, float],
-    spec: dict[str, Any],
+    components: _Components,
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     tolerance_pct: dict[str, float] | float = 5.0,
     n_runs: Annotated[int, Field(gt=0, le=10_000)] = 1000,
     z0: Annotated[float, Field(gt=0)] = 50.0,
@@ -1873,6 +1955,7 @@ def monte_carlo_analysis(
     trace: bool = False,
     trace_path: str | None = None,
 ) -> Envelope[dict[str, Any]]:
+    components = _coerce_components(components)
     timer = Timer()
     try:
         result = _monte_carlo(
@@ -1964,9 +2047,9 @@ def _wrap(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Envelope[Any]:
     ),
 )
 def parameter_sweep(
-    components: dict[str, float],
-    sweep: dict[str, list[float]],
-    spec: dict[str, Any],
+    components: _Components,
+    sweep: Annotated[dict[str, list[float]], Field(description=_SWEEP_DESC)],
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool | None = None,
     kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
@@ -1981,6 +2064,7 @@ def parameter_sweep(
         Field(description="'auto', 'inline', or 'artifact'. Large results default to JSONL."),
     ] = "auto",
 ) -> Envelope[dict[str, Any]]:
+    components = _coerce_components(components)
     timer = Timer()
     try:
         result = _parameter_sweep(
@@ -2029,9 +2113,9 @@ def parameter_sweep(
     ),
 )
 def corner_analysis(
-    components: dict[str, float],
+    components: _Components,
     corners: dict[str, dict[str, float]],
-    spec: dict[str, Any],
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool | None = None,
     kind: Annotated[str, Field(description="lowpass, highpass, bandpass, or bandstop")] = "lowpass",
@@ -2041,6 +2125,7 @@ def corner_analysis(
         Field(description="Optional output of substitute_real_components; includes parasitics."),
     ] = None,
 ) -> Envelope[dict[str, Any]]:
+    components = _coerce_components(components)
     return _wrap(
         _corner_analysis,
         components,
@@ -2063,8 +2148,8 @@ def corner_analysis(
     ),
 )
 def sensitivity_analysis(
-    components: dict[str, float],
-    spec: dict[str, Any],
+    components: _Components,
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     perturbation_pct: Annotated[float, Field(gt=0, le=10)] = 1.0,
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool | None = None,
@@ -2075,6 +2160,7 @@ def sensitivity_analysis(
         Field(description="Optional output of substitute_real_components; includes parasitics."),
     ] = None,
 ) -> Envelope[dict[str, Any]]:
+    components = _coerce_components(components)
     return _wrap(
         _sensitivity,
         components,
@@ -2100,12 +2186,13 @@ def sensitivity_analysis(
     ),
 )
 def srf_audit(
-    components: dict[str, float],
-    spec: dict[str, Any],
+    components: _Components,
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     inductor_vendor: str = "coilcraft_0402hp",
     capacitor_vendor: str = "murata_gjm_c0g",
     margin_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
 ) -> Envelope[dict[str, Any]]:
+    components = _coerce_components(components)
     return _wrap(
         _srf_audit,
         components,
@@ -3102,7 +3189,7 @@ def lookup_reference(part_number: str) -> Envelope[dict[str, Any]]:
 def compare_filter_orders(
     orders: Annotated[list[int], Field(min_length=1, max_length=5)],
     cutoff_hz: Annotated[float, Field(gt=0)],
-    spec: dict[str, Any],
+    spec: Annotated[dict[str, Any], Field(description=_FILTER_SPEC_DESC)],
     zero_targets_hz: list[float],
     ripple_db: Annotated[float, Field(gt=0)] = 0.1,
     stopband_atten_db: Annotated[float, Field(gt=0)] = 50.0,
@@ -3184,12 +3271,13 @@ def compare_filter_orders(
     ),
 )
 def render_lc_ladder_schematic(
-    components: dict[str, float],
+    components: _Components,
     output_path: Annotated[str, Field(description="Output .svg or .png path.")],
     z0: Annotated[float, Field(gt=0)] = 50.0,
     transmission_zeros: bool = False,
     title: str | None = None,
 ) -> Envelope[dict[str, str]]:
+    components = _coerce_components(components)
     timer = Timer()
     try:
         out = _render_lc_schematic(

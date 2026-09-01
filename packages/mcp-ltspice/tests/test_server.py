@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from mcp_ltspice import server
 from mcp_ltspice.runner import RunResult, Simulator
 
@@ -178,3 +180,52 @@ def test_synthesize_with_invalid_args_returns_error_envelope(tmp_path) -> None:
     )
     assert env.status == "error"
     assert env.error
+
+
+# ---- callers write "4.7 nH", and the schema has to say what it wants ----
+
+
+def test_component_values_accept_engineering_notation():
+    """Every prompt and datasheet in this domain writes 4.7 nH, so callers do
+    too. These used to reach the arithmetic untouched and raise "unsupported
+    operand type(s) for -: 'float' and 'str'", which says nothing about what to
+    send instead."""
+    got = server._coerce_components(
+        {"C2": "5.6p", "C4": "5.6pF", "L1": "4.7n", "L3": "15nH", "R1": "1meg"}
+    )
+    assert got["C2"] == pytest.approx(5.6e-12)
+    assert got["C4"] == pytest.approx(5.6e-12)
+    assert got["L1"] == pytest.approx(4.7e-9)
+    assert got["L3"] == pytest.approx(15e-9)
+    assert got["R1"] == pytest.approx(1e6)
+
+
+def test_spice_m_is_milli_not_mega():
+    """The classic SPICE trap. Getting this backwards would be a 10^9 error
+    that still simulates cleanly."""
+    assert server._coerce_components({"L1": "1m"})["L1"] == pytest.approx(1e-3)
+    assert server._coerce_components({"L1": "1meg"})["L1"] == pytest.approx(1e6)
+
+
+def test_numbers_pass_through_and_junk_is_left_for_pydantic():
+    got = server._coerce_components({"L1": 4.7e-9, "L2": "not a value"})
+    assert got["L1"] == 4.7e-9
+    # Left as-is on purpose: the field's own validation reports it, rather than
+    # this helper inventing an error of its own.
+    assert got["L2"] == "not a value"
+
+
+def test_filter_spec_shaped_arguments_describe_themselves():
+    """`spec`, `sweep` and `components` were bare dicts in the MCP schema, so a
+    caller saw `{"type": "object"}` and had to guess. The guesses failed
+    validation on the missing `passband` -- 77 times in one benchmark run."""
+    for name in ("parameter_sweep", "sensitivity_analysis", "monte_carlo_analysis"):
+        fn = getattr(server, name)
+        hints = fn.__annotations__
+        assert "spec" in hints, name
+    props = server.parameter_sweep.__annotations__
+    assert props  # signature intact after the annotation change
+
+    spec_desc = server._FILTER_SPEC_DESC
+    assert "passband" in spec_desc and "f_start" in spec_desc and "il_max_db" in spec_desc
+    assert "NOT a frequency sweep" in server._SWEEP_DESC
