@@ -97,3 +97,18 @@ tasks/
 
 # Pitch/business material kept private
 /presentation/
+
+# Simulator scratch dropped in the repo root by ad-hoc runs (.s2p/.asc/.cir/
+# .net/.raw/.log/.png). Anchored with a leading slash so the committed example
+# Touchstones under examples/ are never caught by this -- downstream consumers
+# read those, so ignoring them would be worse than the mess.
+/*.s2p
+/*.asc
+/*.cir
+/*.net
+/*.raw
+/*.log
+/*.png
+/workspace/
+/outputs/
+/example/
