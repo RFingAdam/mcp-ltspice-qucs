@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import numpy as np
 from fastmcp import FastMCP
@@ -1634,7 +1634,7 @@ def substitute_real_components(
     spec: Annotated[dict[str, Any] | None, Field(description=_FILTER_SPEC_DESC)] = None,
     max_value_drift_pct: Annotated[float | None, Field(gt=0)] = 25.0,
 ) -> Envelope[dict[str, dict[str, Any]]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     timer = Timer()
     try:
         return ok(
@@ -1772,7 +1772,7 @@ def simulate_realized_filter(
     prefer: Annotated[str | None, Field(description="'ltspice' | 'ngspice' | null.")] = None,
     timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     timer = Timer()
     try:
         if f_stop_hz <= f_start_hz:
@@ -1955,7 +1955,7 @@ def monte_carlo_analysis(
     trace: bool = False,
     trace_path: str | None = None,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     timer = Timer()
     try:
         result = _monte_carlo(
@@ -2064,7 +2064,7 @@ def parameter_sweep(
         Field(description="'auto', 'inline', or 'artifact'. Large results default to JSONL."),
     ] = "auto",
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     timer = Timer()
     try:
         result = _parameter_sweep(
@@ -2125,7 +2125,7 @@ def corner_analysis(
         Field(description="Optional output of substitute_real_components; includes parasitics."),
     ] = None,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     return _wrap(
         _corner_analysis,
         components,
@@ -2160,7 +2160,7 @@ def sensitivity_analysis(
         Field(description="Optional output of substitute_real_components; includes parasitics."),
     ] = None,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     return _wrap(
         _sensitivity,
         components,
@@ -2192,7 +2192,7 @@ def srf_audit(
     capacitor_vendor: str = "murata_gjm_c0g",
     margin_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     return _wrap(
         _srf_audit,
         components,
@@ -3277,7 +3277,7 @@ def render_lc_ladder_schematic(
     transmission_zeros: bool = False,
     title: str | None = None,
 ) -> Envelope[dict[str, str]]:
-    components = _coerce_components(components)
+    components = cast("dict[str, float]", _coerce_components(components))
     timer = Timer()
     try:
         out = _render_lc_schematic(
