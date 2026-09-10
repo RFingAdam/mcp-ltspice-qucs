@@ -8,6 +8,7 @@ from typing import Any
 from mcp_ltspice.asc_io import generate_lpf_asc
 from mcp_ltspice.runner import (
     Simulator,
+    _needs_wine,
     bubblewrap_ready,
     find_ltspice,
     find_ngspice,
@@ -74,7 +75,12 @@ def probe_spice_backend(
         executable, environment=environment, timeout_sec=min(timeout_sec, 5.0)
     )
     if selected == Simulator.LTSPICE:
-        if executable.suffix.lower() == ".exe" and find_wine() is None:
+        # _needs_wine() rather than a bare '.exe' test: on native Windows a .exe
+        # launches directly, and requiring Wine there reported the platform
+        # LTspice actually ships for as unavailable. run_simulation() already
+        # gates on _needs_wine; this probe has to agree with it or it reports a
+        # working install as broken.
+        if _needs_wine(executable) and find_wine() is None:
             result["diagnostic"] = "Windows LTspice binary found but Wine is unavailable"
             _LAST_PROBES[selected.value] = result
             return result
