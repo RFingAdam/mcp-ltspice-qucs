@@ -11,13 +11,9 @@ permissions:
   id-token: write
   attestations: write
 
-concurrency:
-  group: release-validation-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   validate:
-    runs-on: [self-hosted, Linux, X64, haven]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 

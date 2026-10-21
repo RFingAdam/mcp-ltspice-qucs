@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -394,6 +395,10 @@ def test_timeout_is_reported_with_first_run_guidance(tmp_path, monkeypatch) -> N
     with pytest.raises(RuntimeError, match="Anonymously Share LTspice Usage Data"):
         runner_mod._run_ltspice(asc, Path("/wine/LTspice.exe"), timeout=120.0)
 
+
+@pytest.mark.skipif(
+    sys.platform != "linux", reason="bubblewrap is Linux-only; the probe never runs elsewhere"
+)
 def test_bubblewrap_probe_binds_the_usr_merge_symlink_paths(monkeypatch):
     """The probe must bind the same system paths the real sandbox does.
 

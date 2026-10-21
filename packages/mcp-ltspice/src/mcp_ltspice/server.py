@@ -445,7 +445,7 @@ _COMPONENTS_DESC = (
 )
 
 
-def _coerce_components(value: object) -> object:
+def _coerce_components(value: object) -> Any:
     """Accept engineering notation for component values.
 
     Reuses `asc_io.from_ltspice_value` for the suffix table rather than
@@ -453,6 +453,9 @@ def _coerce_components(value: object) -> object:
     that SPICE itself does not write but callers do: '5.6pF' -> 5.6e-12. A value
     that still will not parse is left untouched, so Pydantic reports it as the
     ordinary validation error for the field instead of failing here.
+
+    Returns `Any` because the result is assigned straight back to the declared
+    `dict[str, float]` parameter, and a value left untouched is not a float.
     """
     if not isinstance(value, dict):
         return value
