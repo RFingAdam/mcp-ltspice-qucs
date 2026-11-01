@@ -1,6 +1,6 @@
 [project]
 name = "mcp-ltspice"
-version = "0.6.1"
+version = "0.6.2"
 description = "MCP server exposing LTspice (and ngspice fallback) for RF filter synthesis, S-parameter extraction, vendor model substitution, optimization, and Monte Carlo analysis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -11,7 +11,7 @@ keywords = ["mcp", "ltspice", "ngspice", "spice", "filter-design", "rf-engineeri
 dependencies = [
     "rf-mcp-common>=0.6,<0.7",
     "mcp-rf-analysis>=0.6,<0.7",
-    "fastmcp>=3.4.4,<3.5",
+    "fastmcp>=3.4.10,<3.5",
     "spicelib>=1.4.0,<3",
     "scipy>=1.11,<2",
     "numpy>=1.26,<3",

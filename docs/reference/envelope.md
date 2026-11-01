@@ -7,7 +7,7 @@ class Envelope[T]:
     status: Literal["ok", "error"]
     data: T | None
     warnings: list[str]
-    metadata: dict[str, Any]   # tool_version, runtime_sec, etc.
+    metadata: dict[str, Any]  # tool_version, runtime_sec, etc.
     error: str | None
 ```
 

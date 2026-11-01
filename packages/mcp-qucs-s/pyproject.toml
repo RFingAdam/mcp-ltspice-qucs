@@ -1,6 +1,6 @@
 [project]
 name = "mcp-qucs-s"
-version = "0.6.1"
+version = "0.6.2"
 description = "MCP server exposing Qucs-S (with Ngspice/Xyce backends) for native S-parameter sims, harmonic balance, microstrip / distributed-element synthesis, and lumped-to-distributed conversion"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ keywords = ["mcp", "qucs", "qucs-s", "harmonic-balance", "microstrip", "rf-engin
 
 dependencies = [
     "rf-mcp-common>=0.6,<0.7",
-    "fastmcp>=3.4.4,<3.5",
+    "fastmcp>=3.4.10,<3.5",
     "scikit-rf>=1.2.0,<2",
     "scipy>=1.11,<2",
     "numpy>=1.26,<3",

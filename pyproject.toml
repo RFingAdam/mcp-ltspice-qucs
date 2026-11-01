@@ -7,6 +7,10 @@ requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"
 authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }]
 
+[tool.uv]
+# numpy 2.5 stubs use Python 3.12 syntax, which mypy rejects at the 3.11 target set below.
+constraint-dependencies = ["numpy<2.5"]
+
 [tool.uv.workspace]
 members = [
     "packages/rf-mcp-common",
