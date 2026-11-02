@@ -1,6 +1,6 @@
 [project]
 name = "rf-mcp-common"
-version = "0.6.1"
+version = "0.6.2"
 description = "Shared contracts for the RF MCP suite: response envelope, Touchstone helpers, E-series snap, structured logging"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ keywords = ["mcp", "rf-engineering", "touchstone", "scikit-rf"]
 
 dependencies = [
     "anyio>=4.14.2,<4.15",
-    "fastmcp>=3.4.4,<3.5",
+    "fastmcp>=3.4.10,<3.5",
     "pydantic>=2.7,<3",
     "scikit-rf>=1.2.0,<2",
     "numpy>=1.26,<3",

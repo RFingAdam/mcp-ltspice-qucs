@@ -11,6 +11,23 @@ grouped by package.
 
 Nothing yet.
 
+## [0.6.2]: 2026-11-01
+
+### Added
+
+- First release to PyPI: `rf-mcp-common`, `mcp-rf-analysis`, `mcp-ltspice`,
+  and `mcp-qucs-s`. Each wheel now carries the license text.
+- A tag-driven release workflow. `release-validation` now gates it, and
+  packages upload in dependency order.
+
+### Changed
+
+- Tool descriptions say what `spec`, `sweep`, and `components` actually want.
+
+### Fixed
+
+- The sandbox probe checks the same system paths the real sandbox binds.
+
 ## [0.6.1]: 2026-07-24
 
 ### Fixed: dependency security audit

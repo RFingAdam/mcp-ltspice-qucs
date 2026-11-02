@@ -78,7 +78,7 @@ cycle. Otherwise the servers exchange simulation data through:
       status: Literal["ok", "error"]
       data: T | None
       warnings: list[str]
-      metadata: dict[str, Any]   # tool_version, runtime_sec, ...
+      metadata: dict[str, Any]  # tool_version, runtime_sec, ...
       error: str | None
   ```
 

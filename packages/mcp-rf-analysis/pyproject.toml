@@ -1,6 +1,6 @@
 [project]
 name = "mcp-rf-analysis"
-version = "0.6.1"
+version = "0.6.2"
 description = "Simulator-agnostic MCP server for RF S-parameter analysis, regulatory band databases (LTE / 5G NR / GNSS / ISM / HaLow), and multi-radio coexistence engineering"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ keywords = ["mcp", "rf-engineering", "scikit-rf", "lte", "5g", "coexistence", "r
 
 dependencies = [
     "rf-mcp-common>=0.6,<0.7",
-    "fastmcp>=3.4.4,<3.5",
+    "fastmcp>=3.4.10,<3.5",
     "scikit-rf>=1.2.0,<2",
     "scipy>=1.11,<2",
     "numpy>=1.26,<3",
