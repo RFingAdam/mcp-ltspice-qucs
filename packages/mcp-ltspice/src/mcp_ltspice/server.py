@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 import numpy as np
 from fastmcp import FastMCP
@@ -445,7 +445,7 @@ _COMPONENTS_DESC = (
 )
 
 
-def _coerce_components(value: object) -> object:
+def _coerce_components(value: object) -> Any:
     """Accept engineering notation for component values.
 
     Reuses `asc_io.from_ltspice_value` for the suffix table rather than
@@ -453,6 +453,9 @@ def _coerce_components(value: object) -> object:
     that SPICE itself does not write but callers do: '5.6pF' -> 5.6e-12. A value
     that still will not parse is left untouched, so Pydantic reports it as the
     ordinary validation error for the field instead of failing here.
+
+    Returns `Any` because the result is assigned straight back to the declared
+    `dict[str, float]` parameter, and a value left untouched is not a float.
     """
     if not isinstance(value, dict):
         return value
@@ -471,18 +474,6 @@ def _coerce_components(value: object) -> object:
         else:
             out[name] = raw
     return out
-
-
-def _coerce_components_typed(value: dict[str, float]) -> dict[str, float]:
-    """Call-site wrapper narrowing `_coerce_components`'s `object` return.
-
-    `_coerce_components` stays typed as `object` -> `object` so a caller that
-    hands it something malformed falls through untouched rather than being
-    coerced into the wrong static type; each tool body already receives a
-    `_Components`-typed value, so the narrowing back to `dict[str, float]` here
-    is safe and keeps that `cast` out of every call site.
-    """
-    return cast("dict[str, float]", _coerce_components(value))
 
 
 #: The annotated form every `components` parameter uses.
@@ -1646,7 +1637,7 @@ def substitute_real_components(
     spec: Annotated[dict[str, Any] | None, Field(description=_FILTER_SPEC_DESC)] = None,
     max_value_drift_pct: Annotated[float | None, Field(gt=0)] = 25.0,
 ) -> Envelope[dict[str, dict[str, Any]]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     timer = Timer()
     try:
         return ok(
@@ -1784,7 +1775,7 @@ def simulate_realized_filter(
     prefer: Annotated[str | None, Field(description="'ltspice' | 'ngspice' | null.")] = None,
     timeout_sec: Annotated[float, Field(gt=0, le=600)] = 120.0,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     timer = Timer()
     try:
         if f_stop_hz <= f_start_hz:
@@ -1967,7 +1958,7 @@ def monte_carlo_analysis(
     trace: bool = False,
     trace_path: str | None = None,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     timer = Timer()
     try:
         result = _monte_carlo(
@@ -2076,7 +2067,7 @@ def parameter_sweep(
         Field(description="'auto', 'inline', or 'artifact'. Large results default to JSONL."),
     ] = "auto",
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     timer = Timer()
     try:
         result = _parameter_sweep(
@@ -2137,7 +2128,7 @@ def corner_analysis(
         Field(description="Optional output of substitute_real_components; includes parasitics."),
     ] = None,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     return _wrap(
         _corner_analysis,
         components,
@@ -2172,7 +2163,7 @@ def sensitivity_analysis(
         Field(description="Optional output of substitute_real_components; includes parasitics."),
     ] = None,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     return _wrap(
         _sensitivity,
         components,
@@ -2204,7 +2195,7 @@ def srf_audit(
     capacitor_vendor: str = "murata_gjm_c0g",
     margin_pct: Annotated[float, Field(gt=0, le=100)] = 30.0,
 ) -> Envelope[dict[str, Any]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     return _wrap(
         _srf_audit,
         components,
@@ -3289,7 +3280,7 @@ def render_lc_ladder_schematic(
     transmission_zeros: bool = False,
     title: str | None = None,
 ) -> Envelope[dict[str, str]]:
-    components = _coerce_components_typed(components)
+    components = _coerce_components(components)
     timer = Timer()
     try:
         out = _render_lc_schematic(

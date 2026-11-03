@@ -4,7 +4,7 @@
 [mcp_servers.ltspice]
 required = true
 command = "uv"
-args = ["run", "--frozen", "--package", "mcp-ltspice", "mcp-ltspice"]
+args = ["run", "--frozen", "mcp-ltspice"]
 cwd = ".."
 startup_timeout_sec = 60.0
 tool_timeout_sec = 300.0
@@ -12,7 +12,7 @@ tool_timeout_sec = 300.0
 [mcp_servers.qucs_s]
 required = true
 command = "uv"
-args = ["run", "--frozen", "--package", "mcp-qucs-s", "mcp-qucs-s"]
+args = ["run", "--frozen", "mcp-qucs-s"]
 cwd = ".."
 startup_timeout_sec = 60.0
 tool_timeout_sec = 300.0
@@ -20,7 +20,7 @@ tool_timeout_sec = 300.0
 [mcp_servers.rf_analysis]
 required = true
 command = "uv"
-args = ["run", "--frozen", "--package", "mcp-rf-analysis", "mcp-rf-analysis"]
+args = ["run", "--frozen", "mcp-rf-analysis"]
 cwd = ".."
 startup_timeout_sec = 60.0
 tool_timeout_sec = 300.0

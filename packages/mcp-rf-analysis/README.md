@@ -5,7 +5,7 @@ source: LTspice, Qucs-S, CST, ADS, or VNA measurements, and exposes
 RF domain knowledge that's the same regardless of where the S-parameters
 came from.
 
-Part of the [mcp-ltspice-qucs](../../README.md) suite.
+Part of the [mcp-ltspice-qucs](https://github.com/RFingAdam/mcp-ltspice-qucs) suite.
 The server exposes 35 primary tools, including `probe_backend` for an
 executable known-answer check of the numerical stack.
 

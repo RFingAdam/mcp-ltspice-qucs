@@ -4,7 +4,7 @@ MCP server exposing **Qucs-S** for RF-specific simulation that LTspice
 handles poorly: native S-parameter analysis, harmonic balance,
 distributed-element synthesis.
 
-Part of the [mcp-ltspice-qucs](../../README.md) suite.
+Part of the [mcp-ltspice-qucs](https://github.com/RFingAdam/mcp-ltspice-qucs) suite.
 
 ## Tools
 

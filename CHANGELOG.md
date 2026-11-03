@@ -4,12 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Each package under `packages/` versions independently; entries below are
-grouped by package.
+From 0.6.2 the repository publishes one PyPI package, `mcp-ltspice-qucs`,
+with one version.
 
 ## [Unreleased]
 
 Nothing yet.
+
+## [0.6.2]: 2026-11-02
+
+### Added
+
+- First release to PyPI, as one package: `pip install mcp-ltspice-qucs`.
+  It installs the `mcp-ltspice`, `mcp-qucs-s`, and `mcp-rf-analysis`
+  commands and the `rf_mcp_common`, `mcp_ltspice`, `mcp_qucs_s`, and
+  `mcp_rf_analysis` modules. The wheel carries the license text.
+- A tag-driven release workflow. `release-validation` gates it, and it
+  publishes one sdist and one wheel through PyPI trusted publishing.
+
+### Changed
+
+- The four workspace packages (`rf-mcp-common`, `mcp-rf-analysis`,
+  `mcp-ltspice`, `mcp-qucs-s`) are merged into the one `mcp-ltspice-qucs`
+  distribution. Import names and command names are unchanged. Every module
+  now reports the `mcp-ltspice-qucs` version. In a checkout, `uv sync`
+  replaces `uv sync --all-packages`, and the bundled client configs drop
+  `--package`.
+- Tool descriptions say what `spec`, `sweep`, and `components` actually want.
+
+### Fixed
+
+- The sandbox probe checks the same system paths the real sandbox binds.
 
 ## [0.6.1]: 2026-07-24
 

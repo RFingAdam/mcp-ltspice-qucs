@@ -1,6 +1,6 @@
 # rf-mcp-common
 
-Shared contracts for the [mcp-ltspice-qucs](../../README.md) suite. Tiny
+Shared contracts for the [mcp-ltspice-qucs](https://github.com/RFingAdam/mcp-ltspice-qucs) suite. Tiny
 package that the three MCP servers depend on so the cross-tool interop
 surface is defined exactly once.
 

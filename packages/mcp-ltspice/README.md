@@ -2,7 +2,7 @@
 
 MCP server exposing **LTspice** (and **ngspice** as a fallback) for
 RF filter synthesis, SMPS-EMC pre-compliance, and analog active-filter
-design. Part of the [mcp-ltspice-qucs](../../README.md) suite.
+design. Part of the [mcp-ltspice-qucs](https://github.com/RFingAdam/mcp-ltspice-qucs) suite.
 
 This is the largest of the three servers: 76 primary tools plus 59
 deprecated categorised aliases
@@ -72,4 +72,4 @@ the canonical surface is `@mcp.tool` registrations in
   the package's stock generated symbols/directives; arbitrary LTspice
   schematics and proprietary models are not guaranteed to translate.
 
-See [`../../docs/installation.md`](../../docs/installation.md) for setup.
+See [the installation guide](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/docs/installation.md) for setup.

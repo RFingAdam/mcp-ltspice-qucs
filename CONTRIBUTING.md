@@ -21,7 +21,7 @@ agreement. Read CLA.md before you submit if you want the full terms.
 ```bash
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs
 cd mcp-ltspice-qucs
-uv sync --all-packages
+uv sync
 uv run pytest -q
 ```
 
@@ -119,11 +119,13 @@ every commit.
 
 Three steps:
 
-1. Scaffold `packages/<new>/` with the same layout as one of the
-   existing servers. Add it to `tool.uv.workspace.members` in the
-   root `pyproject.toml`.
-2. Depend on `rf-mcp-common` so the envelope and Touchstone helpers
-   are available. Don't reimplement either.
+1. Scaffold `packages/<new>/src/<module>/` with the same layout as one
+   of the existing servers. Add the module to
+   `tool.hatch.build.targets.wheel.packages` (and its `src` to the sdist
+   `only-include`), its command to `project.scripts`, and any new
+   dependencies to `project.dependencies` in the root `pyproject.toml`.
+2. Import the envelope and Touchstone helpers from `rf_mcp_common`.
+   Don't reimplement either.
 3. Use Touchstone files for any inter-server data exchange. The
    contract is documented in [ARCHITECTURE](https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/ARCHITECTURE.md).
 
@@ -152,15 +154,16 @@ Examples:
 ## Releases
 
 We follow [Keep a Changelog](https://keepachangelog.com/) +
-[Semver](https://semver.org/). Each package versions independently:
+[Semver](https://semver.org/). The repository publishes one PyPI
+package, `mcp-ltspice-qucs`, with one version:
 
-- Bump `version` in `packages/<name>/pyproject.toml`
+- Bump `version` in the root `pyproject.toml` and run `uv lock`
 - Move entries from `[Unreleased]` to a new dated section in `CHANGELOG.md`
-- Tag: `git tag <name>-v<version> && git push --tags`
+- Merge to `main`, then push a `v<version>` tag on that commit
 
-CI runs the test matrix on every push and PR. PyPI publishing is
-not yet wired up; install from a git ref or build wheels locally
-with `uv build` until that lands.
+The `Release` workflow (`.github/workflows/release.yml`) builds one
+sdist and one wheel, checks them, and publishes to PyPI through
+trusted publishing from the `pypi` environment.
 
 ## Code of conduct
 

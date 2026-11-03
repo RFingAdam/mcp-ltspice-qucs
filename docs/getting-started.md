@@ -5,9 +5,16 @@ Five minutes from clone to first synthesized filter.
 ## 1. Install
 
 ```bash
+pip install mcp-ltspice-qucs
+```
+
+That installs the `mcp-ltspice`, `mcp-qucs-s`, and `mcp-rf-analysis`
+commands. To run the examples or work on the code, use a checkout:
+
+```bash
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs
 cd mcp-ltspice-qucs
-uv sync --all-packages
+uv sync
 ```
 
 That's enough to run every tool that doesn't need a real SPICE

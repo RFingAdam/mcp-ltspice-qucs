@@ -2,7 +2,7 @@
 
 from rf_mcp_common.version import distribution_version
 
-__version__ = distribution_version("rf-mcp-common")
+__version__ = distribution_version()
 
 from rf_mcp_common.backend import (
     DEFAULT_TOLERANCE_POLICIES,

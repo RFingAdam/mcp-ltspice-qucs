@@ -17,22 +17,33 @@ design still requires model attachment and simulator verification.
 ```bash
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs.git
 cd mcp-ltspice-qucs
-uv sync --all-packages
+uv sync
 ```
 
-Register the three servers with Claude Desktop / Code:
+Register the servers with Claude Desktop / Code. From a checkout:
 
 ```json
 {
   "mcpServers": {
     "ltspice": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/mcp-ltspice-qucs/packages/mcp-ltspice", "mcp-ltspice"]
+      "args": ["run", "--directory", "/path/to/mcp-ltspice-qucs", "mcp-ltspice"]
     },
     "rf-analysis": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/mcp-ltspice-qucs/packages/mcp-rf-analysis", "mcp-rf-analysis"]
+      "args": ["run", "--directory", "/path/to/mcp-ltspice-qucs", "mcp-rf-analysis"]
     }
+  }
+}
+```
+
+Or straight from PyPI, with no checkout:
+
+```json
+{
+  "mcpServers": {
+    "ltspice": { "command": "uvx", "args": ["--from", "mcp-ltspice-qucs", "mcp-ltspice"] },
+    "rf-analysis": { "command": "uvx", "args": ["--from", "mcp-ltspice-qucs", "mcp-rf-analysis"] }
   }
 }
 ```

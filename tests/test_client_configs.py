@@ -5,7 +5,7 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXPECTED_PACKAGES = {
+EXPECTED_COMMANDS = {
     "mcp-ltspice",
     "mcp-qucs-s",
     "mcp-rf-analysis",
@@ -13,19 +13,21 @@ EXPECTED_PACKAGES = {
 
 
 def _assert_uv_commands(commands: list[dict[str, object]]) -> None:
-    packages: set[str] = set()
+    scripts = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "scripts"
+    ]
+    launched: set[str] = set()
     for command in commands:
         assert command["command"] == "uv"
         args = command["args"]
         assert isinstance(args, list)
         assert all(isinstance(value, str) for value in args)
         assert "--frozen" in args
-        package_index = args.index("--package")
-        package = args[package_index + 1]
-        assert isinstance(package, str)
-        assert args[-1] == package
-        packages.add(package)
-    assert packages == EXPECTED_PACKAGES
+        assert "--package" not in args, "the repo is one package; --package is not needed"
+        server = args[-1]
+        assert server in scripts
+        launched.add(server)
+    assert launched == EXPECTED_COMMANDS
 
 
 def test_codex_project_config_declares_required_stdio_servers() -> None:
