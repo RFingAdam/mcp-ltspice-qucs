@@ -38,9 +38,19 @@ _SPICE_INCLUDE = re.compile(
 # locale, user configuration, and a temporary directory.  Keeping this list
 # explicit prevents unrelated credentials and agent configuration from leaking
 # into child processes.
+#
+# The Windows path variables below are not optional conveniences.  Windows APIs
+# expand "%SystemDrive%" / "%ProgramData%" internally; when those names are
+# absent from the child environment the expansion yields the *literal* string,
+# which Windows then treats as a path relative to the working directory.  A
+# simulator launched with cwd inside a repository silently created a
+# "%SystemDrive%/ProgramData/..." tree in the working copy.  All of these are
+# fixed system locations, not secrets.
 DEFAULT_SUBPROCESS_ENV_KEYS = frozenset(
     {
+        "ALLUSERSPROFILE",
         "APPDATA",
+        "COMMONPROGRAMFILES",
         "COMSPEC",
         "DYLD_FALLBACK_LIBRARY_PATH",
         "DYLD_LIBRARY_PATH",
@@ -58,7 +68,12 @@ DEFAULT_SUBPROCESS_ENV_KEYS = frozenset(
         "OPENBLAS_NUM_THREADS",
         "PATH",
         "PATHEXT",
+        "PROGRAMDATA",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "PROGRAMW6432",
         "SHELL",
+        "SYSTEMDRIVE",
         "SYSTEMROOT",
         "TEMP",
         "TMP",
