@@ -58,7 +58,7 @@ jobs:
         run: |
           test "$(find dist -maxdepth 1 -name 'mcp_ltspice_qucs-*.tar.gz' | wc -l)" -eq 1
           test "$(find dist -maxdepth 1 -name 'mcp_ltspice_qucs-*-py3-none-any.whl' | wc -l)" -eq 1
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 2
+          test "$(find dist -maxdepth 1 -type f ! -name .gitignore | wc -l)" -eq 2
 
       - name: Refuse a tag that does not match the package version
         if: github.ref_type == 'tag'
