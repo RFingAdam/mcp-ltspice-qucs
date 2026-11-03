@@ -1,8 +1,15 @@
 # Installation
 
-The Python package side is straightforward: `uv sync --all-packages`
-and you have all four packages installed in editable mode along with
-the dev tools.
+The Python side is one package, `mcp-ltspice-qucs`, which ships all
+three servers (`mcp-ltspice`, `mcp-qucs-s`, `mcp-rf-analysis`) and the
+shared `rf_mcp_common` module.
+
+```bash
+pip install mcp-ltspice-qucs
+```
+
+For development, `uv sync` in a checkout installs the package in editable
+mode along with the dev tools.
 
 The simulators are optional but enable additional functionality.
 
@@ -13,7 +20,7 @@ Tested on Python 3.11, 3.12, 3.13.
 ```bash
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs
 cd mcp-ltspice-qucs
-uv sync --all-packages
+uv sync
 uv run pytest -q
 ```
 
@@ -293,15 +300,10 @@ This runs ruff format + ruff check + mypy on every commit.
 
 ## Troubleshooting
 
-**`ModuleNotFoundError: No module named 'rf_mcp_common'` after first
-`uv sync`**: pass `--all-packages`:
-
-```bash
-uv sync --all-packages
-```
-
-The default `uv sync` only resolves the workspace root's dependencies;
-adding `--all-packages` installs every member into the venv.
+**`ModuleNotFoundError: No module named 'rf_mcp_common'` in a checkout
+made before 0.6.2**: the repository used to be a uv workspace of four
+packages. It is now one package, so remove the old `.venv` and run
+`uv sync` again.
 
 **`LTspice did not produce ...raw` from the runner**. The most common
 cause on Linux is that Wine's display server tried to pop up the
@@ -310,7 +312,7 @@ if you see Wine errors about X11 / display, install `xvfb` and run
 under it (`xvfb-run uv run python ...`).
 
 **`importlib.resources` can't find the `bands/` JSON files**. Make
-sure you `uv sync --all-packages --reinstall-package mcp-rf-analysis`
+sure you `uv sync --reinstall-package mcp-ltspice-qucs`
 after pulling fresh source so the editable install re-discovers the
 bundled resources.
 

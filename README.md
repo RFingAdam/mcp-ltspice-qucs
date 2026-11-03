@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo-banner.svg" alt="mcp-ltspice-qucs: RF filter and SMPS-EMC design via LTspice, Qucs-S, and scikit-rf" width="100%"/>
+<img src="https://raw.githubusercontent.com/RFingAdam/mcp-ltspice-qucs/main/assets/logo-banner.svg" alt="mcp-ltspice-qucs: RF filter and SMPS-EMC design via LTspice, Qucs-S, and scikit-rf" width="100%"/>
 
 <br/>
 
@@ -79,10 +79,32 @@ and Xyce instead of treating an absent backend as a pass.
 
 ### Install
 
+One package from PyPI installs all three servers:
+
+```bash
+pip install mcp-ltspice-qucs      # or: uv tool install mcp-ltspice-qucs
+```
+
+That puts three commands on your `PATH`: `mcp-ltspice`, `mcp-qucs-s`, and
+`mcp-rf-analysis`. Each one runs an MCP server on stdio. To use them from an
+MCP client without a separate install step:
+
+```json
+{
+  "mcpServers": {
+    "ltspice": { "command": "uvx", "args": ["--from", "mcp-ltspice-qucs", "mcp-ltspice"] },
+    "qucs-s": { "command": "uvx", "args": ["--from", "mcp-ltspice-qucs", "mcp-qucs-s"] },
+    "rf-analysis": { "command": "uvx", "args": ["--from", "mcp-ltspice-qucs", "mcp-rf-analysis"] }
+  }
+}
+```
+
+To work from a source checkout instead:
+
 ```bash
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs.git
 cd mcp-ltspice-qucs
-uv sync --all-packages
+uv sync
 uv run pytest -q                  # simulator-gated tests skip when tools are absent
 uv run python examples/basic_lpf/design.py
 ```
@@ -230,7 +252,7 @@ Contributions are welcome.
 2. **Fork + branch** (`feature/your-thing` or `fix/your-bug`).
 3. **Run the local check suite**:
    ```bash
-   uv sync --all-packages
+   uv sync
    uv run pytest -q
    uv run ruff check . && uv run ruff format --check .
    ```

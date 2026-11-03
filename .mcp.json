@@ -8,8 +8,6 @@
         "--frozen",
         "--directory",
         "${CLAUDE_PROJECT_DIR:-.}",
-        "--package",
-        "mcp-ltspice",
         "mcp-ltspice"
       ],
       "env": {}
@@ -22,8 +20,6 @@
         "--frozen",
         "--directory",
         "${CLAUDE_PROJECT_DIR:-.}",
-        "--package",
-        "mcp-qucs-s",
         "mcp-qucs-s"
       ],
       "env": {}
@@ -36,8 +32,6 @@
         "--frozen",
         "--directory",
         "${CLAUDE_PROJECT_DIR:-.}",
-        "--package",
-        "mcp-rf-analysis",
         "mcp-rf-analysis"
       ],
       "env": {}

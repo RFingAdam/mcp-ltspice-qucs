@@ -45,7 +45,7 @@ with 99% yield**; vendor parasitics are not applied in that calculation.
 ```bash
 git clone https://github.com/RFingAdam/mcp-ltspice-qucs
 cd mcp-ltspice-qucs
-uv sync --all-packages
+uv sync
 uv run python examples/basic_lpf/design.py
 ```
 

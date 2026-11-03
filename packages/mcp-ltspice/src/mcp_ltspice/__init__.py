@@ -2,4 +2,4 @@
 
 from rf_mcp_common.version import distribution_version
 
-__version__ = distribution_version("mcp-ltspice")
+__version__ = distribution_version()

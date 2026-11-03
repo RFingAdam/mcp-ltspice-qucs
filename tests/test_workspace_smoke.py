@@ -1,50 +1,41 @@
-"""Workspace-level smoke test.
+"""Package-level smoke test.
 
-The mcp-ltspice-qucs repo is a uv workspace with four packages:
+The mcp-ltspice-qucs repo builds one distribution, ``mcp-ltspice-qucs``,
+from four import packages kept under ``packages/``:
 
-    packages/rf-mcp-common
-    packages/mcp-ltspice
-    packages/mcp-qucs-s
-    packages/mcp-rf-analysis
+    packages/rf-mcp-common/src/rf_mcp_common
+    packages/mcp-ltspice/src/mcp_ltspice
+    packages/mcp-qucs-s/src/mcp_qucs_s
+    packages/mcp-rf-analysis/src/mcp_rf_analysis
 
-Each package has its own pytest suite under `packages/*/tests/`. This
-top-level smoke test just verifies the workspace itself is consistent:
-all four packages are importable and report a version. Detailed unit
-tests live alongside the package they cover.
-
-Run all tests across the workspace:
-
-    uv run pytest packages/
+Each module has its own pytest suite under ``packages/*/tests/``. This
+top-level smoke test verifies that all four modules import, that the one
+distribution is installed, and that it declares every server command.
 """
 
 from __future__ import annotations
 
 import importlib
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
+from importlib.metadata import distribution
 
-PACKAGES = [
-    ("rf_mcp_common", "rf-mcp-common"),
-    ("mcp_ltspice", "mcp-ltspice"),
-    ("mcp_qucs_s", "mcp-qucs-s"),
-    ("mcp_rf_analysis", "mcp-rf-analysis"),
-]
+MODULES = ["rf_mcp_common", "mcp_ltspice", "mcp_qucs_s", "mcp_rf_analysis"]
+COMMANDS = {
+    "mcp-ltspice": "mcp_ltspice.server:main",
+    "mcp-qucs-s": "mcp_qucs_s.server:main",
+    "mcp-rf-analysis": "mcp_rf_analysis.server:main",
+}
 
 
-def test_all_workspace_packages_importable() -> None:
-    """Every workspace package imports without error."""
-    for module_name, _ in PACKAGES:
+def test_all_modules_importable() -> None:
+    """Every module in the distribution imports without error."""
+    for module_name in MODULES:
         mod = importlib.import_module(module_name)
         assert mod is not None, f"{module_name} imported as None"
 
 
-def test_all_workspace_packages_installed() -> None:
-    """Every workspace package is installed (metadata resolves)."""
-    missing = []
-    for _, dist_name in PACKAGES:
-        try:
-            v = pkg_version(dist_name)
-            assert v, f"{dist_name} reports empty version"
-        except PackageNotFoundError:
-            missing.append(dist_name)
-    assert not missing, f"workspace packages not installed: {missing}"
+def test_distribution_installed_with_every_server_command() -> None:
+    """The one distribution is installed and declares all three servers."""
+    dist = distribution("mcp-ltspice-qucs")
+    assert dist.version
+    scripts = {e.name: e.value for e in dist.entry_points if e.group == "console_scripts"}
+    assert scripts == COMMANDS

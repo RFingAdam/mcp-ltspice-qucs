@@ -13,7 +13,7 @@ def test_ok_envelope_contains_status_and_data() -> None:
     assert env.status == "ok"
     assert env.data == {"value": 42}
     assert env.metadata["foo"] == "bar"
-    assert env.metadata["tool_version"] == version("rf-mcp-common")
+    assert env.metadata["tool_version"] == version("mcp-ltspice-qucs")
     assert env.error is None
     assert env.warnings == []
 

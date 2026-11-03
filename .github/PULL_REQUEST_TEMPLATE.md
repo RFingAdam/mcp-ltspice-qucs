@@ -18,7 +18,7 @@ usually enough: bullet what changed and why, not how.
 - [ ] If touching a server tool: smoke-tested via `uv run mcp-<server>` and
       a manual `call_tool` round-trip
 - [ ] If touching CI / packaging / install paths: ran the change in a
-      fresh `uv sync --all-packages --reinstall` venv
+      fresh `uv sync --reinstall` venv
 
 ## Changelog
 

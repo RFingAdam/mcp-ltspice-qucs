@@ -1,15 +1,15 @@
-"""Each published package carries its own copy of the repository licence."""
+"""The published distribution carries the repository licence."""
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize("package", sorted(p.name for p in (ROOT / "packages").iterdir()))
-def test_package_license_matches_repository(package: str) -> None:
-    packaged = ROOT / "packages" / package / "LICENSE"
-    assert packaged.read_bytes() == (ROOT / "LICENSE").read_bytes()
+def test_distribution_ships_repository_license() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    assert project["license"] == "AGPL-3.0-or-later"
+    assert project["license-files"] == ["LICENSE"]
+    assert (ROOT / "LICENSE").is_file()

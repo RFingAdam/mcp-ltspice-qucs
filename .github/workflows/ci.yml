@@ -28,7 +28,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages --frozen
+        run: uv sync --frozen
 
       - name: Ruff format check
         run: uv run ruff format --check .
@@ -71,7 +71,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Sync workspace
-        run: uv sync --all-packages --frozen
+        run: uv sync --frozen
 
       - name: Install ngspice
         run: |
@@ -102,7 +102,7 @@ jobs:
         run: uv lock --resolution lowest-direct
 
       - name: Sync minimum dependency environment
-        run: uv sync --all-packages --no-dev --resolution lowest-direct
+        run: uv sync --no-dev --resolution lowest-direct
 
       - name: Install the bounded test runner only
         run: uv pip install --python .venv/bin/python "pytest>=8.3.3,<10"
@@ -131,13 +131,13 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
-      - name: Build wheels and source distributions
-        run: uv build --all-packages
+      - name: Build the wheel and source distribution
+        run: uv build
 
       - name: Create isolated environment
         run: uv venv "${RUNNER_TEMP}/wheel-smoke"
 
-      - name: Install built wheels
+      - name: Install the built wheel
         run: >-
           uv pip install
           --python "${RUNNER_TEMP}/wheel-smoke/bin/python"
@@ -154,15 +154,18 @@ jobs:
 
           names = {
               entry.name
-              for entry in metadata.entry_points(group="console_scripts")
+              for entry in metadata.distribution("mcp-ltspice-qucs").entry_points
+              if entry.group == "console_scripts"
           }
           expected = {"mcp-ltspice", "mcp-qucs-s", "mcp-rf-analysis"}
-          assert expected <= names
+          assert names == expected, sorted(names)
           print("isolated wheel imports and entry points OK")
           PY
 
-      - name: Inspect source distributions
-        run: test "$(find dist -name '*.tar.gz' | wc -l)" -eq 4
+      - name: Inspect the source distribution
+        run: |
+          test "$(find dist -name 'mcp_ltspice_qucs-*.tar.gz' | wc -l)" -eq 1
+          test "$(find dist -name '*.tar.gz' | wc -l)" -eq 1
 
   test-windows:
     # Covers the native-Windows simulator-discovery branch (issue #40):
@@ -186,7 +189,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages --frozen
+        run: uv sync --frozen
 
       - name: Native discovery branch (no os_name hook)
         run: |
@@ -212,7 +215,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync workspace
-        run: uv sync --all-packages --frozen
+        run: uv sync --frozen
 
       - name: Run basic LPF design
         run: uv run python examples/basic_lpf/design.py

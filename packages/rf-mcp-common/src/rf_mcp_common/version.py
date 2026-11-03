@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+#: The one PyPI distribution that ships every module in this repository.
+DISTRIBUTION_NAME = "mcp-ltspice-qucs"
 
-def distribution_version(distribution_name: str) -> str:
+
+def distribution_version(distribution_name: str = DISTRIBUTION_NAME) -> str:
     """Return the installed version without duplicating it in source code.
 
     Packages are normally imported from an installed wheel or editable

@@ -1,29 +1,84 @@
 [project]
-name = "mcp-ltspice-qucs-workspace"
-version = "0.0.0"
-description = "RF engineering MCP suite: LTspice, Qucs-S, and analysis servers (workspace root)"
+name = "mcp-ltspice-qucs"
+version = "0.6.2"
+description = "RF engineering MCP servers for LTspice/ngspice, Qucs-S, and simulator-agnostic RF analysis, in one package"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{ name = "Adam Engelbrecht", email = "adam.engelbrecht76@gmail.com" }]
+keywords = [
+    "mcp",
+    "ltspice",
+    "ngspice",
+    "spice",
+    "qucs",
+    "qucs-s",
+    "harmonic-balance",
+    "microstrip",
+    "filter-design",
+    "scikit-rf",
+    "coexistence",
+    "rf-engineering",
+]
+
+# One distribution ships all four import packages (rf_mcp_common, mcp_rf_analysis,
+# mcp_ltspice, mcp_qucs_s) and the three server commands below.
+dependencies = [
+    "anyio>=4.14.2,<4.15",
+    "fastmcp>=3.4.10,<3.5",
+    "pydantic>=2.7,<3",
+    "scikit-rf>=1.2.0,<2",
+    "numpy>=1.26,<3",
+    "scipy>=1.11,<2",
+    "pandas>=2.1,<4",
+    "spicelib>=1.4.0,<3",
+    "matplotlib>=3.8,<4",
+    "joblib>=1.3,<2",
+    "schemdraw>=0.22,<1",
+    "lxml>=5.0,<7",
+]
+
+[project.urls]
+Homepage = "https://github.com/RFingAdam/mcp-ltspice-qucs"
+Documentation = "https://rfingadam.github.io/mcp-ltspice-qucs/"
+Repository = "https://github.com/RFingAdam/mcp-ltspice-qucs"
+Changelog = "https://github.com/RFingAdam/mcp-ltspice-qucs/blob/main/CHANGELOG.md"
+Issues = "https://github.com/RFingAdam/mcp-ltspice-qucs/issues"
+
+[project.scripts]
+mcp-ltspice = "mcp_ltspice.server:main"
+mcp-qucs-s = "mcp_qucs_s.server:main"
+mcp-rf-analysis = "mcp_rf_analysis.server:main"
+
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+# The source stays in packages/<server>/src/<module>; the wheel puts each module at top level.
+[tool.hatch.build.targets.wheel]
+packages = [
+    "packages/rf-mcp-common/src/rf_mcp_common",
+    "packages/mcp-rf-analysis/src/mcp_rf_analysis",
+    "packages/mcp-ltspice/src/mcp_ltspice",
+    "packages/mcp-qucs-s/src/mcp_qucs_s",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "packages/rf-mcp-common/src",
+    "packages/mcp-rf-analysis/src",
+    "packages/mcp-ltspice/src",
+    "packages/mcp-qucs-s/src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 [tool.uv]
 # numpy 2.5 stubs use Python 3.12 syntax, which mypy rejects at the 3.11 target set below.
 constraint-dependencies = ["numpy<2.5"]
-
-[tool.uv.workspace]
-members = [
-    "packages/rf-mcp-common",
-    "packages/mcp-ltspice",
-    "packages/mcp-rf-analysis",
-    "packages/mcp-qucs-s",
-]
-
-[tool.uv.sources]
-rf-mcp-common = { workspace = true }
-mcp-ltspice = { workspace = true }
-mcp-rf-analysis = { workspace = true }
-mcp-qucs-s = { workspace = true }
 
 [dependency-groups]
 dev = [
