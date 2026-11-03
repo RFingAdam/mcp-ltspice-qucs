@@ -22,17 +22,17 @@ Read `capabilities://ltspice`, `capabilities://qucs-s`, or
   is required per commit. It runs static checks, locked and minimum dependency
   contracts, real stdio initialize/list/call/error tests, isolated wheel
   installation, Windows discovery, and a real ngspice known answer.
-- [Extended simulator and MCP client matrix](https://github.com/RFingAdam/mcp-ltspice-qucs/actions/workflows/extended-matrix.yml)
-  runs weekly and on demand on capability-labelled self-hosted runners. It is
-  the truthful execution tier for Qucsator-RF, Xyce, LTspice native/Wine,
+- The extended simulator and MCP client matrix runs weekly and on demand from a
+  private CI repository on the maintainer's own runner, never on pull requests
+  to this public repository. It is
+  the truthful execution tier for Qucsator-RF, Xyce, LTspice under Wine,
   current Codex, and current Claude Code.
 - [Release validation](https://github.com/RFingAdam/mcp-ltspice-qucs/actions/workflows/release-validation.yml)
   rebuilds documentation and contract snapshots, audits dependencies, builds
   all distributions, emits an SPDX SBOM, and attests artifact provenance.
 
-An absent proprietary or specialist runner is not converted into a passing
-result. The extended workflow remains queued until a runner with the declared
-capability label accepts it.
+An absent proprietary or specialist backend is not converted into a passing
+result.
 
 ## Output confidence
 
