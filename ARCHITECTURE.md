@@ -1,7 +1,9 @@
 # Architecture
 
-The repo ships **three MCP servers** plus a tiny shared package, all
-under one uv workspace.
+The repo ships **three MCP servers** plus a tiny shared module, all in
+one Python distribution, `mcp-ltspice-qucs`. The source for each module
+lives under `packages/<name>/src/<module>/`; the root `pyproject.toml`
+builds them into a single wheel.
 
 ## Workspace layout
 
@@ -179,13 +181,11 @@ incantation is needed.
 
 ## Versioning
 
-Each package has its own `pyproject.toml` and version, bumping
-independently per [Semver](https://semver.org/). The current minor
-release is `0.6.0`. Runtime package and FastMCP server versions are derived
-from installed distribution metadata rather than duplicated in source.
-`rf-mcp-common` is the contract layer; breaking
-changes there cascade to every server and warrant a major bump for
-all four.
+The root `pyproject.toml` holds the one version, following
+[Semver](https://semver.org/). Every module and FastMCP server reports the
+`mcp-ltspice-qucs` distribution version from installed metadata rather than
+duplicating it in source. `rf_mcp_common` is the contract layer; breaking
+changes there cascade to every server and warrant a major bump.
 
 `mcp-qucs-s` implements Qucsator S-parameter and noise analysis plus Xyce
 harmonic balance. Simulator-dependent tools report a clear error when their

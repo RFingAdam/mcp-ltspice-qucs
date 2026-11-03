@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from rf_mcp_common.version import distribution_version
 
 T = TypeVar("T")
-_DEFAULT_TOOL_VERSION = distribution_version("rf-mcp-common")
+_DEFAULT_TOOL_VERSION = distribution_version()
 
 
 class Envelope(BaseModel, Generic[T]):

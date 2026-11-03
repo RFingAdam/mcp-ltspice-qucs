@@ -10,7 +10,7 @@ on:
       - ".github/workflows/release.yml"
       - ".github/workflows/release-validation.yml"
       - "build-constraints.txt"
-      - "packages/*/pyproject.toml"
+      - "pyproject.toml"
       - "uv.lock"
 
 permissions:
@@ -27,7 +27,8 @@ jobs:
 
   # Kept apart from validate, which runs tools resolved at run time. Nothing unlocked may run where
   # the published files are made: build-constraints.txt pins the build backend by hash, and this job
-  # installs nothing else. --no-sources proves the packages build the way PyPI will install them.
+  # installs nothing else. --no-sources proves the package builds the way PyPI will install it.
+  # The repository publishes one distribution, mcp-ltspice-qucs: one sdist and one wheel.
   build:
     needs: validate
     runs-on: ubuntu-24.04
@@ -50,15 +51,20 @@ jobs:
         if: github.ref_type == 'tag'
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
 
-      - name: Build packages
-        run: uv build --all-packages --no-sources --python 3.12 --build-constraint build-constraints.txt --require-hashes
+      - name: Build the package
+        run: uv build --no-sources --python 3.12 --build-constraint build-constraints.txt --require-hashes
 
-      - name: Refuse a tag that does not match every package version
+      - name: Expect exactly one sdist and one wheel
+        run: |
+          test "$(find dist -maxdepth 1 -name 'mcp_ltspice_qucs-*.tar.gz' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -name 'mcp_ltspice_qucs-*-py3-none-any.whl' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 2
+
+      - name: Refuse a tag that does not match the package version
         if: github.ref_type == 'tag'
         run: |
-          for name in rf_mcp_common mcp_rf_analysis mcp_ltspice mcp_qucs_s; do
-            test -f "dist/$name-${GITHUB_REF_NAME#v}-py3-none-any.whl"
-          done
+          test -f "dist/mcp_ltspice_qucs-${GITHUB_REF_NAME#v}-py3-none-any.whl"
+          test -f "dist/mcp_ltspice_qucs-${GITHUB_REF_NAME#v}.tar.gz"
 
       - name: Upload packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -85,18 +91,24 @@ jobs:
       - name: Check the package metadata
         run: uvx twine check --strict dist/*
 
-      - name: Install the wheels and load every server
+      - name: Install the wheel and load every server
         run: |
           uv venv --python 3.12 wheel-env
           uv pip install --python wheel-env/bin/python dist/*.whl
           wheel-env/bin/python -c '
+          import importlib
           from importlib.metadata import distribution
-          for name in ("mcp-ltspice", "mcp-qucs-s", "mcp-rf-analysis"):
-              commands = [e for e in distribution(name).entry_points if e.group == "console_scripts"]
-              assert commands, name
-              for command in commands:
-                  command.load()
-              print(name, "loaded", [c.name for c in commands])
+          for module in ("rf_mcp_common", "mcp_rf_analysis", "mcp_ltspice", "mcp_qucs_s"):
+              importlib.import_module(module)
+          commands = {
+              e.name: e for e in distribution("mcp-ltspice-qucs").entry_points
+              if e.group == "console_scripts"
+          }
+          assert set(commands) == {"mcp-ltspice", "mcp-qucs-s", "mcp-rf-analysis"}, sorted(commands)
+          for name, command in sorted(commands.items()):
+              server = importlib.import_module(command.module).mcp
+              command.load()
+              print(name, "loaded", server.name, server.version)
           '
 
   publish:
@@ -106,7 +118,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: pypi
-      url: https://pypi.org/project/mcp-ltspice/
+      url: https://pypi.org/project/mcp-ltspice-qucs/
     permissions:
       id-token: write
     steps:
@@ -115,39 +127,9 @@ jobs:
           name: dist
           path: dist
 
-      - name: Sort the files by package
-        run: |
-          for name in rf_mcp_common mcp_rf_analysis mcp_ltspice mcp_qucs_s; do
-            mkdir -p "upload/$name"
-            mv "dist/$name"-* "upload/$name/"
-          done
-          test -z "$(ls -A dist)"
-
-      # Dependencies first, one package at a time. If a run stops partway, nothing on PyPI requires
-      # a name that is still unclaimed, and re-running the job picks up where it stopped.
-      - name: Publish rf-mcp-common
+      # Trusted publishing: PyPI project mcp-ltspice-qucs, workflow release.yml, environment pypi.
+      - name: Publish mcp-ltspice-qucs
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-        with:
-          packages-dir: upload/rf_mcp_common/
-          skip-existing: true
-
-      - name: Publish mcp-rf-analysis
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-        with:
-          packages-dir: upload/mcp_rf_analysis/
-          skip-existing: true
-
-      - name: Publish mcp-ltspice
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-        with:
-          packages-dir: upload/mcp_ltspice/
-          skip-existing: true
-
-      - name: Publish mcp-qucs-s
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-        with:
-          packages-dir: upload/mcp_qucs_s/
-          skip-existing: true
 
   github-release:
     needs: publish

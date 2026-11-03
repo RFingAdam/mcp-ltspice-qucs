@@ -6,4 +6,4 @@ analysis, and Xyce harmonic-balance workflows.
 
 from rf_mcp_common.version import distribution_version
 
-__version__ = distribution_version("mcp-qucs-s")
+__version__ = distribution_version()
