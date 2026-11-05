@@ -5,19 +5,21 @@
     "last_updated": "2026-04-22"
   },
   "limits": {
-    "en_300_220_h1p6": {
-      "band_label": "868 MHz EU SRD - sub-band h1.6",
+    "en_300_220_h1p7": {
+      "band_label": "869.4-869.65 MHz EU SRD - ERC/REC 70-03 Annex 1 band h1.7",
       "f_low": 869.4e6,
       "f_high": 869.65e6,
       "max_erp_dbm": 27,
+      "citation": "ERC/REC 70-03 (edition of 9 October 2026, https://docdb.cept.org/document/845) Annex 1 band h1.7: 500 mW e.r.p., <= 10% duty cycle or LBT+AFA",
       "duty_cycle_max_pct": 10,
       "spurious_dbm": -36
     },
-    "en_300_220_g3": {
-      "band_label": "868 MHz EU SRD - sub-band G3",
+    "en_300_220_h1p6": {
+      "band_label": "868.7-869.2 MHz EU SRD - ERC/REC 70-03 Annex 1 band h1.6",
       "f_low": 868.7e6,
       "f_high": 869.2e6,
       "max_erp_dbm": 14,
+      "citation": "ERC/REC 70-03 (edition of 9 October 2026, https://docdb.cept.org/document/845) Annex 1 band h1.6: 25 mW e.r.p., <= 0.1% duty cycle or LBT+AFA",
       "duty_cycle_max_pct": 0.1,
       "spurious_dbm": -36
     },

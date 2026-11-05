@@ -67,11 +67,15 @@ def test_cispr22_class_b_step_at_5mhz() -> None:
     assert limit_mid == pytest.approx(60.0, abs=0.5)
 
 
-def test_cispr22_class_a_is_10db_above_class_b() -> None:
-    """Class A (industrial) is 10 dB more permissive."""
-    a = cispr_limit_at(1e6, standard="cispr22_a")
-    b = cispr_limit_at(1e6, standard="cispr22_b")
-    assert a - b == pytest.approx(10.0)
+@pytest.mark.parametrize(
+    ("freq_hz", "expected_dbuv"),
+    [(150e3, 79.0), (300e3, 79.0), (1e6, 73.0), (10e6, 73.0), (30e6, 73.0)],
+)
+def test_cispr22_class_a_quasi_peak_table(freq_hz: float, expected_dbuv: float) -> None:
+    """Class A mains QP: 79 dBuV 0.15-0.5 MHz, 73 dBuV 0.5-30 MHz
+    (CISPR 22/32 Class A = 47 CFR 15.107(b)). It was modelled as
+    Class B + 10 dB, which gave 66 dBuV at 1 MHz instead of 73."""
+    assert cispr_limit_at(freq_hz, standard="cispr22_a") == pytest.approx(expected_dbuv)
 
 
 def test_cispr_limit_outside_range_raises() -> None:
