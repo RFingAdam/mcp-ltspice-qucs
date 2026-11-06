@@ -6,7 +6,8 @@ frequency, and the industry metric is ΔC/N₀ (dB-Hz), not a blocking
 margin. The model (documented assumptions, all hand-checkable):
 
 - Interference noise density at the RX:
-  ``I₀ = PA_noise_dBm/Hz − filter_rejection_at_victim − antenna_iso``
+  ``I₀ = PA_noise_dBm/Hz − aggressor_TX_filter_rejection_at_GNSS − antenna_iso``
+  (the GNSS receiver's own filter cannot reject in-band energy)
 - GNSS effective noise floor: ``N₀ = −174 + NF`` dBm/Hz
 - ``ΔC/N₀ = 10·log₁₀(1 + 10^((I₀−N₀)/10))``. The effective-floor rise;
   at I₀ = N₀ this is exactly 3.010 dB.
@@ -45,15 +46,19 @@ def _matrix(tx, rx, **kw):
 
 
 def test_broadband_noise_hand_pin_negligible() -> None:
-    """PA noise −155 dBm/Hz, 20 dB filter rejection at L1, 30 dB isolation:
-    I₀ = −205; N₀ = −172; ΔC/N₀ = 10log10(1+10^−3.3) = 0.00218 dB."""
+    """PA noise −155 dBm/Hz, 20 dB aggressor TX-filter rejection at L1, 30 dB isolation:
+    I₀ = −205; N₀ = −172; ΔC/N₀ = 10log10(1+10^−3.3) = 0.00218 dB.
+
+    The rejection sits on the aggressor side: PA noise at L1 is inside the
+    GNSS passband, so the GNSS receiver's own filter cannot remove it."""
     tx = {
         "name": "TX900",
         "f_center_hz": 915e6,
         "power_dbm": 30.0,
         "broadband_noise_dbm_hz": -155.0,
+        "noise_filter_rejection_db": 20.0,
     }
-    rx = {**GPS_L1, "filter_rejection_db": 20.0}
+    rx = dict(GPS_L1)
     rows = [r for r in _matrix(tx, rx, antenna_iso_db=30.0) if r["mechanism"] == "broadband_noise"]
     assert len(rows) == 1
     r = rows[0]

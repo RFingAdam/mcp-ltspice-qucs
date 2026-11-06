@@ -12,8 +12,10 @@ One call closes the loop the engineer used to orchestrate by hand:
 4. The realized ladder's rejection is evaluated analytically and folded
    into the coex matrix inputs: the fundamental sees the filter's
    in-band rejection, each harmonic's dBc is deepened by the rejection
-   at n·f0, and GNSS victims get the rejection at *their* frequency
-   injected (#15's ``filter_rejection_db``).
+   at n·f0, and each GNSS victim gets the transmit filter's rejection at
+   *its* frequency as ``aggressor_filter_rejection_db``: the filter sits
+   on the aggressor side, so it attenuates the PA's broadband noise that
+   lands inside the GNSS passband.
 5. :func:`mcp_rf_analysis.coex.check_coex_matrix` (GNSS-aware) yields
    the worst-case desense; if it exceeds the target, the order steps by
    2 and the loop repeats up to ``max_order``. Non-convergence returns
@@ -190,8 +192,8 @@ def synthesize_for_coex_target(
         rx_list: list[dict[str, Any]] = []
         for v in victim_bands:
             v = dict(v)
-            if v.get("victim_type") == "gnss" and "filter_rejection_db" not in v:
-                v["filter_rejection_db"] = _rejection_db(
+            if v.get("victim_type") == "gnss" and "aggressor_filter_rejection_db" not in v:
+                v["aggressor_filter_rejection_db"] = _rejection_db(
                     realized,
                     [v["f_center_hz"]],
                     substitution=substitution,

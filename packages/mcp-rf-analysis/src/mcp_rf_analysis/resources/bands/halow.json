@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "source": "IEEE 802.11ah-2016 / 802.11-2020 Annex E (regional channel sets); FCC Part 15.247; ETSI EN 300 220",
-    "notes": "Center frequencies in Hz. HaLow operates in sub-1 GHz ISM bands; channel grids and allowed PSDs differ by region.",
+    "source": "IEEE 802.11ah-2016 / 802.11-2020 Annex E (regional channel sets); 47 CFR 15.247; ERC/REC 70-03 with ETSI EN 300 220",
+    "notes": "Center frequencies in Hz. HaLow operates in sub-1 GHz ISM bands; channel grids and allowed PSDs differ by region. Power limits: only US and EU carry a primary citation; every other region is marked power_limit_status UNVERIFIED. EU limits are e.r.p. (max_erp_dbm), with max_eirp_dbm derived as ERP + 2.15 dB.",
     "last_updated": "2026-04-22"
   },
   "regions": {
@@ -9,8 +9,11 @@
       "label": "United States (FCC Part 15.247)",
       "band": [902e6, 928e6],
       "channel_widths_mhz": [1, 2, 4, 8, 16],
+      "max_conducted_power_dbm": 30,
       "max_eirp_dbm": 36,
-      "notes": "Frequency hopping or DSSS. Rich channel set; full 26 MHz available.",
+      "power_limit_status": "cited",
+      "power_limit_citation": "47 CFR 15.247(b)(3) (1 W conducted, digital modulation in 902-928 MHz) and 15.247(b)(4) (6 dBi antenna gain before power reduction); eCFR snapshot 2026-08-01",
+      "notes": "Digital modulation (15.247(b)(3)): 1 W conducted with up to 6 dBi antenna gain = 36 dBm EIRP; above 6 dBi the conducted power is reduced dB-for-dB (15.247(b)(4)). Frequency-hopping systems with fewer than 50 channels are limited to 0.25 W (15.247(b)(2)). Rich channel set; full 26 MHz available.",
       "channels_1mhz_centers": [
         903e6,  904e6,  905e6,  906e6,  907e6,  908e6,  909e6,  910e6,  911e6,  912e6,
         913e6,  914e6,  915e6,  916e6,  917e6,  918e6,  919e6,  920e6,  921e6,  922e6,
@@ -21,19 +24,38 @@
       "label": "Europe (ETSI EN 300 220 sub-bands)",
       "band": [863e6, 870e6],
       "channel_widths_mhz": [1, 2],
-      "max_eirp_dbm": 14,
-      "notes": "Sub-band-dependent duty cycle limits (0.1%-10%); restricted relative to US allocation.",
+      "max_erp_dbm": 14,
+      "max_erp_mw": 25,
+      "max_eirp_dbm": 16.15,
+      "erp_to_eirp_db": 2.15,
+      "power_limit_status": "cited",
+      "power_limit_citation": "ERC/REC 70-03 (edition of 9 October 2026, https://docdb.cept.org/document/845) Annex 1 band h1.3 (863-865 MHz, 25 mW e.r.p., <= 0.1% duty cycle or LBT+AFA), band h1.4 (865-868 MHz, 25 mW e.r.p., <= 1% duty cycle or LBT+AFA); Annex 3 band a1 (863-868 MHz wideband data transmission, > 600 kHz to <= 1 MHz, 25 mW e.r.p., polite spectrum access required, <= 10% duty cycle for network access points, <= 2.8% otherwise)",
+      "source_of_truth": "Same values and citation as mcp-emc-regulations data/wifi_standards.json bands.sub_1ghz.regions.etsi; tests/test_review_followups.py pins both to these constants.",
+      "notes": "The limit is 25 mW e.r.p. (14 dBm ERP); max_eirp_dbm = ERP + 2.15 dB = 16.15 dBm. A 1 MHz channel uses Annex 3 a1 (polite access, 10% / 2.8% duty cycle) or Annex 1 h1.3/h1.4 (0.1% / 1% duty cycle or LBT+AFA). Channels wider than 1 MHz exceed the Annex 3 a1 bandwidth. The 1 MHz channels centred at 868 and 869 MHz extend above 868 MHz, outside Annex 3 a1 and partly outside the Annex 1 non-specific SRD bands (868.6-868.7 and 869.2-869.4 MHz are not h1.x bands): check before using them.",
       "channels_1mhz_centers": [864e6, 865e6, 866e6, 867e6, 868e6, 869e6]
     },
     "JP": {
       "label": "Japan (ARIB STD-T108)",
+      "power_limit_status": "cited",
+      "max_eirp_dbm": 16,
+      "max_antenna_gain_dbi": 3,
+      "unit_channel_khz": 200,
+      "max_simultaneous_unit_channels": 20,
+      "eirp_band_hz": [920.5e6, 928.1e6],
+      "power_limit_citation": "MIC Ordinance Regulating Radio Equipment (Radio Regulatory Commission Rules No. 18 of 1950) Art. 49-14 item 7 (ro): transmit antenna absolute gain <= 3 dBi; EIRP above 16 dBm must be removed by reducing antenna gain (920.5-928.1 MHz specified low-power radio stations); item 7 (ha): 200 kHz unit channels from 920.6 MHz, up to 20 simultaneous with carrier sense",
+      "power_limit_verification": "verified_against_primary: Art. 49-14 text retrieved from the e-Gov law API (lawdata/325M50080000018) on 2026-11-05",
+      "max_antenna_power_status": "UNVERIFIED",
+      "max_antenna_power_note": "UNVERIFIED / NO DATA: the antenna-power limit is not in the Ordinance; Radio Law Enforcement Regulations Art. 6(4)(ii) delegates it to a separate MIC Notification, which has not been checked. See MIC / ARIB STD-T108.",
+      "source_of_truth": "Same values and citation as mcp-emc-regulations data/wifi_standards.json bands.sub_1ghz.regions.japan and data/japan_rules.json arib_standards.std_t108; tests/test_review_followups.py pins both to the same constants.",
+      "notes": "The 16 dBm EIRP cap applies to 920.5-928.1 MHz (item 7). Channels below 920.5 MHz fall under item 8 (915.9-929.7 MHz, EIRP reference 3 dBm under item 8 (ro)) or item 6 (916.7-923.5 MHz, mobile identification / wireless power transfer only): the 917-920 MHz 1 MHz channels listed here are not covered by the 16 dBm cap. 20 x 200 kHz = 4 MHz is the widest aggregate under item 7 (ha).",
       "band": [916.5e6, 927.5e6],
       "channel_widths_mhz": [1, 2, 4],
-      "max_eirp_dbm": 20,
       "channels_1mhz_centers": [917e6, 918e6, 919e6, 920e6, 921e6, 922e6, 923e6, 924e6, 925e6, 926e6, 927e6]
     },
     "KR": {
       "label": "Korea",
+      "power_limit_status": "UNVERIFIED",
+      "power_limit_note": "UNVERIFIED: max_eirp_dbm = 14 has no primary citation in this dataset and may be EIRP, ERP or conducted. See National Radio Research Agency (https://www.rra.go.kr).",
       "band": [917.5e6, 923.5e6],
       "channel_widths_mhz": [1, 2, 4],
       "max_eirp_dbm": 14,
@@ -41,6 +63,8 @@
     },
     "CN": {
       "label": "China",
+      "power_limit_status": "UNVERIFIED",
+      "power_limit_note": "UNVERIFIED: max_eirp_dbm = 20 has no primary citation in this dataset and may be EIRP, ERP or conducted. See MIIT / SRRC China.",
       "band": [755e6, 787e6],
       "channel_widths_mhz": [1, 2, 4, 8],
       "max_eirp_dbm": 20,
@@ -48,6 +72,8 @@
     },
     "SG": {
       "label": "Singapore",
+      "power_limit_status": "UNVERIFIED",
+      "power_limit_note": "UNVERIFIED: max_eirp_dbm = 14 has no primary citation in this dataset and may be EIRP, ERP or conducted. See IMDA Singapore.",
       "band": [866e6, 869e6],
       "channel_widths_mhz": [1, 2],
       "max_eirp_dbm": 14,
@@ -55,6 +81,8 @@
     },
     "AU_NZ": {
       "label": "Australia / New Zealand",
+      "power_limit_status": "UNVERIFIED",
+      "power_limit_note": "UNVERIFIED: max_eirp_dbm = 30 has no primary citation in this dataset and may be EIRP, ERP or conducted. See ACMA LIPD Class Licence 2015 (Australia) / RSM GURL for Short Range Devices (New Zealand).",
       "band": [915e6, 928e6],
       "channel_widths_mhz": [1, 2, 4, 8],
       "max_eirp_dbm": 30,
@@ -64,6 +92,8 @@
     },
     "IN": {
       "label": "India",
+      "power_limit_status": "UNVERIFIED",
+      "power_limit_note": "UNVERIFIED: max_eirp_dbm = 14 has no primary citation in this dataset and may be EIRP, ERP or conducted. See WPC / DoT India.",
       "band": [865e6, 868e6],
       "channel_widths_mhz": [1, 2],
       "max_eirp_dbm": 14,

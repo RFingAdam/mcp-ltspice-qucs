@@ -10,6 +10,7 @@ from pydantic import Field
 
 from mcp_rf_analysis import __version__
 from mcp_rf_analysis.bands import (
+    fcc_15247_spurious_limit,
     is_in_restricted_band,
     list_5gnr_bands,
     list_fcc_restricted_bands,
@@ -42,6 +43,9 @@ from mcp_rf_analysis.emc import (
 )
 from mcp_rf_analysis.emc import (
     predict_radiated_emissions_loop as _predict_radiated,
+)
+from mcp_rf_analysis.link import (
+    DesenseInputError,
 )
 from mcp_rf_analysis.link import (
     compute_antenna_isolation_estimate as _compute_antenna_isolation_estimate,
@@ -402,20 +406,60 @@ def is_in_restricted_band_tool(
 
 @mcp.tool(
     annotations=DEFAULT_TOOL_ANNOTATIONS,
-    description="For a TX center frequency, find which RX bands its 2nd / 3rd / etc. harmonics land in.",
+    description=(
+        "47 CFR 15.247(d) spurious-emission limit at a frequency for a 15.247 transmitter. "
+        "Inside a 15.205 restricted band: the 15.209(a) field-strength limit (e.g. 54 dBuV/m "
+        "at 3 m above 960 MHz) and its EIRP, EIRP(dBm) = E(dBuV/m) + 20log10(d) - 104.77. "
+        "Outside: >= 20 dB below the highest in-band 100 kHz level (30 dB when power was "
+        "shown with RMS averaging, power_method='average'), never required below 15.209(a). "
+        "Not a flat absolute dBm figure."
+    ),
 )
-def lookup_harmonic_victims(
-    f_center_hz: Annotated[float, Field(gt=0)],
-    harmonic_orders: list[int] | None = None,
-) -> Envelope[list[dict[str, Any]]]:
-    return _wrap(_lookup_harmonic_victims, f_center_hz, harmonic_orders)
+def fcc_15247_spurious_limit_tool(
+    freq_hz: Annotated[float, Field(gt=0)],
+    inband_peak_dbm_100khz: float | None = None,
+    power_method: Literal["peak", "average"] = "peak",
+) -> Envelope[dict[str, Any]]:
+    return _wrap(
+        fcc_15247_spurious_limit,
+        freq_hz,
+        inband_peak_dbm_100khz=inband_peak_dbm_100khz,
+        power_method=power_method,
+    )
 
 
 @mcp.tool(
     annotations=DEFAULT_TOOL_ANNOTATIONS,
     description=(
-        "Compute the multi-radio coex aggressor × victim matrix with predicted "
-        "desense. RX entries may set victim_type='gnss' to switch to the "
+        "For a TX or oscillator center frequency, find which RX bands its 2nd / 3rd / "
+        "etc. harmonics land in and which FCC rule governs each one. source_type: "
+        "'intentional' (transmitter) reports 47 CFR 15.205 restricted-band overlap "
+        "(15.209 limits apply there); 'unintentional' (clock oscillator, crystal, "
+        "digital logic) never reports a 15.205 restriction and labels each harmonic "
+        "'check 15.109 limit'; 'unspecified' (default) reports the 15.205 table overlap "
+        "as a frequency fact only, with in_fcc_restricted = null."
+    ),
+)
+def lookup_harmonic_victims(
+    f_center_hz: Annotated[float, Field(gt=0)],
+    harmonic_orders: list[int] | None = None,
+    source_type: Literal["intentional", "unintentional", "unspecified"] = "unspecified",
+) -> Envelope[list[dict[str, Any]]]:
+    return _wrap(_lookup_harmonic_victims, f_center_hz, harmonic_orders, source_type=source_type)
+
+
+@mcp.tool(
+    annotations=DEFAULT_TOOL_ANNOTATIONS,
+    description=(
+        "Compute the multi-radio coex aggressor × victim matrix. Radios are matched by "
+        "name; every unordered pair is enumerated once (n_pairs_analyzed = N(N-1)/2 for "
+        "N radios that can interact) and analysed in each TX->RX direction. An emission "
+        "inside the victim band is 'in_band' (adds to rx.noise_floor_dbm; attenuated only "
+        "by the aggressor TX filter: tx.tx_filter_rejection_db on harmonics, never on the "
+        "fundamental). An aggressor fundamental outside the victim band is "
+        "'out_of_band_blocker' (attenuated by rx.rx_filter_rejection_db, compared with "
+        "rx.blocking_spec_dbm / rx.p1db_in_dbm; listed in not_evaluated if neither is "
+        "given). RX entries may set victim_type='gnss' to switch to the "
         "GNSS-specific model: broadband PA noise at the GNSS frequency "
         "(rx.pa_broadband_noise_dbm_hz_at_offset or tx.broadband_noise_dbm_hz, "
         "default -150 dBm/Hz) plus chip-rate-spread in-band CW landings, "
@@ -521,21 +565,58 @@ def compute_antenna_isolation_estimate(
 
 @mcp.tool(
     annotations=DEFAULT_TOOL_ANNOTATIONS,
-    description="Predict RX desense from an aggressor TX with filter and antenna isolation.",
+    description=(
+        "Predict RX desense from an aggressor for ONE declared mechanism (required; "
+        "no default). P_rx = aggressor_power_dbm - filter_rejection_db - antenna_iso_db. "
+        "mechanism='in_band': spur/harmonic/TX noise inside the victim channel adds to "
+        "the noise floor; needs victim_noise_floor_dbm (integrated channel noise, not "
+        "sensitivity); desense_db = 10log10(1 + 10^((P_rx - N)/10)), "
+        "desense_margin_db = max_desense_db - desense_db. "
+        "mechanism='out_of_band_blocker': does NOT add to the noise floor; needs "
+        "victim_blocking_spec_dbm and/or victim_p1db_in_dbm; margin = spec - P_rx "
+        "(min of the two). mechanism='reciprocal_mixing': needs lo_phase_noise_dbc_hz "
+        "at the blocker offset, victim_bandwidth_hz and victim_noise_floor_dbm; "
+        "I_rm = P_rx + PN + 10log10(BW), then treated as in-band noise. Missing "
+        "inputs return a structured error (metadata.missing_inputs)."
+    ),
 )
 def compute_desense(
     aggressor_power_dbm: float,
     filter_rejection_db: Annotated[float, Field(ge=0)],
     antenna_iso_db: Annotated[float, Field(ge=0)],
-    victim_noise_floor_dbm: float,
+    victim_noise_floor_dbm: float | None = None,
+    mechanism: Literal["in_band", "out_of_band_blocker", "reciprocal_mixing"] | None = None,
+    victim_blocking_spec_dbm: float | None = None,
+    victim_p1db_in_dbm: float | None = None,
+    lo_phase_noise_dbc_hz: float | None = None,
+    victim_bandwidth_hz: Annotated[float | None, Field(gt=0)] = None,
+    victim_sensitivity_dbm: float | None = None,
+    max_desense_db: Annotated[float, Field(gt=0)] = 1.0,
 ) -> Envelope[dict[str, Any]]:
-    return _wrap(
-        _compute_desense,
-        aggressor_power_dbm,
-        filter_rejection_db,
-        antenna_iso_db,
-        victim_noise_floor_dbm,
-    )
+    timer = Timer()
+    try:
+        data = _compute_desense(
+            aggressor_power_dbm,
+            filter_rejection_db,
+            antenna_iso_db,
+            victim_noise_floor_dbm,
+            mechanism=mechanism,
+            victim_blocking_spec_dbm=victim_blocking_spec_dbm,
+            victim_p1db_in_dbm=victim_p1db_in_dbm,
+            lo_phase_noise_dbc_hz=lo_phase_noise_dbc_hz,
+            victim_bandwidth_hz=victim_bandwidth_hz,
+            victim_sensitivity_dbm=victim_sensitivity_dbm,
+            max_desense_db=max_desense_db,
+        )
+    except DesenseInputError as exc:
+        return error(
+            f"compute_desense failed: {exc}",
+            metadata=exc.details(),
+            tool_version=__version__,
+        )
+    except Exception as exc:
+        return error(f"compute_desense failed: {exc}", tool_version=__version__)
+    return ok(data, runtime_sec=timer.elapsed(), tool_version=__version__)
 
 
 # -------- Touchstone utilities --------

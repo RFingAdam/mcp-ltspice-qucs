@@ -73,6 +73,20 @@ _FCC_15B_CLASS_B = [
 ]
 
 
+# CISPR 22 / 32 Class A limits, conducted mains port, dBuV (quasi-peak).
+# Identical to 47 CFR 15.107(b) (Class A digital device):
+#   0.15-0.50 MHz : 79 dBuV (constant)
+#   0.50-30.0 MHz : 73 dBuV (constant: step down at 0.5 MHz)
+# Class A is NOT "Class B + 10 dB": the offset is 13 dB at 150 kHz,
+# 23 dB just below 500 kHz, 17 dB from 0.5-5 MHz and 13 dB above 5 MHz.
+_CISPR22_CLASS_A_QP = [
+    (150e3, 79.0),
+    (500e3, 79.0),
+    (500.001e3, 73.0),
+    (30e6, 73.0),
+]
+
+
 def cispr_limit_at(
     freq_hz: float,
     *,
@@ -83,8 +97,7 @@ def cispr_limit_at(
     if standard == "cispr22_b" or standard == "fcc15b_b":
         table = _CISPR22_CLASS_B_QP
     elif standard == "cispr22_a":
-        # Class A is +10 dB above Class B
-        return cispr_limit_at(freq_hz, standard="cispr22_b") + 10
+        table = _CISPR22_CLASS_A_QP
     else:
         raise ValueError(f"Unknown standard: {standard}")
 

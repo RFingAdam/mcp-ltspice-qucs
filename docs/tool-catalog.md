@@ -1,7 +1,7 @@
 # Tool Catalog
 
 <!-- BEGIN GENERATED -->
-Three servers, **140 primary tools** total. Frequencies are always Hz on the
+Three servers, **141 primary tools** total. Frequencies are always Hz on the
 wire; every tool returns the [Envelope](reference/envelope.md) shape.
 `mcp-ltspice` additionally registers 59 deprecated namespaced aliases (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) for its primary tools; only primaries are listed here.
 
@@ -125,18 +125,18 @@ after adding or changing tools.)*
     | `synthesize_stepped_impedance_lpf` | Synthesize a stepped-impedance microstrip LPF (Pozar §8.6) from a lumped LPF ladder: series inductors become short high-Z sections (βl = ω_c·L/Z_h), shunt ca… |
     | `workspace_create` | Create a durable server-owned workspace for Qucs circuit artifacts. |
 
-=== "mcp-rf-analysis (35 tools)"
+=== "mcp-rf-analysis (36 tools)"
 
     | Tool | Purpose |
     |---|---|
     | `cascade_networks` | Cascade two or more 2-port networks (left-to-right). |
-    | `check_coex_matrix` | Compute the multi-radio coex aggressor × victim matrix with predicted desense. |
+    | `check_coex_matrix` | Compute the multi-radio coex aggressor × victim matrix. |
     | `check_passband_compliance` | Check passband insertion loss + return loss across [f_start, f_stop]. |
     | `check_rejection_at` | Check |S21| at a single frequency against a min-rejection target. |
     | `cispr_limit_at` | Conducted-emissions limit (dBuV) at a frequency for CISPR 22 / FCC 15B. |
     | `compare_sparameters` | Compare two .s2p files (S21 dB / S11 dB / magnitude / phase) on the union of their measured points inside the overlapping frequency span. |
     | `compute_antenna_isolation_estimate` | Estimate antenna-to-antenna isolation in dB. |
-    | `compute_desense` | Predict RX desense from an aggressor TX with filter and antenna isolation. |
+    | `compute_desense` | Predict RX desense from an aggressor for ONE declared mechanism (required; no default). |
     | `compute_path_loss` | Compute Friis or log-distance path loss in dB. |
     | `compute_stability` | Compute Rollett K-factor + |Δ| + μ-factor across frequency. |
     | `deembed_network` | De-embed left/right fixtures from a measured 2-port network. |
@@ -145,6 +145,7 @@ after adding or changing tools.)*
     | `evaluate_against_spec_template` | Evaluate a .s2p against a bundled spec template (FCC / ETSI / 3GPP). |
     | `extract_delay` | Compute group delay (or unwrapped phase) of S21. |
     | `eye_diagram_from_s2p` | Compute eye-diagram metrics for a channel given its S2P. |
+    | `fcc_15247_spurious_limit_tool` | 47 CFR 15.247(d) spurious-emission limit at a frequency for a 15.247 transmitter. |
     | `fcc_part15_radiated_limit_at` | FCC Part 15.109 Class B radiated-emissions limit (dBuV/m) at distance. |
     | `fit_equivalent_circuit` | Fit a lumped equivalent circuit to a measured 2-port and report bounded-solver convergence, residuals, identifiability, and valid range. |
     | `is_in_restricted_band_tool` | Check whether a frequency falls into an FCC restricted band. |
@@ -156,7 +157,7 @@ after adding or changing tools.)*
     | `list_lte_bands_tool` | List LTE bands. |
     | `list_spec_templates_tool` | List names of bundled spec templates. |
     | `lookup_band_by_freq_tool` | Find every band/system that contains a given frequency. |
-    | `lookup_harmonic_victims` | For a TX center frequency, find which RX bands its 2nd / 3rd / etc. |
+    | `lookup_harmonic_victims` | For a TX or oscillator center frequency, find which RX bands its 2nd / 3rd / etc. |
     | `place_zeros_for_coex` | Compute optimal elliptic-filter transmission-zero frequencies for coexistence: for each harmonic landing [n·f_lo, n·f_hi], the zero goes at the severity-weig… |
     | `predict_conducted_emissions` | Convert an AC line-current spectrum to LISN voltage and check against CISPR 22 / FCC 15B conducted-emissions limits. |
     | `predict_radiated_emissions_loop` | Estimate radiated E-field from a current-carrying loop (small-loop approximation). |
