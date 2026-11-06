@@ -497,13 +497,18 @@ def _analyse_direction(
         # real-world GNSS desense mechanism for co-located transmitters).
         # The PA noise sits at the GNSS frequency, i.e. inside the GNSS
         # passband, so the GNSS receiver's filter cannot reject it. Only a
-        # filter on the aggressor side (``noise_filter_rejection_db``: TX
-        # filter rejection at the GNSS frequency) and isolation reduce it.
+        # filter on the aggressor side and isolation reduce it. The
+        # aggressor filter's rejection at this victim's frequency comes from
+        # the victim entry (``aggressor_filter_rejection_db``) when given, so
+        # each GNSS band gets the rejection at its own frequency, else from
+        # the transmitter (``noise_filter_rejection_db``).
         pa_noise = rx.get(
             "pa_broadband_noise_dbm_hz_at_offset",
             tx.get("broadband_noise_dbm_hz", GNSS_DEFAULT_PA_NOISE_DBM_HZ),
         )
-        tx_noise_rej = tx.get("noise_filter_rejection_db", 0.0)
+        tx_noise_rej = rx.get(
+            "aggressor_filter_rejection_db", tx.get("noise_filter_rejection_db", 0.0)
+        )
         i0 = pa_noise - tx_noise_rej - antenna_iso_db
         matrix.append(
             _gnss_entry(

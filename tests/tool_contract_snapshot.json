@@ -1000,7 +1000,7 @@
         "canonical_name": null,
         "deprecated": false,
         "name": "check_coex_matrix",
-        "sha256": "d3ac551bd117fd5f5a6f1c862b5fa7057ca8fddc93e150a7ba5ffbd8ba675c9d"
+        "sha256": "37128f42735adf4642657c0f1e0e2575c943af35e8cccbac8f4d950d10669848"
       },
       {
         "canonical_name": null,
@@ -1036,7 +1036,7 @@
         "canonical_name": null,
         "deprecated": false,
         "name": "compute_desense",
-        "sha256": "05bd00ad67f6f6ee8c51b92055e7398ce632e877f85820964c384975ec696133"
+        "sha256": "98c25458d32288acdbf49f052f43e09c963ed1378a0c5f90029cde490ad3cbbe"
       },
       {
         "canonical_name": null,
@@ -1085,6 +1085,12 @@
         "deprecated": false,
         "name": "eye_diagram_from_s2p",
         "sha256": "da091eba59c5dfcb178d9755b889d9663cfb7b806c815d66e84a706823269898"
+      },
+      {
+        "canonical_name": null,
+        "deprecated": false,
+        "name": "fcc_15247_spurious_limit_tool",
+        "sha256": "f23bd158dc5c0ce34c3b55430d40517649be4319ebe2cce0f2b329626608788c"
       },
       {
         "canonical_name": null,
@@ -1156,7 +1162,7 @@
         "canonical_name": null,
         "deprecated": false,
         "name": "lookup_harmonic_victims",
-        "sha256": "37ded81880bf73d8d1892084d38e4d36175a545f283212c2d0be03c5455a9c61"
+        "sha256": "9a3b0775f8d9a0b984355853de977bf0f358b1c8ba31509f8385cb89cd4523eb"
       },
       {
         "canonical_name": null,

@@ -82,6 +82,17 @@ def test_broadband_pa_noise_not_reduced_by_gnss_rx_filter() -> None:
     )
     assert r2["i0_dbm_hz"] == pytest.approx(-200.0)
 
+    # Per-victim value: the aggressor filter's rejection at this victim's
+    # own frequency overrides the transmitter-wide figure.
+    victim = {**GPS_L1_WITH_SAW, "aggressor_filter_rejection_db": 25.0}
+    r3 = next(
+        r
+        for r in _rows(tx_filtered, victim, iso=20.0)["matrix"]
+        if r["mechanism"] == "broadband_noise"
+    )
+    assert r3["i0_dbm_hz"] == pytest.approx(-195.0)
+    assert r3["assumptions"]["tx_noise_filter_rejection_db"] == pytest.approx(25.0)
+
 
 def test_out_of_band_fundamental_is_a_blocker_with_gnss_rx_filter() -> None:
     """Hand check. Fundamental 915 MHz at 30 dBm is outside L1, so it is a
