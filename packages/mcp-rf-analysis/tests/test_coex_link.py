@@ -53,10 +53,13 @@ def test_compute_desense_high_concern() -> None:
         filter_rejection_db=10,
         antenna_iso_db=15,
         victim_noise_floor_dbm=-97,
+        mechanism="in_band",
     )
     assert res["received_at_rx_dbm"] == -5  # 20-10-15
     assert res["concern_level"] == "critical"
-    assert res["snr_margin_db"] < -30
+    # I/N = +92 dB, so the floor rises by ~92 dB.
+    assert res["desense_db"] == pytest.approx(92.0, abs=0.01)
+    assert res["desense_margin_db"] < -30
 
 
 def test_compute_desense_no_concern() -> None:
@@ -65,6 +68,7 @@ def test_compute_desense_no_concern() -> None:
         filter_rejection_db=60,
         antenna_iso_db=30,
         victim_noise_floor_dbm=-97,
+        mechanism="in_band",
     )
     # P_rx = 23-60-30 = -67 dBm, well above noise floor (-97), so margin is -30 → "high"
     # But snr_margin = -97 - (-67) = -30 → boundary; concern depends on cutoff.

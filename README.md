@@ -141,14 +141,14 @@ before treating that number as production evidence.
 
 ## Tools
 
-`mcp-ltspice-qucs` ships three MCP servers with 140 primary tools
+`mcp-ltspice-qucs` ships three MCP servers with 141 primary tools
 (199 registrations when the 59 deprecated `mcp-ltspice` aliases are included):
 
 | Server                | Tools | Purpose                                                                 |
 | --------------------- | ----: | ----------------------------------------------------------------------- |
 | **`mcp-ltspice`**     | 76    | LTspice + ngspice. Circuit IR import/export, durable jobs/artifacts, generic model-aware optimization, LC ladder synthesis, coex-driven design, Monte Carlo, SMPS sizing + EMC, active filters, device catalogs |
 | **`mcp-qucs-s`**      | 29    | Qucs schematic/netlist IR import/export, durable simulation jobs, native S-param simulation + Xyce harmonic balance, microstrip + 16 substrate presets, couplers, and distributed filters |
-| **`mcp-rf-analysis`** | 35    | Touchstone I/O, skrf wrappers, readiness probing, LTE / 5G NR / ISM / HaLow / GNSS bands, FCC / ETSI / 3GPP eval, coex matrix with GNSS ΔC/N₀ model, victim-weighted zero placement, EMC predictors |
+| **`mcp-rf-analysis`** | 36    | Touchstone I/O, skrf wrappers, readiness probing, LTE / 5G NR / ISM / HaLow / GNSS bands, FCC / ETSI / 3GPP eval, coex matrix with GNSS ΔC/N₀ model, victim-weighted zero placement, EMC predictors |
 
 The underscore-separated names are canonical. The categorised dotted aliases
 (`filter.*`, `power.*`, `analog.*`, `digital.*`, `vendor.*`, `sim.*`) are
@@ -210,7 +210,7 @@ full boundary statement, decision flow, and cross-MCP workflow examples.
 ## Documentation
 
 - **[Getting started](docs/getting-started.md)**: install through first call.
-- **[Tool catalog](docs/tool-catalog.md)**. All 140 primary tools, per-server pages under [`docs/tools/`](docs/tools/).
+- **[Tool catalog](docs/tool-catalog.md)**. All 141 primary tools, per-server pages under [`docs/tools/`](docs/tools/).
 - **[Backend matrix](docs/backend-matrix.md)**: runtime readiness and CI validation tiers.
 - **[Migration guide](docs/migration-0.5.md)**: canonical names, error semantics, jobs, and numerical changes.
 - **[Usage example](docs/usage.md)**: practical end-to-end walkthrough.

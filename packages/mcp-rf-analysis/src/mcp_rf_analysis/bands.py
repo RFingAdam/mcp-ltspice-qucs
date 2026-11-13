@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import functools
 import json
+import math
 from importlib import resources
 from typing import Any, cast
 
@@ -140,3 +141,99 @@ def is_in_restricted_band(freq_hz: float) -> tuple[bool, dict[str, Any] | None]:
         if r["f_low"] <= freq_hz <= r["f_high"]:
             return True, r
     return False, None
+
+
+#: Far-field field strength to EIRP: EIRP_W = (E * d)^2 / 30, so
+#: EIRP(dBm) = E(dBuV/m) + 20*log10(d_m) - 104.77.
+FIELD_TO_EIRP_CONST_DB = 104.77
+
+
+def field_strength_to_eirp_dbm(e_dbuv_m: float, distance_m: float) -> float:
+    """EIRP (dBm) of an isotropic source producing ``e_dbuv_m`` at ``distance_m``."""
+    return e_dbuv_m + 20.0 * math.log10(distance_m) - FIELD_TO_EIRP_CONST_DB
+
+
+def fcc_15247_spurious_limit(
+    freq_hz: float,
+    *,
+    inband_peak_dbm_100khz: float | None = None,
+    power_method: str = "peak",
+) -> dict[str, Any]:
+    """Spurious-emission limit for a 47 CFR 15.247 transmitter at ``freq_hz``.
+
+    - Inside a 15.205(a) restricted band: the absolute 15.209(a) field
+      strength (15.247(d), see 15.205(c)), also given as EIRP via
+      :func:`field_strength_to_eirp_dbm`.
+    - Outside: relative to the highest in-band 100 kHz level, at least
+      20 dB below it (``power_method="peak"``) or 30 dB below it when the
+      conducted power was shown with RMS averaging per 15.247(b)(3)
+      (``power_method="average"``). Attenuation below the 15.209(a) general
+      limit is not required, so the limit never goes below that level.
+      Needs ``inband_peak_dbm_100khz``; without it the relative rule is
+      returned with ``limit_dbm_100khz`` None.
+    """
+    if power_method not in ("peak", "average"):
+        raise ValueError("power_method must be 'peak' or 'average' (15.247(b)(3) RMS averaging)")
+    spur = _load_limit_json("fcc")["spurious_emissions_15_247_d"]
+    restricted, info = is_in_restricted_band(freq_hz)
+
+    row_209 = None
+    for row in spur["in_restricted_bands"]["table_15_209_a"]:
+        hi = row["f_high"] if row["f_high"] is not None else float("inf")
+        if row["f_low"] <= freq_hz < hi or (row["f_high"] is not None and freq_hz == row["f_high"]):
+            row_209 = row
+            break
+    floor_eirp = (
+        field_strength_to_eirp_dbm(row_209["limit_dbuv_m"], row_209["distance_m"])
+        if row_209
+        else None
+    )
+
+    if restricted:
+        if row_209 is None:
+            return {
+                "freq_hz": freq_hz,
+                "in_restricted_band": True,
+                "restricted_band": info,
+                "rule": "15.209(a) field strength",
+                "limit_eirp_dbm": None,
+                "note": spur["in_restricted_bands"]["below_30_mhz"],
+                "citation": spur["citation"],
+            }
+        return {
+            "freq_hz": freq_hz,
+            "in_restricted_band": True,
+            "restricted_band": info,
+            "rule": "15.209(a) field strength (15.247(d), see 15.205(c))",
+            "limit_dbuv_m": row_209["limit_dbuv_m"],
+            "limit_uv_m": row_209["limit_uv_m"],
+            "distance_m": row_209["distance_m"],
+            "detector": row_209["detector"],
+            "limit_eirp_dbm": floor_eirp,
+            "eirp_conversion": spur["in_restricted_bands"]["eirp_conversion"],
+            "citation": spur["citation"],
+        }
+
+    rel = spur["outside_restricted_bands"]
+    atten = (
+        rel["min_attenuation_db_average_power_method"]
+        if power_method == "average"
+        else rel["min_attenuation_db_peak_power_method"]
+    )
+    limit = None
+    if inband_peak_dbm_100khz is not None:
+        limit = inband_peak_dbm_100khz - atten
+        if floor_eirp is not None:
+            limit = max(limit, floor_eirp)
+    return {
+        "freq_hz": freq_hz,
+        "in_restricted_band": False,
+        "rule": f"relative: >= {atten} dB below the highest in-band 100 kHz level (15.247(d))",
+        "min_attenuation_db": atten,
+        "power_method": power_method,
+        "inband_peak_dbm_100khz": inband_peak_dbm_100khz,
+        "limit_dbm_100khz": limit,
+        "floor_15_209_eirp_dbm": floor_eirp,
+        "floor_note": rel["floor"],
+        "citation": rel["citation"],
+    }

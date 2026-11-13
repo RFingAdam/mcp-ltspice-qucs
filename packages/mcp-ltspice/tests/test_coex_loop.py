@@ -106,9 +106,10 @@ def test_gnss_victim_flows_through_with_cn0_metric() -> None:
     assert gnss_rows, "GNSS victim must appear in the final matrix"
     assert all("delta_cn0_db_hz" in r for r in gnss_rows)
     bb = [r for r in gnss_rows if r["mechanism"] == "broadband_noise"]
-    assert bb and bb[0]["assumptions"]["filter_rejection_at_victim_db"] > 20.0, (
-        "the realized filter's rejection at L1 must be injected into the GNSS model"
+    assert bb and bb[0]["assumptions"]["tx_noise_filter_rejection_db"] > 20.0, (
+        "the realized TX filter's rejection at L1 must reduce the PA noise in the GNSS model"
     )
+    assert bb[0]["assumptions"]["rx_filter_rejection_db"] == 0.0
 
 
 def test_zeros_plan_is_reported_with_the_filter() -> None:

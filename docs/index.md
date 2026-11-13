@@ -25,7 +25,7 @@ human engineer in the loop for judgment calls.
 |---|---|---|
 | [`mcp-ltspice`](tools/ltspice.md) | LTspice (Wine) + ngspice fallback, CircuitDocument import/export, durable jobs/artifacts, model-aware generic optimization, filter synthesis, S-parameter extraction, Monte Carlo | 76 |
 | [`mcp-qucs-s`](tools/qucs-s.md) | Qucs schematic/netlist import/export, durable simulation jobs, native S-parameters/noise, Xyce harmonic balance, microstrip + distributed-element synthesis | 29 |
-| [`mcp-rf-analysis`](tools/rf-analysis.md) | Simulator-agnostic skrf wrappers/readiness probing, LTE/5G NR/GNSS/ISM/HaLow band databases, FCC/ETSI/3GPP spec evaluation, multi-radio coex matrix | 35 |
+| [`mcp-rf-analysis`](tools/rf-analysis.md) | Simulator-agnostic skrf wrappers/readiness probing, LTE/5G NR/GNSS/ISM/HaLow band databases, FCC/ETSI/3GPP spec evaluation, multi-radio coex matrix | 36 |
 
 All three speak **Touchstone** (`.s2p` / `.snp`) as the cross-tool
 exchange format and return a uniform [response envelope](reference/envelope.md).
